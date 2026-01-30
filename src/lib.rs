@@ -3,7 +3,7 @@
 //! `ln` is a vector-based 3D renderer written in Rust. It is used to produce 2D
 //! vector graphics (think SVGs) depicting 3D scenes.
 //!
-//! *The output of an OpenGL pipeline is a rastered image. The output of `ln` is
+//! *The output of an OpenGL pipeline is a rasterized image. The output of `ln` is
 //! a set of 2D vector paths.*
 //!
 //! ## Quick Start
