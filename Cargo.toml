@@ -14,5 +14,41 @@ name = "example0"
 path = "examples/example0.rs"
 
 [[example]]
+name = "example1"
+path = "examples/example1.rs"
+
+[[example]]
 name = "csg"
 path = "examples/csg.rs"
+
+[[example]]
+name = "beads"
+path = "examples/beads.rs"
+
+[[example]]
+name = "function"
+path = "examples/function.rs"
+
+[[example]]
+name = "graph"
+path = "examples/graph.rs"
+
+[[example]]
+name = "outline"
+path = "examples/outline.rs"
+
+[[example]]
+name = "skyscrapers"
+path = "examples/skyscrapers.rs"
+
+[[example]]
+name = "slicer"
+path = "examples/slicer.rs"
+
+[[example]]
+name = "suzanne"
+path = "examples/suzanne.rs"
+
+[[example]]
+name = "test"
+path = "examples/test.rs"
