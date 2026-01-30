@@ -1,6 +1,52 @@
+//! 4x4 transformation matrices.
+//!
+//! This module provides the [`Matrix`] struct for 3D transformations including
+//! translation, rotation, scaling, and projection.
+//!
+//! # Example
+//!
+//! ```
+//! use ln::{Matrix, Vector, radians};
+//!
+//! // Create a rotation matrix (45 degrees around Z axis)
+//! let rotation = Matrix::rotate(Vector::new(0.0, 0.0, 1.0), radians(45.0));
+//!
+//! // Create a translation matrix
+//! let translation = Matrix::translate(Vector::new(1.0, 2.0, 3.0));
+//!
+//! // Combine transformations
+//! let combined = rotation.translated(Vector::new(1.0, 2.0, 3.0));
+//! ```
+
 use crate::ray::Ray;
 use crate::vector::Vector;
 
+/// A 4x4 transformation matrix.
+///
+/// `Matrix` represents affine and projective transformations in 3D space.
+/// It is used for positioning shapes, camera transformations, and projections.
+///
+/// # Matrix Layout
+///
+/// The matrix is stored in row-major order:
+/// ```text
+/// | x00 x01 x02 x03 |
+/// | x10 x11 x12 x13 |
+/// | x20 x21 x22 x23 |
+/// | x30 x31 x32 x33 |
+/// ```
+///
+/// # Example
+///
+/// ```
+/// use ln::{Matrix, Vector, radians};
+///
+/// // Transform a point
+/// let transform = Matrix::translate(Vector::new(1.0, 0.0, 0.0));
+/// let point = Vector::new(0.0, 0.0, 0.0);
+/// let transformed = transform.mul_position(point);
+/// assert!((transformed.x - 1.0).abs() < 1e-10);
+/// ```
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Matrix {
     pub x00: f64, pub x01: f64, pub x02: f64, pub x03: f64,
@@ -10,6 +56,7 @@ pub struct Matrix {
 }
 
 impl Matrix {
+    /// Returns the 4x4 identity matrix.
     pub fn identity() -> Self {
         Matrix {
             x00: 1.0, x01: 0.0, x02: 0.0, x03: 0.0,
@@ -19,6 +66,17 @@ impl Matrix {
         }
     }
 
+    /// Creates a translation matrix.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use ln::{Matrix, Vector};
+    ///
+    /// let t = Matrix::translate(Vector::new(1.0, 2.0, 3.0));
+    /// let p = t.mul_position(Vector::new(0.0, 0.0, 0.0));
+    /// assert!((p.x - 1.0).abs() < 1e-10);
+    /// ```
     pub fn translate(v: Vector) -> Self {
         Matrix {
             x00: 1.0, x01: 0.0, x02: 0.0, x03: v.x,
@@ -28,6 +86,7 @@ impl Matrix {
         }
     }
 
+    /// Creates a scale matrix.
     pub fn scale(v: Vector) -> Self {
         Matrix {
             x00: v.x, x01: 0.0, x02: 0.0, x03: 0.0,
@@ -37,6 +96,18 @@ impl Matrix {
         }
     }
 
+    /// Creates a rotation matrix.
+    ///
+    /// Rotates around the axis `v` by angle `a` (in radians).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use ln::{Matrix, Vector, radians};
+    ///
+    /// // Rotate 90 degrees around Z axis
+    /// let r = Matrix::rotate(Vector::new(0.0, 0.0, 1.0), radians(90.0));
+    /// ```
     pub fn rotate(v: Vector, a: f64) -> Self {
         let v = v.normalize();
         let s = a.sin();
@@ -62,6 +133,7 @@ impl Matrix {
         }
     }
 
+    /// Creates a frustum projection matrix.
     pub fn frustum(l: f64, r: f64, b: f64, t: f64, n: f64, f: f64) -> Self {
         let t1 = 2.0 * n;
         let t2 = r - l;
@@ -75,6 +147,7 @@ impl Matrix {
         }
     }
 
+    /// Creates an orthographic projection matrix.
     pub fn orthographic(l: f64, r: f64, b: f64, t: f64, n: f64, f: f64) -> Self {
         Matrix {
             x00: 2.0 / (r - l), x01: 0.0, x02: 0.0, x03: -(r + l) / (r - l),
@@ -84,12 +157,27 @@ impl Matrix {
         }
     }
 
+    /// Creates a perspective projection matrix.
+    ///
+    /// # Arguments
+    ///
+    /// * `fovy` - Vertical field of view in degrees
+    /// * `aspect` - Aspect ratio (width / height)
+    /// * `near` - Near clipping plane distance
+    /// * `far` - Far clipping plane distance
     pub fn perspective(fovy: f64, aspect: f64, near: f64, far: f64) -> Self {
         let ymax = near * (fovy * std::f64::consts::PI / 360.0).tan();
         let xmax = ymax * aspect;
         Self::frustum(-xmax, xmax, -ymax, ymax, near, far)
     }
 
+    /// Creates a view matrix looking at a target point.
+    ///
+    /// # Arguments
+    ///
+    /// * `eye` - Camera position
+    /// * `center` - Point to look at
+    /// * `up` - Up direction vector
     pub fn look_at(eye: Vector, center: Vector, up: Vector) -> Self {
         let up = up.normalize();
         let f = center.sub(eye).normalize();
@@ -104,30 +192,37 @@ impl Matrix {
         m.inverse()
     }
 
+    /// Returns a new matrix with a translation applied.
     pub fn translated(&self, v: Vector) -> Matrix {
         Matrix::translate(v).mul(self)
     }
 
+    /// Returns a new matrix with a scale applied.
     pub fn scaled(&self, v: Vector) -> Matrix {
         Matrix::scale(v).mul(self)
     }
 
+    /// Returns a new matrix with a rotation applied.
     pub fn rotated(&self, v: Vector, a: f64) -> Matrix {
         Matrix::rotate(v, a).mul(self)
     }
 
+    /// Returns a new matrix with a frustum projection applied.
     pub fn with_frustum(&self, l: f64, r: f64, b: f64, t: f64, n: f64, f: f64) -> Matrix {
         Matrix::frustum(l, r, b, t, n, f).mul(self)
     }
 
+    /// Returns a new matrix with an orthographic projection applied.
     pub fn with_orthographic(&self, l: f64, r: f64, b: f64, t: f64, n: f64, f: f64) -> Matrix {
         Matrix::orthographic(l, r, b, t, n, f).mul(self)
     }
 
+    /// Returns a new matrix with a perspective projection applied.
     pub fn with_perspective(&self, fovy: f64, aspect: f64, near: f64, far: f64) -> Matrix {
         Matrix::perspective(fovy, aspect, near, far).mul(self)
     }
 
+    /// Multiplies this matrix by another matrix.
     pub fn mul(&self, b: &Matrix) -> Matrix {
         let a = self;
         Matrix {
@@ -150,6 +245,7 @@ impl Matrix {
         }
     }
 
+    /// Transforms a position (point) by this matrix.
     pub fn mul_position(&self, b: Vector) -> Vector {
         let x = self.x00 * b.x + self.x01 * b.y + self.x02 * b.z + self.x03;
         let y = self.x10 * b.x + self.x11 * b.y + self.x12 * b.z + self.x13;
@@ -157,6 +253,7 @@ impl Matrix {
         Vector::new(x, y, z)
     }
 
+    /// Transforms a position with perspective divide.
     pub fn mul_position_w(&self, b: Vector) -> Vector {
         let x = self.x00 * b.x + self.x01 * b.y + self.x02 * b.z + self.x03;
         let y = self.x10 * b.x + self.x11 * b.y + self.x12 * b.z + self.x13;
@@ -165,6 +262,10 @@ impl Matrix {
         Vector::new(x / w, y / w, z / w)
     }
 
+    /// Transforms a direction vector by this matrix.
+    ///
+    /// Unlike `mul_position`, this ignores the translation component
+    /// and normalizes the result.
     pub fn mul_direction(&self, b: Vector) -> Vector {
         let x = self.x00 * b.x + self.x01 * b.y + self.x02 * b.z;
         let y = self.x10 * b.x + self.x11 * b.y + self.x12 * b.z;
@@ -172,10 +273,12 @@ impl Matrix {
         Vector::new(x, y, z).normalize()
     }
 
+    /// Transforms a ray by this matrix.
     pub fn mul_ray(&self, b: Ray) -> Ray {
         Ray::new(self.mul_position(b.origin), self.mul_direction(b.direction))
     }
 
+    /// Transforms a bounding box by this matrix.
     pub fn mul_box(&self, bx: crate::bounding_box::Box) -> crate::bounding_box::Box {
         let r = Vector::new(self.x00, self.x10, self.x20);
         let u = Vector::new(self.x01, self.x11, self.x21);
@@ -195,6 +298,7 @@ impl Matrix {
         crate::bounding_box::Box { min, max }
     }
 
+    /// Returns the transpose of this matrix.
     pub fn transpose(&self) -> Matrix {
         Matrix {
             x00: self.x00, x01: self.x10, x02: self.x20, x03: self.x30,
@@ -204,6 +308,7 @@ impl Matrix {
         }
     }
 
+    /// Computes the determinant of this matrix.
     pub fn determinant(&self) -> f64 {
         let a = self;
         a.x00 * a.x11 * a.x22 * a.x33 - a.x00 * a.x11 * a.x23 * a.x32 +
@@ -220,6 +325,7 @@ impl Matrix {
         a.x03 * a.x12 * a.x20 * a.x31 + a.x03 * a.x12 * a.x21 * a.x30
     }
 
+    /// Computes the inverse of this matrix.
     pub fn inverse(&self) -> Matrix {
         let a = self;
         let d = self.determinant();

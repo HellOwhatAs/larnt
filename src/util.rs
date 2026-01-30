@@ -1,7 +1,32 @@
+//! Utility functions.
+//!
+//! This module provides utility functions for angle conversion, median computation,
+//! and parsing.
+
+/// Converts degrees to radians.
+///
+/// # Example
+///
+/// ```
+/// use ln::radians;
+///
+/// let rad = radians(90.0);
+/// assert!((rad - std::f64::consts::PI / 2.0).abs() < 1e-10);
+/// ```
 pub fn radians(degrees: f64) -> f64 {
     degrees * std::f64::consts::PI / 180.0
 }
 
+/// Converts radians to degrees.
+///
+/// # Example
+///
+/// ```
+/// use ln::degrees;
+///
+/// let deg = degrees(std::f64::consts::PI);
+/// assert!((deg - 180.0).abs() < 1e-10);
+/// ```
 pub fn degrees(radians: f64) -> f64 {
     radians * 180.0 / std::f64::consts::PI
 }

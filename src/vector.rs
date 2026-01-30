@@ -1,18 +1,67 @@
+//! 3D vector mathematics.
+//!
+//! This module provides the [`Vector`] struct for 3D vector operations.
+//! Vectors are used throughout `ln` for positions, directions, and colors.
+//!
+//! # Example
+//!
+//! ```
+//! use ln::Vector;
+//!
+//! let a = Vector::new(1.0, 2.0, 3.0);
+//! let b = Vector::new(4.0, 5.0, 6.0);
+//!
+//! // Basic operations
+//! let sum = a.add(b);
+//! let diff = a.sub(b);
+//! let dot = a.dot(b);
+//! let cross = a.cross(b);
+//!
+//! // Normalize to unit length
+//! let normalized = a.normalize();
+//! assert!((normalized.length() - 1.0).abs() < 1e-10);
+//! ```
+
 use rand::Rng;
 use std::ops::{Add, Div, Mul, Sub};
 
+/// A 3D vector with x, y, and z components.
+///
+/// `Vector` is the fundamental type for 3D mathematics in `ln`. It supports
+/// standard vector operations like addition, subtraction, dot product, cross
+/// product, and normalization.
+///
+/// # Operator Overloading
+///
+/// `Vector` implements `Add`, `Sub`, `Mul`, and `Div` for both vector-vector
+/// and vector-scalar operations.
+///
+/// ```
+/// use ln::Vector;
+///
+/// let a = Vector::new(1.0, 2.0, 3.0);
+/// let b = Vector::new(2.0, 3.0, 4.0);
+///
+/// let sum = a + b;  // Vector addition
+/// let scaled = a * 2.0;  // Scalar multiplication
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Vector {
+    /// The x component.
     pub x: f64,
+    /// The y component.
     pub y: f64,
+    /// The z component.
     pub z: f64,
 }
 
 impl Vector {
+    /// Creates a new vector with the given components.
     pub fn new(x: f64, y: f64, z: f64) -> Self {
         Vector { x, y, z }
     }
 
+    /// Returns a random unit vector (uniformly distributed on the unit sphere).
     pub fn random_unit_vector() -> Self {
         let mut rng = rand::thread_rng();
         loop {
@@ -25,26 +74,42 @@ impl Vector {
         }
     }
 
+    /// Returns the length (magnitude) of this vector.
     pub fn length(&self) -> f64 {
         (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
     }
 
+    /// Returns the distance between this vector and another.
     pub fn distance(&self, other: Vector) -> f64 {
         self.sub(other).length()
     }
 
+    /// Returns the squared length of this vector.
+    ///
+    /// This is more efficient than `length()` when you only need to compare
+    /// distances, since it avoids the square root.
     pub fn length_squared(&self) -> f64 {
         self.x * self.x + self.y * self.y + self.z * self.z
     }
 
+    /// Returns the squared distance between this vector and another.
     pub fn distance_squared(&self, other: Vector) -> f64 {
         self.sub(other).length_squared()
     }
 
+    /// Returns the dot product of this vector and another.
+    ///
+    /// The dot product is useful for computing angles between vectors
+    /// and for projection operations.
     pub fn dot(&self, other: Vector) -> f64 {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
 
+    /// Returns the cross product of this vector and another.
+    ///
+    /// The cross product produces a vector perpendicular to both inputs.
+    /// The magnitude equals the area of the parallelogram formed by the
+    /// two vectors.
     pub fn cross(&self, other: Vector) -> Vector {
         Vector {
             x: self.y * other.z - self.z * other.y,

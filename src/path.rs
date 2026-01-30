@@ -1,3 +1,33 @@
+//! Path handling and output.
+//!
+//! This module provides types for working with 2D/3D paths and outputting
+//! them to various formats like PNG and SVG.
+//!
+//! # Types
+//!
+//! - [`Path`]: A single path (sequence of [`Vector`] points)
+//! - [`Paths`]: A collection of paths
+//!
+//! # Example
+//!
+//! ```no_run
+//! use ln::{Scene, Cube, Vector};
+//!
+//! let mut scene = Scene::new();
+//! scene.add(Cube::new(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)));
+//!
+//! let paths = scene.render(
+//!     Vector::new(4.0, 3.0, 2.0),
+//!     Vector::new(0.0, 0.0, 0.0),
+//!     Vector::new(0.0, 0.0, 1.0),
+//!     1024.0, 1024.0, 50.0, 0.1, 10.0, 0.01,
+//! );
+//!
+//! // Output to different formats
+//! paths.write_to_png("output.png", 1024.0, 1024.0);
+//! paths.write_to_svg("output.svg", 1024.0, 1024.0).unwrap();
+//! ```
+
 use crate::bounding_box::Box;
 use crate::filter::Filter;
 use crate::matrix::Matrix;
@@ -5,30 +35,53 @@ use crate::vector::Vector;
 use image::{ImageBuffer, Rgb};
 use std::io::Write;
 
+/// A single path represented as a sequence of 3D points.
 pub type Path = Vec<Vector>;
 
+/// A collection of paths.
+///
+/// `Paths` is the main output type from rendering. It contains a collection
+/// of polylines that can be filtered, transformed, and output to various formats.
+///
+/// # Example
+///
+/// ```
+/// use ln::{Paths, Vector};
+///
+/// // Create paths manually
+/// let paths = Paths::from_vec(vec![
+///     vec![Vector::new(0.0, 0.0, 0.0), Vector::new(1.0, 1.0, 0.0)],
+///     vec![Vector::new(1.0, 0.0, 0.0), Vector::new(0.0, 1.0, 0.0)],
+/// ]);
+/// ```
 #[derive(Debug, Clone, Default)]
 pub struct Paths {
+    /// The collection of paths.
     pub paths: Vec<Path>,
 }
 
 impl Paths {
+    /// Creates a new empty `Paths` collection.
     pub fn new() -> Self {
         Paths { paths: Vec::new() }
     }
 
+    /// Creates a `Paths` collection from a vector of paths.
     pub fn from_vec(paths: Vec<Path>) -> Self {
         Paths { paths }
     }
 
+    /// Adds a path to this collection.
     pub fn push(&mut self, path: Path) {
         self.paths.push(path);
     }
 
+    /// Extends this collection with paths from another.
     pub fn extend(&mut self, other: Paths) {
         self.paths.extend(other.paths);
     }
 
+    /// Returns the bounding box of all paths.
     pub fn bounding_box(&self) -> Box {
         if self.paths.is_empty() {
             return Box::default();
@@ -40,6 +93,7 @@ impl Paths {
         bx
     }
 
+    /// Applies a transformation matrix to all paths.
     pub fn transform(&self, matrix: &Matrix) -> Paths {
         let paths = self.paths.iter()
             .map(|path| path_transform(path, matrix))
@@ -47,6 +101,10 @@ impl Paths {
         Paths { paths }
     }
 
+    /// Subdivides paths into smaller segments.
+    ///
+    /// This is used internally for visibility testing. The `step` parameter
+    /// controls the maximum distance between consecutive points.
     pub fn chop(&self, step: f64) -> Paths {
         let paths = self.paths.iter()
             .map(|path| path_chop(path, step))
@@ -54,6 +112,7 @@ impl Paths {
         Paths { paths }
     }
 
+    /// Filters paths using a custom filter.
     pub fn filter<F: Filter>(&self, f: &F) -> Paths {
         let mut result = Vec::new();
         for path in &self.paths {
@@ -62,6 +121,10 @@ impl Paths {
         Paths { paths: result }
     }
 
+    /// Simplifies paths by removing redundant points.
+    ///
+    /// Uses the Ramer-Douglas-Peucker algorithm to reduce the number of
+    /// points while preserving the overall shape.
     pub fn simplify(&self, threshold: f64) -> Paths {
         let paths = self.paths.iter()
             .map(|path| path_simplify(path, threshold))
@@ -69,6 +132,12 @@ impl Paths {
         Paths { paths }
     }
 
+    /// Converts the paths to an SVG string.
+    ///
+    /// # Arguments
+    ///
+    /// * `width` - The SVG width
+    /// * `height` - The SVG height
     pub fn to_svg(&self, width: f64, height: f64) -> String {
         let mut lines = Vec::new();
         lines.push(format!(
@@ -83,11 +152,51 @@ impl Paths {
         lines.join("\n")
     }
 
+    /// Writes the paths to an SVG file.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use ln::{Scene, Cube, Vector};
+    ///
+    /// let mut scene = Scene::new();
+    /// scene.add(Cube::new(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)));
+    ///
+    /// let paths = scene.render(
+    ///     Vector::new(4.0, 3.0, 2.0),
+    ///     Vector::new(0.0, 0.0, 0.0),
+    ///     Vector::new(0.0, 0.0, 1.0),
+    ///     1024.0, 1024.0, 50.0, 0.1, 10.0, 0.01,
+    /// );
+    ///
+    /// paths.write_to_svg("output.svg", 1024.0, 1024.0).unwrap();
+    /// ```
     pub fn write_to_svg(&self, path: &str, width: f64, height: f64) -> std::io::Result<()> {
         let svg = self.to_svg(width, height);
         std::fs::write(path, svg)
     }
 
+    /// Writes the paths to a PNG image file.
+    ///
+    /// Renders the paths as black lines on a white background.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use ln::{Scene, Sphere, Vector};
+    ///
+    /// let mut scene = Scene::new();
+    /// scene.add(Sphere::new(Vector::new(0.0, 0.0, 0.0), 1.0));
+    ///
+    /// let paths = scene.render(
+    ///     Vector::new(4.0, 3.0, 2.0),
+    ///     Vector::new(0.0, 0.0, 0.0),
+    ///     Vector::new(0.0, 0.0, 1.0),
+    ///     512.0, 512.0, 50.0, 0.1, 10.0, 0.01,
+    /// );
+    ///
+    /// paths.write_to_png("output.png", 512.0, 512.0);
+    /// ```
     pub fn write_to_png(&self, path: &str, width: f64, height: f64) {
         let scale = 1.0;
         let w = (width * scale) as u32;
@@ -109,6 +218,9 @@ impl Paths {
         img.save(path).expect("Failed to save PNG");
     }
 
+    /// Writes the paths to a text file.
+    ///
+    /// Each path is written as a line of semicolon-separated x,y coordinates.
     pub fn write_to_txt(&self, path: &str) -> std::io::Result<()> {
         let mut file = std::fs::File::create(path)?;
         for path_points in &self.paths {

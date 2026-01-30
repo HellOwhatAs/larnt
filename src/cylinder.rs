@@ -1,3 +1,21 @@
+//! Cylinder primitive.
+//!
+//! This module provides the [`Cylinder`] shape (aligned along the Z axis)
+//! and [`OutlineCylinder`] which renders as a silhouette from the camera's
+//! perspective.
+//!
+//! # Example
+//!
+//! ```
+//! use ln::{Cylinder, Scene, Vector};
+//!
+//! // Create a cylinder with radius 1.0, from z=0 to z=2
+//! let cylinder = Cylinder::new(1.0, 0.0, 2.0);
+//!
+//! let mut scene = Scene::new();
+//! scene.add(cylinder);
+//! ```
+
 use crate::bounding_box::Box;
 use crate::hit::Hit;
 use crate::matrix::Matrix;
@@ -8,14 +26,31 @@ use crate::util::radians;
 use crate::vector::Vector;
 use std::sync::Arc;
 
+/// A cylinder aligned along the Z axis.
+///
+/// The cylinder is defined by its radius and Z-range. The default paths
+/// are vertical lines around the circumference.
+///
+/// # Example
+///
+/// ```
+/// use ln::{Cylinder, Vector};
+///
+/// // Cylinder with radius 0.5, from z=-1 to z=1
+/// let cylinder = Cylinder::new(0.5, -1.0, 1.0);
+/// ```
 #[derive(Debug, Clone)]
 pub struct Cylinder {
+    /// The radius of the cylinder.
     pub radius: f64,
+    /// The minimum Z coordinate.
     pub z0: f64,
+    /// The maximum Z coordinate.
     pub z1: f64,
 }
 
 impl Cylinder {
+    /// Creates a new cylinder with the given radius and Z-range.
     pub fn new(radius: f64, z0: f64, z1: f64) -> Self {
         Cylinder { radius, z0, z1 }
     }
@@ -84,14 +119,22 @@ impl Shape for Cylinder {
     }
 }
 
+/// A cylinder that renders as a silhouette from the camera's perspective.
+///
+/// Unlike [`Cylinder`] which draws vertical lines, `OutlineCylinder` draws
+/// only the visible outline of the cylinder as seen from the camera.
 #[derive(Debug, Clone)]
 pub struct OutlineCylinder {
+    /// The underlying cylinder geometry.
     pub cylinder: Cylinder,
+    /// The camera position.
     pub eye: Vector,
+    /// The up direction.
     pub up: Vector,
 }
 
 impl OutlineCylinder {
+    /// Creates a new outline cylinder.
     pub fn new(eye: Vector, up: Vector, radius: f64, z0: f64, z1: f64) -> Self {
         OutlineCylinder {
             cylinder: Cylinder::new(radius, z0, z1),
@@ -157,6 +200,18 @@ impl Shape for OutlineCylinder {
     }
 }
 
+/// Creates an outline cylinder between two arbitrary points.
+///
+/// This is useful for drawing cylinders that aren't aligned with the Z axis.
+/// The cylinder is created along the axis from `v0` to `v1` with the given radius.
+///
+/// # Arguments
+///
+/// * `eye` - Camera position for silhouette calculation
+/// * `up` - Up direction vector
+/// * `v0` - Start point of the cylinder
+/// * `v1` - End point of the cylinder
+/// * `radius` - Radius of the cylinder
 pub fn new_transformed_outline_cylinder(
     eye: Vector,
     up: Vector,

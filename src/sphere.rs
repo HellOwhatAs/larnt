@@ -1,3 +1,21 @@
+//! Sphere primitive.
+//!
+//! This module provides the [`Sphere`] shape with latitude/longitude line texturing,
+//! and [`OutlineSphere`] which renders as a silhouette circle from the camera's
+//! perspective.
+//!
+//! # Example
+//!
+//! ```
+//! use ln::{Scene, Sphere, Vector};
+//!
+//! // Create a unit sphere at the origin
+//! let sphere = Sphere::new(Vector::new(0.0, 0.0, 0.0), 1.0);
+//!
+//! let mut scene = Scene::new();
+//! scene.add(sphere);
+//! ```
+
 use crate::bounding_box::Box;
 use crate::hit::Hit;
 use crate::path::Paths;
@@ -6,14 +24,31 @@ use crate::shape::Shape;
 use crate::util::radians;
 use crate::vector::Vector;
 
+/// A sphere defined by center and radius.
+///
+/// The default paths generated are latitude and longitude lines, creating
+/// a globe-like appearance.
+///
+/// # Example
+///
+/// ```
+/// use ln::{Sphere, Vector};
+///
+/// // Sphere at origin with radius 2
+/// let sphere = Sphere::new(Vector::new(0.0, 0.0, 0.0), 2.0);
+/// ```
 #[derive(Debug, Clone)]
 pub struct Sphere {
+    /// The center point of the sphere.
     pub center: Vector,
+    /// The radius of the sphere.
     pub radius: f64,
+    /// Cached bounding box.
     pub bx: Box,
 }
 
 impl Sphere {
+    /// Creates a new sphere with the given center and radius.
     pub fn new(center: Vector, radius: f64) -> Self {
         let min = Vector::new(center.x - radius, center.y - radius, center.z - radius);
         let max = Vector::new(center.x + radius, center.y + radius, center.z + radius);
@@ -88,6 +123,17 @@ impl Shape for Sphere {
     }
 }
 
+/// Converts latitude and longitude to 3D coordinates on a sphere.
+///
+/// # Arguments
+///
+/// * `lat` - Latitude in degrees (-90 to 90)
+/// * `lng` - Longitude in degrees (0 to 360)
+/// * `radius` - Radius of the sphere
+///
+/// # Returns
+///
+/// A [`Vector`] representing the point on the sphere surface.
 pub fn lat_lng_to_xyz(lat: f64, lng: f64, radius: f64) -> Vector {
     let lat = radians(lat);
     let lng = radians(lng);
@@ -97,14 +143,41 @@ pub fn lat_lng_to_xyz(lat: f64, lng: f64, radius: f64) -> Vector {
     Vector::new(x, y, z)
 }
 
+/// A sphere that renders as a silhouette circle from the camera's perspective.
+///
+/// Unlike [`Sphere`] which draws latitude/longitude lines, `OutlineSphere`
+/// draws only the visible outline of the sphere as seen from the camera.
+/// This is useful for cleaner, more stylized renderings.
+///
+/// # Example
+///
+/// ```
+/// use ln::{OutlineSphere, Scene, Vector};
+///
+/// let eye = Vector::new(4.0, 3.0, 2.0);
+/// let up = Vector::new(0.0, 0.0, 1.0);
+///
+/// let sphere = OutlineSphere::new(eye, up, Vector::new(0.0, 0.0, 0.0), 1.0);
+/// ```
 #[derive(Debug, Clone)]
 pub struct OutlineSphere {
+    /// The underlying sphere geometry.
     pub sphere: Sphere,
+    /// The camera position (used to compute the silhouette).
     pub eye: Vector,
+    /// The up direction (used to orient the silhouette).
     pub up: Vector,
 }
 
 impl OutlineSphere {
+    /// Creates a new outline sphere.
+    ///
+    /// # Arguments
+    ///
+    /// * `eye` - The camera position
+    /// * `up` - The up direction vector
+    /// * `center` - The center of the sphere
+    /// * `radius` - The radius of the sphere
     pub fn new(eye: Vector, up: Vector, center: Vector, radius: f64) -> Self {
         OutlineSphere {
             sphere: Sphere::new(center, radius),

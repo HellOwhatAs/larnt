@@ -1,3 +1,20 @@
+//! STL file loader and saver.
+//!
+//! This module provides functionality to load and save 3D models in STL format.
+//! Both ASCII and binary STL formats are supported.
+//!
+//! # Example
+//!
+//! ```no_run
+//! use ln::{load_binary_stl, load_stl, save_binary_stl, Scene, Vector};
+//!
+//! // Load a binary STL file
+//! let mesh = load_binary_stl("model.stl").expect("Failed to load STL");
+//!
+//! let mut scene = Scene::new();
+//! scene.add(mesh);
+//! ```
+
 use crate::mesh::Mesh;
 use crate::triangle::Triangle;
 use crate::util::parse_floats;
@@ -5,6 +22,21 @@ use crate::vector::Vector;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Read, Write};
 
+/// Loads a triangle mesh from a binary STL file.
+///
+/// Binary STL files are more compact than ASCII STL files and load faster.
+///
+/// # Arguments
+///
+/// * `path` - Path to the binary STL file
+///
+/// # Example
+///
+/// ```no_run
+/// use ln::load_binary_stl;
+///
+/// let mesh = load_binary_stl("model.stl").expect("Failed to load STL");
+/// ```
 pub fn load_binary_stl(path: &str) -> std::io::Result<Mesh> {
     println!("Loading STL (Binary): {}", path);
     let mut file = File::open(path)?;
@@ -43,6 +75,21 @@ pub fn load_binary_stl(path: &str) -> std::io::Result<Mesh> {
     Ok(Mesh::new(triangles))
 }
 
+/// Saves a triangle mesh to a binary STL file.
+///
+/// # Arguments
+///
+/// * `path` - Path to save the STL file
+/// * `mesh` - The mesh to save
+///
+/// # Example
+///
+/// ```no_run
+/// use ln::{save_binary_stl, load_obj};
+///
+/// let mesh = load_obj("model.obj").expect("Failed to load OBJ");
+/// save_binary_stl("output.stl", &mesh).expect("Failed to save STL");
+/// ```
 pub fn save_binary_stl(path: &str, mesh: &Mesh) -> std::io::Result<()> {
     let file = File::create(path)?;
     let mut writer = BufWriter::new(file);
@@ -82,6 +129,21 @@ pub fn save_binary_stl(path: &str, mesh: &Mesh) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Loads a triangle mesh from an ASCII STL file.
+///
+/// ASCII STL files are human-readable but larger than binary STL files.
+///
+/// # Arguments
+///
+/// * `path` - Path to the ASCII STL file
+///
+/// # Example
+///
+/// ```no_run
+/// use ln::load_stl;
+///
+/// let mesh = load_stl("model.stl").expect("Failed to load STL");
+/// ```
 pub fn load_stl(path: &str) -> std::io::Result<Mesh> {
     println!("Loading STL (ASCII): {}", path);
     let file = File::open(path)?;

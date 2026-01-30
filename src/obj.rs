@@ -1,3 +1,17 @@
+//! OBJ file loader.
+//!
+//! This module provides functionality to load 3D models from Wavefront OBJ files.
+//!
+//! # Example
+//!
+//! ```no_run
+//! use ln::{load_obj, Scene, Vector};
+//!
+//! let mesh = load_obj("model.obj").expect("Failed to load OBJ");
+//! let mut scene = Scene::new();
+//! scene.add(mesh);
+//! ```
+
 use crate::mesh::Mesh;
 use crate::triangle::Triangle;
 use crate::util::parse_floats;
@@ -14,6 +28,27 @@ fn parse_index(value: &str, length: usize) -> usize {
     }
 }
 
+/// Loads a triangle mesh from an OBJ file.
+///
+/// This function supports basic OBJ features:
+/// - Vertex positions (`v` lines)
+/// - Faces (`f` lines) - triangulated automatically if needed
+///
+/// # Arguments
+///
+/// * `path` - Path to the OBJ file
+///
+/// # Returns
+///
+/// A [`Mesh`] containing the loaded triangles.
+///
+/// # Example
+///
+/// ```no_run
+/// use ln::load_obj;
+///
+/// let mesh = load_obj("model.obj").expect("Failed to load OBJ");
+/// ```
 pub fn load_obj(path: &str) -> std::io::Result<Mesh> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
