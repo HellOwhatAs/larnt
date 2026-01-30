@@ -139,7 +139,15 @@ impl Shape for OutlineSphere {
         let r = theta.sin() * adj;
         
         let w = center.sub(self.eye).normalize();
-        let u = w.cross(self.up).normalize();
+        
+        // Handle case when w is parallel to up vector by finding a perpendicular vector
+        let cross = w.cross(self.up);
+        let u = if cross.length_squared() < 1e-18 {
+            // w is parallel to up, use the minimum axis approach to find a perpendicular
+            w.cross(w.min_axis()).normalize()
+        } else {
+            cross.normalize()
+        };
         let v = w.cross(u).normalize();
         let c = self.eye.add(w.mul_scalar(d));
         
