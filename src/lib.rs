@@ -271,7 +271,7 @@ pub use csg::{new_difference, new_intersection, BooleanShape, Op};
 pub use cube::Cube;
 pub use cylinder::{new_transformed_outline_cylinder, Cylinder, OutlineCylinder};
 pub use filter::{ClipFilter, Filter};
-pub use function::{Direction, Function};
+pub use function::{Direction, Function, FunctionTexture};
 pub use hit::Hit;
 pub use matrix::Matrix;
 pub use mesh::Mesh;

@@ -1,16 +1,19 @@
-use ln::{Direction, Function, Scene, Vector, Box as BBox};
+use ln::{Direction, Function, FunctionTexture, Scene, Vector, Box as BBox};
 
 fn my_function(x: f64, y: f64) -> f64 {
-    -1.0 / (x * x + y * y)
+    x.sin() * y.cos()
 }
 
 fn main() {
     let mut scene = Scene::new();
-    let bbox = BBox::new(Vector::new(-2.0, -2.0, -4.0), Vector::new(2.0, 2.0, 2.0));
-    scene.add(Function::new(my_function, bbox, Direction::Below));
+    let bbox = BBox::new(Vector::new(-3.0, -3.0, -1.0), Vector::new(3.0, 3.0, 1.0));
     
-    let eye = Vector::new(3.0, 0.0, 3.0);
-    let center = Vector::new(1.1, 0.0, 0.0);
+    // Use grid texture (default) - works with any function
+    // Other options: FunctionTexture::Swirl (best for negative z), FunctionTexture::Spiral
+    scene.add(Function::new(my_function, bbox, Direction::Below).with_texture(FunctionTexture::Grid));
+    
+    let eye = Vector::new(4.0, 3.0, 2.0);
+    let center = Vector::new(0.0, 0.0, 0.0);
     let up = Vector::new(0.0, 0.0, 1.0);
     let width = 1024.0;
     let height = 1024.0;
