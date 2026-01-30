@@ -1,0 +1,18 @@
+[package]
+name = "ln"
+version = "0.1.0"
+edition = "2021"
+description = "The 3D Line Art Engine - A vector-based 3D renderer written in Rust"
+license = "MIT"
+
+[dependencies]
+rand = "0.8"
+image = "0.25"
+
+[[example]]
+name = "example0"
+path = "examples/example0.rs"
+
+[[example]]
+name = "csg"
+path = "examples/csg.rs"
