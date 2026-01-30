@@ -6,6 +6,16 @@ pub fn degrees(radians: f64) -> f64 {
     radians * 180.0 / std::f64::consts::PI
 }
 
+/// Computes the median of a sorted slice of floats.
+/// 
+/// # Arguments
+/// * `items` - A sorted slice of f64 values
+/// 
+/// # Returns
+/// The median value. Returns 0.0 for empty slices.
+/// 
+/// # Note
+/// The caller must ensure the slice is sorted before calling this function.
 pub fn median(items: &[f64]) -> f64 {
     let n = items.len();
     match n {

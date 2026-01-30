@@ -78,10 +78,18 @@ impl Node {
             }
         };
 
+        // SAFETY: left and right children always exist when axis != Axis::None
+        // This invariant is maintained by the split() method
         let (first, second) = if left_first {
-            (self.left.as_ref().unwrap(), self.right.as_ref().unwrap())
+            (
+                self.left.as_ref().expect("left child must exist when axis is set"),
+                self.right.as_ref().expect("right child must exist when axis is set")
+            )
         } else {
-            (self.right.as_ref().unwrap(), self.left.as_ref().unwrap())
+            (
+                self.right.as_ref().expect("right child must exist when axis is set"),
+                self.left.as_ref().expect("left child must exist when axis is set")
+            )
         };
 
         if tsplit > tmax || tsplit <= 0.0 {

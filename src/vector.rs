@@ -53,8 +53,13 @@ impl Vector {
         }
     }
 
+    /// Normalizes the vector to unit length.
+    /// 
+    /// # Panics
+    /// Panics if the vector has zero length.
     pub fn normalize(&self) -> Vector {
         let d = self.length();
+        assert!(d != 0.0, "Cannot normalize a zero-length vector");
         Vector {
             x: self.x / d,
             y: self.y / d,
