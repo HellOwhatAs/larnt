@@ -9,12 +9,11 @@ fn main() {
     for x in -n..=n {
         for y in -n..=n {
             let p = rng.gen::<f64>() * 0.25 + 0.2;
-            let _dx = rng.gen::<f64>() * 0.5 - 0.25;
-            let _dy = rng.gen::<f64>() * 0.5 - 0.25;
             let fx = x as f64;
             let fy = y as f64;
             let fz = rng.gen::<f64>() * 3.0 + 1.0;
             
+            // Skip one building to create a gap (matching original example)
             if x == 2 && y == 1 {
                 continue;
             }
