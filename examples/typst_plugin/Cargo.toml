@@ -1,0 +1,22 @@
+[package]
+name = "ln_typst_plugin"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Same package and version as Typst uses.
+ciborium = "0.2.1"
+serde = "1.0"
+wasm-minimal-protocol = { git = "https://github.com/astrale-sharp/wasm-minimal-protocol", rev = "c51acd43095fe9da8fa943e064618e486fd2b58d" }
+ln = { path = "../.." }
+rand = { version = "0.8", default-features = false, features = ["small_rng"] }
+
+[profile.release]
+lto = true        # Enable link-time optimization
+strip = true      # Strip symbols from binary*
+# opt-level = 'z'   # Optimize for size
+# codegen-units = 1 # Reduce number of codegen units to increase optimizations
+panic = 'abort'   # Abort on panic
