@@ -34,7 +34,7 @@ fn low_pass_noise(rng: &mut SmallRng, n: usize, alpha: f64, iterations: usize) -
 }
 
 fn main() {
-    let mut rng = SmallRng::seed_from_u64(1212);
+    let mut rng = SmallRng::seed_from_u64(1211);
     let eye = Vector::new(8.0, 8.0, 8.0);
     let center = Vector::new(0.0, 0.0, 0.0);
     let up = Vector::new(0.0, 0.0, 1.0);
@@ -50,7 +50,7 @@ fn main() {
 
         let mut position = Vector::new(0.0, 0.0, 0.0);
         for i in 0..n {
-            let sphere = OutlineSphere::new(eye, up, position, 0.05);
+            let sphere = OutlineSphere::new(eye, up, position, 0.1);
             scene.add(sphere);
             let s = (ss[i] + 1.0) / 2.0 * 0.1 + 0.01;
             let v = Vector::new(xs[i], ys[i], zs[i]).normalize().mul_scalar(s);
