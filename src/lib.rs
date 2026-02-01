@@ -281,7 +281,7 @@ pub use plane::Plane;
 pub use ray::Ray;
 pub use scene::Scene;
 pub use shape::{EmptyShape, Shape, TransformedShape};
-pub use sphere::{lat_lng_to_xyz, OutlineSphere, Sphere};
+pub use sphere::{lat_lng_to_xyz, OutlineSphere, Sphere, SphereTexture};
 pub use stl::{load_binary_stl, load_stl, save_binary_stl};
 pub use tree::Tree;
 pub use triangle::Triangle;

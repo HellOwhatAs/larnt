@@ -1,41 +1,67 @@
 //! Sphere primitive.
 //!
-//! This module provides the [`Sphere`] shape with latitude/longitude line texturing,
+//! This module provides the [`Sphere`] shape with multiple texture options,
 //! and [`OutlineSphere`] which renders as a silhouette circle from the camera's
 //! perspective.
 //!
 //! # Example
 //!
 //! ```
-//! use ln::{Scene, Sphere, Vector};
+//! use ln::{Scene, Sphere, SphereTexture, Vector};
 //!
-//! // Create a unit sphere at the origin
+//! // Create a unit sphere at the origin with the default lat/lng texture
 //! let sphere = Sphere::new(Vector::new(0.0, 0.0, 0.0), 1.0);
+//!
+//! // Or with a custom texture
+//! let sphere_dots = Sphere::new(Vector::new(2.0, 0.0, 0.0), 1.0)
+//!     .with_texture(SphereTexture::Dots);
 //!
 //! let mut scene = Scene::new();
 //! scene.add(sphere);
+//! scene.add(sphere_dots);
 //! ```
 
 use crate::bounding_box::Box;
 use crate::hit::Hit;
+use crate::matrix::Matrix;
 use crate::path::Paths;
 use crate::ray::Ray;
 use crate::shape::Shape;
 use crate::util::radians;
 use crate::vector::Vector;
+use rand::{rngs::SmallRng, Rng, SeedableRng};
+
+/// Texture style for Sphere shapes
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SphereTexture {
+    /// Latitude/longitude grid texture (default)
+    #[default]
+    LatLng,
+    /// Random rotated equators (great circles)
+    RandomEquators,
+    /// Random point dots on the surface
+    Dots,
+    /// Random concentric circles pattern
+    RandomCircles,
+}
 
 /// A sphere defined by center and radius.
 ///
 /// The default paths generated are latitude and longitude lines, creating
-/// a globe-like appearance.
+/// a globe-like appearance. You can use [`with_texture`](Sphere::with_texture)
+/// to select different texture styles.
 ///
 /// # Example
 ///
 /// ```
-/// use ln::{Sphere, Vector};
+/// use ln::{Sphere, SphereTexture, Vector};
 ///
-/// // Sphere at origin with radius 2
+/// // Sphere at origin with radius 2 (default lat/lng texture)
 /// let sphere = Sphere::new(Vector::new(0.0, 0.0, 0.0), 2.0);
+///
+/// // Sphere with dots texture
+/// let sphere_dots = Sphere::new(Vector::new(0.0, 0.0, 0.0), 2.0)
+///     .with_texture(SphereTexture::Dots);
 /// ```
 #[derive(Debug, Clone)]
 pub struct Sphere {
@@ -45,6 +71,8 @@ pub struct Sphere {
     pub radius: f64,
     /// Cached bounding box.
     pub bx: Box,
+    /// The texture style for the sphere.
+    pub texture: SphereTexture,
 }
 
 impl Sphere {
@@ -56,7 +84,14 @@ impl Sphere {
             center,
             radius,
             bx: Box::new(min, max),
+            texture: SphereTexture::default(),
         }
+    }
+
+    /// Sets the texture style for the sphere.
+    pub fn with_texture(mut self, texture: SphereTexture) -> Self {
+        self.texture = texture;
+        self
     }
 }
 
@@ -91,6 +126,18 @@ impl Shape for Sphere {
     }
 
     fn paths(&self) -> Paths {
+        match self.texture {
+            SphereTexture::LatLng => self.paths_lat_lng(),
+            SphereTexture::RandomEquators => self.paths_random_equators(),
+            SphereTexture::Dots => self.paths_dots(),
+            SphereTexture::RandomCircles => self.paths_random_circles(),
+        }
+    }
+}
+
+impl Sphere {
+    /// Latitude/longitude grid texture (default)
+    fn paths_lat_lng(&self) -> Paths {
         let mut paths = Vec::new();
         let n = 10;
         let o = 10;
@@ -117,6 +164,107 @@ impl Shape for Sphere {
             }
             paths.push(path);
             lng += n;
+        }
+        
+        Paths::from_vec(paths)
+    }
+
+    /// Random rotated equators (great circles)
+    fn paths_random_equators(&self) -> Paths {
+        let mut rng = SmallRng::seed_from_u64(42);
+        
+        // Create a single equator path
+        let mut equator = Vec::new();
+        for lng in 0..=360 {
+            let v = lat_lng_to_xyz(0.0, lng as f64, self.radius);
+            equator.push(v);
+        }
+        
+        let mut paths = Vec::new();
+        for _ in 0..100 {
+            let mut m = Matrix::identity();
+            for _ in 0..3 {
+                let v = Vector::random_unit_vector(&mut rng);
+                m = m.rotated(v, rng.gen::<f64>() * 2.0 * std::f64::consts::PI);
+            }
+            m = m.translated(self.center);
+            
+            // Transform the equator path
+            let transformed: Vec<Vector> = equator.iter().map(|p| m.mul_position(*p)).collect();
+            paths.push(transformed);
+        }
+        
+        Paths::from_vec(paths)
+    }
+
+    /// Random point dots on the surface
+    fn paths_dots(&self) -> Paths {
+        let mut rng = SmallRng::seed_from_u64(42);
+        let mut paths = Vec::new();
+        
+        for _ in 0..20000 {
+            let v = Vector::random_unit_vector(&mut rng)
+                .mul_scalar(self.radius)
+                .add(self.center);
+            // Each "dot" is a zero-length path (two identical points)
+            paths.push(vec![v, v]);
+        }
+        
+        Paths::from_vec(paths)
+    }
+
+    /// Random concentric circles pattern
+    fn paths_random_circles(&self) -> Paths {
+        let mut rng = SmallRng::seed_from_u64(42);
+        let mut paths = Vec::new();
+        let mut seen: Vec<Vector> = Vec::new();
+        let mut radii: Vec<f64> = Vec::new();
+        
+        for _ in 0..140 {
+            let mut v: Vector;
+            let mut m: f64;
+            
+            // Find a spot that doesn't overlap too much with existing circles
+            loop {
+                v = Vector::random_unit_vector(&mut rng);
+                m = rng.gen::<f64>() * 0.25 + 0.05;
+                
+                let mut ok = true;
+                for (i, other) in seen.iter().enumerate() {
+                    let threshold = m + radii[i] + 0.02;
+                    if other.sub(v).length() < threshold {
+                        ok = false;
+                        break;
+                    }
+                }
+                if ok {
+                    seen.push(v);
+                    radii.push(m);
+                    break;
+                }
+            }
+            
+            // Calculate perpendicular vectors for the circle plane
+            let p = v.cross(Vector::random_unit_vector(&mut rng)).normalize();
+            let q = p.cross(v).normalize();
+            
+            // Draw n concentric circles, each smaller than the last
+            let n = rng.gen_range(1..=4);
+            let mut current_m = m;
+            for _ in 0..n {
+                let mut path = Vec::new();
+                for j in (0..=360).step_by(5) {
+                    let a = radians(j as f64);
+                    let mut x = v;
+                    x = x.add(p.mul_scalar(a.cos() * current_m));
+                    x = x.add(q.mul_scalar(a.sin() * current_m));
+                    x = x.normalize();
+                    x = x.mul_scalar(self.radius).add(self.center);
+                    path.push(x);
+                }
+                paths.push(path);
+                current_m *= 0.75;
+            }
         }
         
         Paths::from_vec(paths)
