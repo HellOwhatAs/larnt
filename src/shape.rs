@@ -171,6 +171,12 @@ impl TransformedShape {
 }
 
 impl Shape for TransformedShape {
+    fn compile(&mut self) {
+        if let Some(s) = std::sync::Arc::get_mut(&mut self.shape) {
+            s.compile();
+        }
+    }
+
     fn bounding_box(&self) -> Box {
         self.matrix.mul_box(self.shape.bounding_box())
     }

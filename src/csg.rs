@@ -127,6 +127,15 @@ pub fn new_difference(shapes: Vec<Arc<dyn Shape + Send + Sync>>) -> Arc<dyn Shap
 }
 
 impl Shape for BooleanShape {
+    fn compile(&mut self) {
+        if let Some(s) = Arc::get_mut(&mut self.a) {
+            s.compile();
+        }
+        if let Some(s) = Arc::get_mut(&mut self.b) {
+            s.compile();
+        }
+    }
+
     fn bounding_box(&self) -> Box {
         let a = self.a.bounding_box();
         let b = self.b.bounding_box();

@@ -76,7 +76,17 @@ impl Scene {
     ///
     /// This is called automatically by [`Scene::render`], but can be called
     /// manually if you want to reuse the same scene for multiple renders.
+    ///
+    /// This method also compiles individual shapes (e.g., building internal
+    /// BVH trees for meshes) when possible. Shapes added via [`Scene::add`]
+    /// are already compiled, but shapes added via [`Scene::add_arc`] will
+    /// be compiled here if there are no other references to them.
     pub fn compile(&mut self) {
+        for shape in &mut self.shapes {
+            if let Some(s) = Arc::get_mut(shape) {
+                s.compile();
+            }
+        }
         if self.tree.is_none() {
             self.tree = Some(Tree::new(self.shapes.clone()));
         }
@@ -94,7 +104,8 @@ impl Scene {
     /// let mut scene = Scene::new();
     /// scene.add(Cube::new(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)));
     /// ```
-    pub fn add<S: Shape + Send + Sync + 'static>(&mut self, shape: S) {
+    pub fn add<S: Shape + Send + Sync + 'static>(&mut self, mut shape: S) {
+        shape.compile();
         self.shapes.push(Arc::new(shape));
     }
 
