@@ -38,11 +38,11 @@ pub enum SphereTexture {
     #[default]
     LatLng,
     /// Random rotated equators (great circles)
-    RandomEquators,
+    RandomEquators(u64),
     /// Random point dots on the surface
-    Dots,
+    RandomDots(u64),
     /// Random concentric circles pattern
-    RandomCircles,
+    RandomCircles(u64),
 }
 
 /// A sphere defined by center and radius.
@@ -110,7 +110,7 @@ impl Shape for Sphere {
         let b = to.dot(r.direction);
         let c = to.dot(to) - radius * radius;
         let d = b * b - c;
-        
+
         if d > 0.0 {
             let d = d.sqrt();
             let t1 = -b - d;
@@ -128,9 +128,9 @@ impl Shape for Sphere {
     fn paths(&self) -> Paths {
         match self.texture {
             SphereTexture::LatLng => self.paths_lat_lng(),
-            SphereTexture::RandomEquators => self.paths_random_equators(),
-            SphereTexture::Dots => self.paths_dots(),
-            SphereTexture::RandomCircles => self.paths_random_circles(),
+            SphereTexture::RandomEquators(seed) => self.paths_random_equators(seed),
+            SphereTexture::RandomDots(seed) => self.paths_random_dots(seed),
+            SphereTexture::RandomCircles(seed) => self.paths_random_circles(seed),
         }
     }
 }
@@ -141,7 +141,7 @@ impl Sphere {
         let mut paths = Vec::new();
         let n = 10;
         let o = 10;
-        
+
         // Latitude lines
         let mut lat = -90 + o;
         while lat <= 90 - o {
@@ -153,7 +153,7 @@ impl Sphere {
             paths.push(path);
             lat += n;
         }
-        
+
         // Longitude lines
         let mut lng = 0;
         while lng <= 360 {
@@ -165,21 +165,20 @@ impl Sphere {
             paths.push(path);
             lng += n;
         }
-        
+
         Paths::from_vec(paths)
     }
 
     /// Random rotated equators (great circles)
-    fn paths_random_equators(&self) -> Paths {
-        let mut rng = SmallRng::seed_from_u64(42);
-        
+    fn paths_random_equators(&self, seed: u64) -> Paths {
+        let mut rng = SmallRng::seed_from_u64(seed);
         // Create a single equator path
         let mut equator = Vec::new();
         for lng in 0..=360 {
             let v = lat_lng_to_xyz(0.0, lng as f64, self.radius);
             equator.push(v);
         }
-        
+
         let mut paths = Vec::new();
         for _ in 0..100 {
             let mut m = Matrix::identity();
@@ -188,20 +187,20 @@ impl Sphere {
                 m = m.rotated(v, rng.gen::<f64>() * 2.0 * std::f64::consts::PI);
             }
             m = m.translated(self.center);
-            
+
             // Transform the equator path
             let transformed: Vec<Vector> = equator.iter().map(|p| m.mul_position(*p)).collect();
             paths.push(transformed);
         }
-        
+
         Paths::from_vec(paths)
     }
 
     /// Random point dots on the surface
-    fn paths_dots(&self) -> Paths {
-        let mut rng = SmallRng::seed_from_u64(42);
+    fn paths_random_dots(&self, seed: u64) -> Paths {
+        let mut rng = SmallRng::seed_from_u64(seed);
         let mut paths = Vec::new();
-        
+
         for _ in 0..20000 {
             let v = Vector::random_unit_vector(&mut rng)
                 .mul_scalar(self.radius)
@@ -209,26 +208,26 @@ impl Sphere {
             // Each "dot" is a zero-length path (two identical points)
             paths.push(vec![v, v]);
         }
-        
+
         Paths::from_vec(paths)
     }
 
     /// Random concentric circles pattern
-    fn paths_random_circles(&self) -> Paths {
-        let mut rng = SmallRng::seed_from_u64(42);
+    fn paths_random_circles(&self, seed: u64) -> Paths {
+        let mut rng = SmallRng::seed_from_u64(seed);
         let mut paths = Vec::new();
         let mut seen: Vec<Vector> = Vec::new();
         let mut radii: Vec<f64> = Vec::new();
-        
+
         for _ in 0..140 {
             let mut v: Vector;
             let mut m: f64;
-            
+
             // Find a spot that doesn't overlap too much with existing circles
             loop {
                 v = Vector::random_unit_vector(&mut rng);
                 m = rng.gen::<f64>() * 0.25 + 0.05;
-                
+
                 let mut ok = true;
                 for (i, other) in seen.iter().enumerate() {
                     let threshold = m + radii[i] + 0.02;
@@ -243,11 +242,11 @@ impl Sphere {
                     break;
                 }
             }
-            
+
             // Calculate perpendicular vectors for the circle plane
             let p = v.cross(Vector::random_unit_vector(&mut rng)).normalize();
             let q = p.cross(v).normalize();
-            
+
             // Draw n concentric circles, each smaller than the last
             let n = rng.gen_range(1..=4);
             let mut current_m = m;
@@ -266,7 +265,7 @@ impl Sphere {
                 current_m *= 0.75;
             }
         }
-        
+
         Paths::from_vec(paths)
     }
 }
@@ -351,16 +350,16 @@ impl Shape for OutlineSphere {
     fn paths(&self) -> Paths {
         let center = self.sphere.center;
         let radius = self.sphere.radius;
-        
+
         let hyp = center.sub(self.eye).length();
         let opp = radius;
         let theta = (opp / hyp).asin();
         let adj = opp / theta.tan();
         let d = theta.cos() * adj;
         let r = theta.sin() * adj;
-        
+
         let w = center.sub(self.eye).normalize();
-        
+
         // Handle case when w is parallel to up vector by finding a perpendicular vector
         let cross = w.cross(self.up);
         let u = if cross.length_squared() < 1e-18 {
@@ -371,7 +370,7 @@ impl Shape for OutlineSphere {
         };
         let v = w.cross(u).normalize();
         let c = self.eye.add(w.mul_scalar(d));
-        
+
         let mut path = Vec::new();
         for i in 0..=360 {
             let a = radians(i as f64);
@@ -380,7 +379,7 @@ impl Shape for OutlineSphere {
             p = p.add(v.mul_scalar(a.sin() * r));
             path.push(p);
         }
-        
+
         Paths::from_vec(vec![path])
     }
 }
