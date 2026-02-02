@@ -118,35 +118,52 @@ impl Shape for OutlineCone {
     }
 
     fn paths(&self) -> Paths {
-        let center = Vector::new(0.0, 0.0, 0.0);
-        let hyp = center.sub(self.eye).length();
-        let opp = self.cone.radius;
-        let theta = (opp / hyp).asin();
-        let adj = opp / theta.tan();
-        let d = theta.cos() * adj;
-        let w = center.sub(self.eye).normalize();
-        let u = w.cross(self.up).normalize();
-        let c0 = self.eye.add(w.mul_scalar(d));
-        let a0 = c0.add(u.mul_scalar(self.cone.radius * 1.01));
-        let b0 = c0.add(u.mul_scalar(-self.cone.radius * 1.01));
+        // For a cone with apex at (0,0,h) and base circle radius r at z=0,
+        // the silhouette generators are found by solving:
+        // E.x * cos(θ) + E.y * sin(θ) = r * (1 - E.z / h)
+        // where E is the eye position.
+        //
+        // This is of the form: a*cos(θ) + b*sin(θ) = c
+        // Solution: θ = atan2(b, a) ± acos(c / sqrt(a^2 + b^2))
+        let r = self.cone.radius;
+        let h = self.cone.height;
 
+        let a = self.eye.x;
+        let b = self.eye.y;
+        let c = r * (1.0 - self.eye.z / h);
+
+        let sqrt_ab = (a * a + b * b).sqrt();
+
+        // Base circle path
         let mut p0 = Vec::new();
-        for a in 0..360 {
-            let x = self.cone.radius * radians(a as f64).cos();
-            let y = self.cone.radius * radians(a as f64).sin();
+        for angle in 0..360 {
+            let x = r * radians(angle as f64).cos();
+            let y = r * radians(angle as f64).sin();
             p0.push(Vector::new(x, y, 0.0));
         }
 
+        // Compute silhouette generator angles
+        let ratio = c / sqrt_ab;
+        if ratio.abs() > 1.0 {
+            // Eye is inside the extended cone surface - no proper silhouette
+            // Fall back to just the base circle
+            return Paths::from_vec(vec![p0]);
+        }
+
+        let eye_azimuth = b.atan2(a);
+        let angular_offset = ratio.acos();
+        let theta1 = eye_azimuth + angular_offset;
+        let theta2 = eye_azimuth - angular_offset;
+
+        // Silhouette points on the base circle (with slight outward offset for visibility)
+        let scale = 1.01;
+        let a0 = Vector::new(r * scale * theta1.cos(), r * scale * theta1.sin(), 0.0);
+        let b0 = Vector::new(r * scale * theta2.cos(), r * scale * theta2.sin(), 0.0);
+
         Paths::from_vec(vec![
             p0,
-            vec![
-                Vector::new(a0.x, a0.y, 0.0),
-                Vector::new(0.0, 0.0, self.cone.height),
-            ],
-            vec![
-                Vector::new(b0.x, b0.y, 0.0),
-                Vector::new(0.0, 0.0, self.cone.height),
-            ],
+            vec![a0, Vector::new(0.0, 0.0, h)],
+            vec![b0, Vector::new(0.0, 0.0, h)],
         ])
     }
 }
