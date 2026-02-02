@@ -6,7 +6,7 @@
 #let cone(radius, v0, v1) = {
   assert(
     type(radius) == float and (v0, v1).all(v => type(v) == array and v.len() == 3 and v.all(i => type(i) == float)),
-    message: "cone(radius, height) expects `radius` be a float and `v0`, `v1` be arrays of 3 floats",
+    message: "cone(radius, v0, v1) expects `radius` be a float and `v0`, `v1` be arrays of 3 floats",
   )
   return (
     Cone: (
@@ -293,7 +293,7 @@
     sphere((0., 0., 0.5), 0.5),
     sphere((1., 0., 0.5), 0.5),
   ),
-  cube((0.3, 0.3, 0.), (.7, .7, 1.2), texture: "Stripes", stripes: 10),
+  cube((0.3, 0.3, 1.), (.7, .7, 1.2), texture: "Stripes", stripes: 10),
   intersection(
     sphere((2.0, 0.25, 0.5), 0.6),
     cube((1.5, -0.25, 0.), (2.5, 0.75, 1.0), texture: "Stripes", stripes: 25),
@@ -308,14 +308,12 @@
       let seed
       (rng, seed) = suiji.integers-f(rng)
       shapes.push(
-        outline(
-          sphere(
-            (float(x), float(y), 0.),
-            0.45,
-            texture: "RandomCircles",
-            seed: seed,
-          ),
-        ),
+        outline(sphere(
+          (float(x), float(y), 0.),
+          0.45,
+          texture: "RandomCircles",
+          seed: seed,
+        )),
       )
     }
   }
@@ -323,5 +321,35 @@
     eye: (8.0, 8.0, 1.0),
     center: (0., 0., -4.25),
     ..shapes,
+  )
+}
+
+
+#{
+  let n = 15
+  let cubes = ()
+  for x in range(-n, n + 1) {
+    for y in range(-n, n + 1) {
+      let p
+      let fz
+      (rng, (p, fz)) = suiji.random-f(rng, size: 2)
+      let (fx, fy, fz, p) = (float(x), float(y), fz * 3 + 1, p * 0.25 + 0.2)
+      if x == 2 and y == 1 {
+        continue
+      }
+      cubes.push(
+        cube(
+          (fx - p, fy - p, 0.),
+          (fx + p, fy + p, fz),
+          texture: "Stripes",
+          stripes: 7,
+        ),
+      )
+    }
+  }
+  render(
+    eye: (1.75, 1.25, 6.0),
+    fovy: 100.0,
+    ..cubes,
   )
 }
