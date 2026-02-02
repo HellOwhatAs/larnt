@@ -43,17 +43,30 @@ fn main() {
         Arc::new(Cone::new(0.5, 1.0)),
         Matrix::translate(Vector::new(-1.0, 0.5, 0.0)),
     )));
+    let cone_transform = Matrix::translate(Vector::new(-1.0, 2.0, 0.0));
     scene.add_arc(Arc::new(TransformedShape::new(
-        Arc::new(OutlineCone::new(eye, up, 0.5, 1.0)),
-        Matrix::translate(Vector::new(-1.0, 2.0, 0.0)),
+        Arc::new(OutlineCone::new(
+            cone_transform.inverse().mul_position(eye),
+            up,
+            0.5,
+            1.0,
+        )),
+        cone_transform,
     )));
     scene.add_arc(Arc::new(TransformedShape::new(
         Arc::new(Cylinder::new(0.5, 0.0, 1.0)),
         Matrix::translate(Vector::new(3.5, 0.5, 0.0)),
     )));
+    let cylinder_transform = Matrix::translate(Vector::new(3.5, 2.0, 0.0));
     scene.add_arc(Arc::new(TransformedShape::new(
-        Arc::new(OutlineCylinder::new(eye, up, 0.5, 0.0, 1.0)),
-        Matrix::translate(Vector::new(3.5, 2.0, 0.0)),
+        Arc::new(OutlineCylinder::new(
+            cylinder_transform.inverse().mul_position(eye),
+            up,
+            0.5,
+            0.0,
+            1.0,
+        )),
+        cylinder_transform,
     )));
 
     // compute 2D paths that depict the 3D scene

@@ -266,7 +266,7 @@ pub mod vector;
 // Re-exports for convenient access
 pub use axis::Axis;
 pub use bounding_box::Box;
-pub use cone::{Cone, OutlineCone};
+pub use cone::{new_transformed_outline_cone, Cone, OutlineCone};
 pub use csg::{new_difference, new_intersection, BooleanShape, Op};
 pub use cube::{Cube, CubeTexture};
 pub use cylinder::{new_transformed_outline_cylinder, Cylinder, OutlineCylinder};
