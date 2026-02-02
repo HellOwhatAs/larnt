@@ -181,7 +181,7 @@ impl Shape for OutlineCylinder {
 
         let mut p0 = Vec::new();
         let mut p1 = Vec::new();
-        for a in 0..360 {
+        for a in 0..=360 {
             let x = self.cylinder.radius * radians(a as f64).cos();
             let y = self.cylinder.radius * radians(a as f64).sin();
             p0.push(Vector::new(x, y, self.cylinder.z0));

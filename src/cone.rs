@@ -136,7 +136,7 @@ impl Shape for OutlineCone {
 
         // Base circle path
         let mut p0 = Vec::new();
-        for angle in 0..360 {
+        for angle in 0..=360 {
             let x = r * radians(angle as f64).cos();
             let y = r * radians(angle as f64).sin();
             p0.push(Vector::new(x, y, 0.0));
@@ -156,9 +156,8 @@ impl Shape for OutlineCone {
         let theta2 = eye_azimuth - angular_offset;
 
         // Silhouette points on the base circle (with slight outward offset for visibility)
-        let scale = 1.01;
-        let a0 = Vector::new(r * scale * theta1.cos(), r * scale * theta1.sin(), 0.0);
-        let b0 = Vector::new(r * scale * theta2.cos(), r * scale * theta2.sin(), 0.0);
+        let a0 = Vector::new(r * theta1.cos(), r * theta1.sin(), 0.0);
+        let b0 = Vector::new(r * theta2.cos(), r * theta2.sin(), 0.0);
 
         Paths::from_vec(vec![
             p0,
