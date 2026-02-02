@@ -152,18 +152,17 @@ impl Cube {
             let p = i as f64 / stripes as f64;
             let x = x1 + (x2 - x1) * p;
             let y = y1 + (y2 - y1) * p;
-            paths.push(vec![Vector::new(x, y1, z1), Vector::new(x, y1, z2)]);
-            paths.push(vec![Vector::new(x, y2, z1), Vector::new(x, y2, z2)]);
-            paths.push(vec![Vector::new(x1, y, z1), Vector::new(x1, y, z2)]);
-            paths.push(vec![Vector::new(x2, y, z1), Vector::new(x2, y, z2)]);
-
-            {
-                let x_ = x2 - (x2 - x1) * p;
-                let y_ = y2 - (y2 - y1) * p;
-                for z in [z1, z2] {
-                    paths.push(vec![Vector::new(x, y, z), Vector::new(x_, y, z)]);
-                    paths.push(vec![Vector::new(x, y, z), Vector::new(x, y_, z)]);
-                }
+            let x_ = x2 - (x2 - x1) * p;
+            let y_ = y2 - (y2 - y1) * p;
+            if i != stripes {
+                paths.push(vec![Vector::new(x, y1, z1), Vector::new(x, y1, z2)]);
+                paths.push(vec![Vector::new(x_, y2, z1), Vector::new(x_, y2, z2)]);
+                paths.push(vec![Vector::new(x1, y_, z1), Vector::new(x1, y_, z2)]);
+                paths.push(vec![Vector::new(x2, y, z1), Vector::new(x2, y, z2)]);
+            }
+            for z in [z1, z2] {
+                paths.push(vec![Vector::new(x, y, z), Vector::new(x_, y, z)]);
+                paths.push(vec![Vector::new(x, y, z), Vector::new(x, y_, z)]);
             }
         }
         Paths::from_vec(paths)

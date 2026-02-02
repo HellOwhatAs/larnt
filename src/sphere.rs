@@ -156,9 +156,9 @@ impl Sphere {
 
         // Longitude lines
         let mut lng = 0;
-        while lng <= 360 {
+        while lng < 360 {
             let mut path = Vec::new();
-            for lat in (-90 + o)..=(90 - o) {
+            for lat in -(90 - o)..=(90 - o) {
                 let v = lat_lng_to_xyz(lat as f64, lng as f64, self.radius).add(self.center);
                 path.push(v);
             }
