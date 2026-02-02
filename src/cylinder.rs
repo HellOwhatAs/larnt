@@ -146,17 +146,12 @@ impl Shape for OutlineCylinder {
         self.cylinder.bounding_box()
     }
 
-    fn contains(&self, _v: Vector, _f: f64) -> bool {
-        // Return false to prevent self-occlusion during visibility filtering,
-        // similar to OutlineCone. This ensures the outline paths are fully visible.
-        false
+    fn contains(&self, v: Vector, f: f64) -> bool {
+        self.cylinder.contains(v, f)
     }
 
-    fn intersect(&self, _r: Ray) -> Hit {
-        // Return no hit to prevent self-occlusion during visibility filtering.
-        // The outline cylinder is meant to show the silhouette, not to occlude
-        // other objects or itself.
-        Hit::no_hit()
+    fn intersect(&self, r: Ray) -> Hit {
+        self.cylinder.intersect(r)
     }
 
     fn paths(&self) -> Paths {
@@ -196,39 +191,31 @@ impl Shape for OutlineCylinder {
         let theta1 = eye_azimuth + angular_offset;
         let theta2 = eye_azimuth - angular_offset;
 
-        // Convert to degrees for iteration
-        let deg1 = theta1.to_degrees();
-        let deg2 = theta2.to_degrees();
-
-        // Top circle: full circle (always visible from above)
+        // For visbility of arcs, scale outer edge by 1/cos(π/360)
+        let vscale = |angle_r: f64| {
+            if (angle_r - eye_azimuth).cos() >= ratio {
+                1.0 / (std::f64::consts::PI / 360.0).cos()
+            } else {
+                1.0
+            }
+        };
+        // Top circle
         let mut p1 = Vec::new();
         for angle in 0..=360 {
-            let x = r * radians(angle as f64).cos();
-            let y = r * radians(angle as f64).sin();
+            let angle_r = radians(angle as f64);
+            let x = r * vscale(angle_r) * angle_r.cos();
+            let y = r * vscale(angle_r) * angle_r.sin();
             p1.push(Vector::new(x, y, self.cylinder.z1));
         }
 
-        // Bottom circle: only the back arc (visible through the top opening)
-        // The back arc goes from theta1 to theta2, passing through the far side
-        // (away from the eye direction)
+        // Bottom circle
         let mut p0 = Vec::new();
-        let start_deg = deg1.ceil() as i32;
-        let end_deg = deg2.floor() as i32 + 360; // Go the long way around
-        
-        // Start with the exact tangent point
-        p0.push(Vector::new(r * theta1.cos(), r * theta1.sin(), self.cylinder.z0));
-        
-        // Add points along the back arc
-        for angle in start_deg..=end_deg {
-            let angle_norm = ((angle % 360) + 360) % 360;
-            let rad = radians(angle_norm as f64);
-            let x = r * rad.cos();
-            let y = r * rad.sin();
+        for angle in 0..=360 {
+            let angle_r = radians(angle as f64);
+            let x = r * vscale(angle_r) * angle_r.cos();
+            let y = r * vscale(angle_r) * angle_r.sin();
             p0.push(Vector::new(x, y, self.cylinder.z0));
         }
-        
-        // End with the exact tangent point
-        p0.push(Vector::new(r * theta2.cos(), r * theta2.sin(), self.cylinder.z0));
 
         // Silhouette lines from tangent points
         let a0 = Vector::new(r * theta1.cos(), r * theta1.sin(), self.cylinder.z0);
@@ -236,12 +223,7 @@ impl Shape for OutlineCylinder {
         let b0 = Vector::new(r * theta2.cos(), r * theta2.sin(), self.cylinder.z0);
         let b1 = Vector::new(r * theta2.cos(), r * theta2.sin(), self.cylinder.z1);
 
-        Paths::from_vec(vec![
-            p0,
-            p1,
-            vec![a0, a1],
-            vec![b0, b1],
-        ])
+        Paths::from_vec(vec![p0, p1, vec![a0, a1], vec![b0, b1]])
     }
 }
 

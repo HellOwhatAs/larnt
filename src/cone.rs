@@ -134,19 +134,17 @@ impl Shape for OutlineCone {
 
         let sqrt_ab = (a * a + b * b).sqrt();
 
-        // Base circle path
-        let mut p0 = Vec::new();
-        for angle in 0..=360 {
-            let x = r * radians(angle as f64).cos();
-            let y = r * radians(angle as f64).sin();
-            p0.push(Vector::new(x, y, 0.0));
-        }
-
         // Compute silhouette generator angles
         let ratio = c / sqrt_ab;
         if ratio.abs() > 1.0 {
             // Eye is inside the extended cone surface - no proper silhouette
             // Fall back to just the base circle
+            let mut p0 = Vec::new();
+            for angle in 0..=360 {
+                let x = r * radians(angle as f64).cos();
+                let y = r * radians(angle as f64).sin();
+                p0.push(Vector::new(x, y, 0.0));
+            }
             return Paths::from_vec(vec![p0]);
         }
 
@@ -154,6 +152,23 @@ impl Shape for OutlineCone {
         let angular_offset = ratio.acos();
         let theta1 = eye_azimuth + angular_offset;
         let theta2 = eye_azimuth - angular_offset;
+
+        // For visbility of arcs, scale outer edge by 1/cos(π/360)
+        let vscale = |angle_r: f64| {
+            if (angle_r - eye_azimuth).cos() >= ratio {
+                1.0 / (std::f64::consts::PI / 360.0).cos()
+            } else {
+                1.0
+            }
+        };
+        // Base circle path
+        let mut p0 = Vec::new();
+        for angle in 0..=360 {
+            let angle_r = radians(angle as f64);
+            let x = r * vscale(angle_r) * angle_r.cos();
+            let y = r * vscale(angle_r) * angle_r.sin();
+            p0.push(Vector::new(x, y, 0.0));
+        }
 
         // Silhouette points on the base circle (with slight outward offset for visibility)
         let a0 = Vector::new(r * theta1.cos(), r * theta1.sin(), 0.0);

@@ -1,11 +1,11 @@
-use ln::{OutlineCylinder, Scene, Vector};
+use ln::{OutlineCone, Scene, Vector};
 
 fn main() {
     // create a scene and add a single cube
     let mut scene = Scene::new();
 
     // define camera parameters
-    let eye = Vector::new(4.0, 3.0, 4.0); // camera position
+    let eye = Vector::new(4.0, 3.0, 6.5); // camera position
     let center = Vector::new(0.0, 0.0, 0.0); // camera looks at
     let up = Vector::new(0.0, 0.0, 1.0); // up direction
 
@@ -14,10 +14,10 @@ fn main() {
     let height = 1024.0; // rendered height
     let fovy = 50.0; // vertical field of view, degrees
     let znear = 0.1; // near z plane
-    let zfar = 10.0; // far z plane
-    let step = 0.0001; // how finely to chop the paths for visibility testing
+    let zfar = 100.0; // far z plane
+    let step = 0.0174; // how finely to chop the paths for visibility testing
 
-    scene.add(OutlineCylinder::new(eye, up, 1.0, 0.0, 1.0));
+    scene.add(OutlineCone::new(eye, up, 1.0, 1.0));
 
     // compute 2D paths that depict the 3D scene
     let paths = scene.render(eye, center, up, width, height, fovy, znear, zfar, step);
