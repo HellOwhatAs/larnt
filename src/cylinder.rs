@@ -172,7 +172,7 @@ impl Shape for OutlineCylinder {
 
         // Compute silhouette generator angles
         let ratio = c / sqrt_ab;
-        if ratio.abs() > 1.0 {
+        if self.eye.z > self.cylinder.z0 && self.eye.z < self.cylinder.z1 && ratio.abs() > 1.0 {
             // Eye is inside the cylinder - no proper silhouette
             // Fall back to full circles
             let mut p0 = Vec::new();

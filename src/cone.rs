@@ -136,7 +136,7 @@ impl Shape for OutlineCone {
 
         // Compute silhouette generator angles
         let ratio = c / sqrt_ab;
-        if ratio.abs() > 1.0 {
+        if self.eye.z > 0.0 && self.eye.z < h && ratio.abs() > 1.0 {
             // Eye is inside the extended cone surface - no proper silhouette
             // Fall back to just the base circle
             let mut p0 = Vec::new();
