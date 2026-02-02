@@ -1,6 +1,6 @@
-use std::sync::Arc;
-
+use crate::eval_func;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Serialize, Deserialize)]
 pub enum Matrix {
@@ -41,6 +41,7 @@ pub enum LnShape {
     Function {
         func: String,
         bbox: ([f64; 3], [f64; 3]),
+        direction: String,
         texture: String,
     },
     Triangle {
@@ -101,12 +102,44 @@ impl LnShape {
                 };
                 Arc::new(sphere)
             }
-            // TODO: implement Function shape
             LnShape::Function {
-                func: _,
-                bbox: _,
-                texture: _,
-            } => todo!(),
+                func,
+                bbox,
+                direction,
+                texture,
+            } => {
+                let (slab, compiled) = eval_func::str2compiled(&func).map_err(|e| e.to_string())?;
+                let f = eval_func::compiled2func(slab, compiled);
+                let func = ln::Function::new(
+                    f,
+                    ln::Box::new(
+                        ln::Vector::new(bbox.0[0], bbox.0[1], bbox.0[2]),
+                        ln::Vector::new(bbox.1[0], bbox.1[1], bbox.1[2]),
+                    ),
+                    match direction.as_str() {
+                        "Below" => ln::Direction::Below,
+                        "Above" => ln::Direction::Above,
+                        _ => {
+                            return Err(format!(
+                                "Invalid function direction: {}. Must be 'Below' or 'Above'",
+                                direction
+                            ));
+                        }
+                    },
+                )
+                .with_texture(match texture.as_str() {
+                    "Grid" => ln::FunctionTexture::Grid,
+                    "Swirl" => ln::FunctionTexture::Swirl,
+                    "Spiral" => ln::FunctionTexture::Spiral,
+                    _ => {
+                        return Err(format!(
+                            "Invalid function texture: {}. Must be 'Grid', 'Swirl', or 'Spiral'",
+                            texture
+                        ));
+                    }
+                });
+                Arc::new(func)
+            }
             LnShape::Triangle { v1, v2, v3 } => {
                 let v1_v = ln::Vector::new(v1[0], v1[1], v1[2]);
                 let v2_v = ln::Vector::new(v2[0], v2[1], v2[2]);
