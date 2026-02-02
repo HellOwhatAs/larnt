@@ -2,7 +2,7 @@ use crate::eval_func;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum Matrix {
     Rotate { v: [f64; 3], a: f64 },
     Scale { v: [f64; 3] },
@@ -23,7 +23,8 @@ impl Matrix {
 pub enum LnShape {
     Cone {
         radius: f64,
-        height: f64,
+        v0: [f64; 3],
+        v1: [f64; 3],
     },
     Cube {
         min: [f64; 3],
@@ -33,8 +34,8 @@ pub enum LnShape {
     },
     Cylinder {
         radius: f64,
-        z0: f64,
-        z1: f64,
+        v0: [f64; 3],
+        v1: [f64; 3],
     },
     Sphere {
         center: [f64; 3],
@@ -71,7 +72,12 @@ impl LnShape {
         up: ln::Vector,
     ) -> Result<Arc<dyn ln::Shape + Send + Sync>, String> {
         Ok(match self {
-            LnShape::Cone { radius, height } => Arc::new(ln::Cone::new(radius, height)),
+            LnShape::Cone { radius, v0, v1 } => Arc::new(ln::new_transformed_cone(
+                up,
+                ln::Vector::new(v0[0], v0[1], v0[2]),
+                ln::Vector::new(v1[0], v1[1], v1[2]),
+                radius,
+            )),
             LnShape::Cube {
                 min,
                 max,
@@ -93,7 +99,12 @@ impl LnShape {
                     },
                 ))
             }
-            LnShape::Cylinder { radius, z0, z1 } => Arc::new(ln::Cylinder::new(radius, z0, z1)),
+            LnShape::Cylinder { radius, v0, v1 } => Arc::new(ln::new_transformed_cylinder(
+                up,
+                ln::Vector::new(v0[0], v0[1], v0[2]),
+                ln::Vector::new(v1[0], v1[1], v1[2]),
+                radius,
+            )),
             LnShape::Sphere {
                 center,
                 radius,
@@ -182,11 +193,21 @@ impl LnShape {
                 Arc::new(ln::Mesh::new(triangles))
             }
             LnShape::Outline(ln_shape) => match *ln_shape {
-                LnShape::Cone { radius, height } => {
-                    Arc::new(ln::OutlineCone::new(eye, up, radius, height))
-                }
-                LnShape::Cylinder { radius, z0, z1 } => {
-                    Arc::new(ln::OutlineCylinder::new(eye, up, radius, z0, z1))
+                LnShape::Cone { radius, v0, v1 } => Arc::new(ln::new_transformed_outline_cone(
+                    eye,
+                    up,
+                    ln::Vector::new(v0[0], v0[1], v0[2]),
+                    ln::Vector::new(v1[0], v1[1], v1[2]),
+                    radius,
+                )),
+                LnShape::Cylinder { radius, v0, v1 } => {
+                    Arc::new(ln::new_transformed_outline_cylinder(
+                        eye,
+                        up,
+                        ln::Vector::new(v0[0], v0[1], v0[2]),
+                        ln::Vector::new(v1[0], v1[1], v1[2]),
+                        radius,
+                    ))
                 }
                 LnShape::Sphere {
                     center,
@@ -221,7 +242,7 @@ impl LnShape {
                 ln::new_intersection(shapes)
             }
             LnShape::Transformation { shape, matrix } => Arc::new(ln::TransformedShape::new(
-                shape.to_shape(eye, up)?,
+                shape.to_shape(matrix.clone().to_matrix().inverse().mul_position(eye), up)?,
                 matrix.to_matrix(),
             )),
         })

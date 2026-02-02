@@ -1,8 +1,7 @@
-use std::sync::Arc;
-
 use ln::{
-    Cone, Cube, CubeTexture, Cylinder, Matrix, OutlineCone, OutlineCylinder, OutlineSphere, Scene,
-    Sphere, SphereTexture, TransformedShape, Vector,
+    new_transformed_cone, new_transformed_cylinder, new_transformed_outline_cone,
+    new_transformed_outline_cylinder, Cube, CubeTexture, OutlineSphere, Scene, Sphere,
+    SphereTexture, Vector,
 };
 
 fn main() {
@@ -39,35 +38,32 @@ fn main() {
             .with_texture(SphereTexture::RandomEquators(42)),
     );
     scene.add(OutlineSphere::new(eye, up, Vector::new(2.0, 3.5, 0.5), 0.5));
-    scene.add_arc(Arc::new(TransformedShape::new(
-        Arc::new(Cone::new(0.5, 1.0)),
-        Matrix::translate(Vector::new(-1.0, 0.5, 0.0)),
-    )));
-    let cone_transform = Matrix::translate(Vector::new(-1.0, 2.0, 0.0));
-    scene.add_arc(Arc::new(TransformedShape::new(
-        Arc::new(OutlineCone::new(
-            cone_transform.inverse().mul_position(eye),
-            up,
-            0.5,
-            1.0,
-        )),
-        cone_transform,
-    )));
-    scene.add_arc(Arc::new(TransformedShape::new(
-        Arc::new(Cylinder::new(0.5, 0.0, 1.0)),
-        Matrix::translate(Vector::new(3.5, 0.5, 0.0)),
-    )));
-    let cylinder_transform = Matrix::translate(Vector::new(3.5, 2.0, 0.0));
-    scene.add_arc(Arc::new(TransformedShape::new(
-        Arc::new(OutlineCylinder::new(
-            cylinder_transform.inverse().mul_position(eye),
-            up,
-            0.5,
-            0.0,
-            1.0,
-        )),
-        cylinder_transform,
-    )));
+    scene.add(new_transformed_cone(
+        up,
+        Vector::new(-1.0, 0.5, 0.0),
+        Vector::new(-1.0, 0.5, 1.0),
+        0.5,
+    ));
+    scene.add(new_transformed_outline_cone(
+        eye,
+        up,
+        Vector::new(-1.0, 2.0, 0.0),
+        Vector::new(-1.0, 2.0, 1.0),
+        0.5,
+    ));
+    scene.add(new_transformed_cylinder(
+        up,
+        Vector::new(3.5, 0.5, 0.0),
+        Vector::new(3.5, 0.5, 1.0),
+        0.5,
+    ));
+    scene.add(new_transformed_outline_cylinder(
+        eye,
+        up,
+        Vector::new(3.5, 2.0, 0.0),
+        Vector::new(3.5, 2.0, 1.0),
+        0.5,
+    ));
 
     // compute 2D paths that depict the 3D scene
     let paths = scene.render(eye, center, up, width, height, fovy, znear, zfar, step);

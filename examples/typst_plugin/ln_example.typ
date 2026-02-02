@@ -3,12 +3,16 @@
 #import "@preview/suiji:0.5.1"
 #import "@preview/eqalc:0.1.4"
 
-#let cone(radius, height) = {
-  assert(type(radius) == float and type(height) == float, message: "cone(radius, height) expects float arguments")
+#let cone(radius, v0, v1) = {
+  assert(
+    type(radius) == float and (v0, v1).all(v => type(v) == array and v.len() == 3 and v.all(i => type(i) == float)),
+    message: "cone(radius, height) expects `radius` be a float and `v0`, `v1` be arrays of 3 floats",
+  )
   return (
     Cone: (
       radius: radius,
-      height: height,
+      v0: v0,
+      v1: v1,
     ),
   )
 }
@@ -29,16 +33,16 @@
   )
 }
 
-#let cylinder(radius, z0, z1) = {
+#let cylinder(radius, v0, v1) = {
   assert(
-    (radius, z0, z1).all(x => type(x) == float),
-    message: "cylinder(radius, z0, z1) expects three float arguments",
+    type(radius) == float and (v0, v1).all(v => type(v) == array and v.len() == 3 and v.all(i => type(i) == float)),
+    message: "cylinder(radius, v0, v1) expects `radius` be a float and `v0`, `v1` be arrays of 3 floats",
   )
   return (
     Cylinder: (
       radius: radius,
-      z0: z0,
-      z1: z1,
+      v0: v0,
+      v1: v1,
     ),
   )
 }
@@ -255,10 +259,10 @@
   sphere((2., 2., .5), 0.5, texture: "RandomCircles"),
   sphere((0.5, 3.5, .5), 0.5, texture: "RandomEquators"),
   outline(sphere((2., 3.5, .5), 0.5)),
-  translate(cone(0.5, 1.0), (-1., 0.5, 0.)),
-  translate(outline(cone(0.5, 1.0)), (-1., 2.0, 0.)),
-  translate(cylinder(0.5, 0.0, 1.0), (3.5, 0.5, 0.)),
-  translate(outline(cylinder(0.5, 0.0, 1.0)), (3.5, 2.0, 0.)),
+  cone(0.5, (-1., 0.5, 0.), (-1., 0.5, 1.)),
+  translate(outline(cone(0.5, (0., 0., 0.), (0., 0., 1.))), (-1., 2.0, 0.)),
+  cylinder(0.5, (3.5, 0.5, 0.), (3.5, 0.5, 1.)),
+  translate(outline(cylinder(0.5, (0., 0., 0.), (0., 0., 1.))), (3.5, 2.0, 0.)),
 )
 
 #{

@@ -14,7 +14,7 @@
 //!
 //! // Or with a custom texture
 //! let sphere_dots = Sphere::new(Vector::new(2.0, 0.0, 0.0), 1.0)
-//!     .with_texture(SphereTexture::RandomDots);
+//!     .with_texture(SphereTexture::RandomDots(42));
 //!
 //! let mut scene = Scene::new();
 //! scene.add(sphere);
@@ -61,7 +61,7 @@ pub enum SphereTexture {
 ///
 /// // Sphere with dots texture
 /// let sphere_dots = Sphere::new(Vector::new(0.0, 0.0, 0.0), 2.0)
-///     .with_texture(SphereTexture::RandomDots);
+///     .with_texture(SphereTexture::RandomDots(42));
 /// ```
 #[derive(Debug, Clone)]
 pub struct Sphere {

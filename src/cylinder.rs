@@ -203,6 +203,25 @@ impl Shape for OutlineCylinder {
     }
 }
 
+pub fn new_transformed_cylinder(
+    up: Vector,
+    v0: Vector,
+    v1: Vector,
+    radius: f64,
+) -> TransformedShape {
+    let d = v1.sub(v0);
+    let z = d.length();
+    let a = d.normalize().dot(up).acos();
+    let m = if a != 0.0 {
+        let u = d.cross(up).normalize();
+        Matrix::rotate(u, a).translated(v0)
+    } else {
+        Matrix::translate(v0)
+    };
+    let c = Cylinder::new(radius, 0.0, z);
+    TransformedShape::new(Arc::new(c), m)
+}
+
 /// Creates an outline cylinder between two arbitrary points.
 ///
 /// This is useful for drawing cylinders that aren't aligned with the Z axis.
