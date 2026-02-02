@@ -97,6 +97,12 @@ impl<F> Function<F>
 where
     F: Fn(f64, f64) -> f64 + Send + Sync,
 {
+    /// Calculate max radius for radial textures based on bbox dimensions
+    fn max_radius(&self) -> f64 {
+        (self.bx.max.x - self.bx.min.x).max(self.bx.max.y - self.bx.min.y) / 2.0
+            * std::f64::consts::SQRT_2
+    }
+
     /// Grid texture - lines along constant x and y (works with any function)
     fn paths_grid(&self) -> Paths {
         let mut paths = Vec::new();
@@ -140,12 +146,13 @@ where
     fn paths_swirl(&self) -> Paths {
         let mut paths = Vec::new();
         let fine = 1.0 / 256.0;
+        let max_radius = self.max_radius();
 
         let mut a = 0;
         while a < 360 {
             let mut path = Vec::new();
             let mut r = 0.0;
-            while r <= 8.0 {
+            while r <= max_radius {
                 let x = radians(a as f64).cos() * r;
                 let y = radians(a as f64).sin() * r;
                 let mut z = (self.func)(x, y);
@@ -154,10 +161,26 @@ where
                 let x = (radians(a as f64) - o).cos() * r;
                 let y = (radians(a as f64) - o).sin() * r;
                 z = z.min(self.bx.max.z).max(self.bx.min.z);
-                path.push(Vector::new(x, y, z));
+
+                // Check if point is within bbox x/y bounds
+                if x >= self.bx.min.x
+                    && x <= self.bx.max.x
+                    && y >= self.bx.min.y
+                    && y <= self.bx.max.y
+                {
+                    path.push(Vector::new(x, y, z));
+                } else {
+                    // Point is outside bbox, start a new path segment
+                    if path.len() > 1 {
+                        paths.push(path);
+                    }
+                    path = Vec::new();
+                }
                 r += fine;
             }
-            paths.push(path);
+            if path.len() > 1 {
+                paths.push(path);
+            }
             a += 5;
         }
 
@@ -166,19 +189,36 @@ where
 
     /// Spiral texture - single spiral path (works with any function)
     fn paths_spiral(&self) -> Paths {
+        let mut paths = Vec::new();
         let mut path = Vec::new();
         let n = 10000;
+        let max_radius = self.max_radius();
 
         for i in 0..n {
             let t = i as f64 / n as f64;
-            let r = 8.0 - t.powf(0.1) * 8.0;
+            let r = max_radius - t * max_radius;
             let x = radians(t * 2.0 * std::f64::consts::PI * 3000.0).cos() * r;
             let y = radians(t * 2.0 * std::f64::consts::PI * 3000.0).sin() * r;
             let mut z = (self.func)(x, y);
             z = z.min(self.bx.max.z).max(self.bx.min.z);
-            path.push(Vector::new(x, y, z));
+
+            // Check if point is within bbox x/y bounds
+            if x >= self.bx.min.x && x <= self.bx.max.x && y >= self.bx.min.y && y <= self.bx.max.y
+            {
+                path.push(Vector::new(x, y, z));
+            } else {
+                // Point is outside bbox, start a new path segment
+                if path.len() > 1 {
+                    paths.push(path);
+                }
+                path = Vec::new();
+            }
         }
 
-        Paths::from_vec(vec![path])
+        if path.len() > 1 {
+            paths.push(path);
+        }
+
+        Paths::from_vec(paths)
     }
 }

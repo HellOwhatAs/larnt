@@ -5,14 +5,16 @@ fn main() {
     let bbox = BBox::new(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0));
 
     scene.add(
-        Function::new(|x, y| x * y, bbox, Direction::Below).with_texture(FunctionTexture::Swirl),
+        Function::new(|x, y| x * y, bbox, Direction::Below).with_texture(FunctionTexture::Spiral),
     );
+
+    scene
+        .add(Function::new(|_, _| 0.0, bbox, Direction::Below).with_texture(FunctionTexture::Grid));
 
     scene.add(
-        Function::new(|_, _| 0.0, bbox, Direction::Below).with_texture(FunctionTexture::Grid),
+        Sphere::new(Vector::new(2.0, 0.25, 0.5), 0.6)
+            .with_texture(ln::SphereTexture::RandomCircles(42)),
     );
-
-    scene.add(Sphere::new(Vector::new(2.0, 0.25, 0.5), 0.6).with_texture(ln::SphereTexture::RandomCircles(42)));
 
     let eye = Vector::new(3.75, 1.75, 5.0);
     let center = Vector::new(0.0, 0.0, 0.0);
