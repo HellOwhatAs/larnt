@@ -68,9 +68,9 @@
   )
 }
 
-#let func(func, min, max, direction: "Below", texture: "Grid") = {
+#let func(func, min, max, direction: "Below", texture: "Grid", n: 100) = {
   assert(
-    type(func) == str
+    (type(func) == function or type(func) == array)
       and type(min) == array
       and min.len() == 3
       and min.all(i => type(i) == float)
@@ -79,7 +79,7 @@
       and max.all(i => type(i) == float)
       and type(direction) == str
       and type(texture) == str,
-    message: "func(...) expects `func` be a string, `min` and `max` be arrays of 3 floats, `direction` and `texture` be strings",
+    message: "func(...) expects `func` be a function or array, `min` and `max` be arrays of 3 floats, `direction` and `texture` be strings",
   )
   assert(
     direction in ("Below", "Above"),
@@ -91,7 +91,15 @@
   )
   return (
     Function: (
-      func: func,
+      samples: if type(func) == function {
+        range(n + 1).map(x => range(n + 1).map(y => {
+          let x = min.at(0) + (max.at(0) - min.at(0)) * x / n
+          let y = min.at(1) + (max.at(1) - min.at(1)) * y / n
+          func(x, y)
+        }))
+      } else {
+        func
+      },
       bbox: (min, max),
       direction: direction,
       texture: texture,

@@ -1,4 +1,4 @@
-use crate::eval_func;
+use crate::interp;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -44,7 +44,7 @@ pub enum LnShape {
         seed: Option<u64>,
     },
     Function {
-        func: String,
+        samples: Vec<Vec<f64>>,
         bbox: ([f64; 3], [f64; 3]),
         direction: String,
         texture: String,
@@ -134,15 +134,26 @@ impl LnShape {
                 Arc::new(sphere)
             }
             LnShape::Function {
-                func,
+                samples,
                 bbox,
                 direction,
                 texture,
             } => {
-                let (slab, compiled) = eval_func::str2compiled(&func).map_err(|e| e.to_string())?;
-                let f = eval_func::compiled2func(slab, compiled);
+                if samples.len() < 2 || samples[0].len() < 2 {
+                    return Err("Function samples must be at least 2x2".to_string());
+                }
+                if samples.iter().any(|row| row.len() != samples[0].len()) {
+                    return Err("Function samples must have consistent row lengths".to_string());
+                }
+                let grid = interp::BilinearGrid::new(
+                    samples[0].len(),
+                    samples.len(),
+                    samples.into_iter().flatten().collect(),
+                    (bbox.0[0], bbox.1[0]),
+                    (bbox.0[1], bbox.1[1]),
+                );
                 let func = ln::Function::new(
-                    f,
+                    move |x, y| grid.get(x, y),
                     ln::Box::new(
                         ln::Vector::new(bbox.0[0], bbox.0[1], bbox.0[2]),
                         ln::Vector::new(bbox.1[0], bbox.1[1], bbox.1[2]),

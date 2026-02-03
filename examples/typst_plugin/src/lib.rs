@@ -1,5 +1,5 @@
 pub mod constructor;
-pub mod eval_func;
+pub mod interp;
 
 use ciborium::de::from_reader;
 use wasm_minimal_protocol::*;
