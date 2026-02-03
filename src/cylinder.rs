@@ -155,51 +155,75 @@ impl Shape for OutlineCylinder {
     }
 
     fn paths(&self) -> Paths {
-        let center = Vector::new(0.0, 0.0, self.cylinder.z0);
-        let hyp = center.sub(self.eye).length();
-        let opp = self.cylinder.radius;
-        let theta = (opp / hyp).asin();
-        let adj = opp / theta.tan();
-        let d = theta.cos() * adj;
-        let w = center.sub(self.eye).normalize();
-        let u = w.cross(self.up).normalize();
-        let c0 = self.eye.add(w.mul_scalar(d));
-        let a0 = c0.add(u.mul_scalar(self.cylinder.radius * 1.01));
-        let b0 = c0.add(u.mul_scalar(-self.cylinder.radius * 1.01));
+        // For a cylinder with radius r aligned along Z-axis, the silhouette
+        // generators are found by solving:
+        // E.x * cos(θ) + E.y * sin(θ) = r
+        // where E is the eye position.
+        //
+        // This is of the form: a*cos(θ) + b*sin(θ) = c
+        // Solution: θ = atan2(b, a) ± acos(c / sqrt(a^2 + b^2))
+        let r = self.cylinder.radius;
 
-        let center = Vector::new(0.0, 0.0, self.cylinder.z1);
-        let hyp = center.sub(self.eye).length();
-        let opp = self.cylinder.radius;
-        let theta = (opp / hyp).asin();
-        let adj = opp / theta.tan();
-        let d = theta.cos() * adj;
-        let w = center.sub(self.eye).normalize();
-        let u = w.cross(self.up).normalize();
-        let c1 = self.eye.add(w.mul_scalar(d));
-        let a1 = c1.add(u.mul_scalar(self.cylinder.radius * 1.01));
-        let b1 = c1.add(u.mul_scalar(-self.cylinder.radius * 1.01));
+        let a = self.eye.x;
+        let b = self.eye.y;
+        let c = r;
 
-        let mut p0 = Vec::new();
+        let sqrt_ab = (a * a + b * b).sqrt();
+
+        // Compute silhouette generator angles
+        let ratio = c / sqrt_ab;
+        if self.eye.z > self.cylinder.z0 && self.eye.z < self.cylinder.z1 && ratio.abs() > 1.0 {
+            // Eye is inside the cylinder - no proper silhouette
+            // Fall back to full circles
+            let mut p0 = Vec::new();
+            let mut p1 = Vec::new();
+            for angle in 0..=360 {
+                let x = r * radians(angle as f64).cos();
+                let y = r * radians(angle as f64).sin();
+                p0.push(Vector::new(x, y, self.cylinder.z0));
+                p1.push(Vector::new(x, y, self.cylinder.z1));
+            }
+            return Paths::from_vec(vec![p0, p1]);
+        }
+
+        let eye_azimuth = b.atan2(a);
+        let angular_offset = ratio.acos();
+        let theta1 = eye_azimuth + angular_offset;
+        let theta2 = eye_azimuth - angular_offset;
+
+        // For visbility of arcs, scale outer edge by 1/cos(π/360)
+        let vscale = |angle_r: f64| {
+            if (angle_r - eye_azimuth).cos() >= ratio {
+                1.0 / (std::f64::consts::PI / 360.0).cos()
+            } else {
+                1.0
+            }
+        };
+        // Top circle
         let mut p1 = Vec::new();
-        for a in 0..=360 {
-            let x = self.cylinder.radius * radians(a as f64).cos();
-            let y = self.cylinder.radius * radians(a as f64).sin();
-            p0.push(Vector::new(x, y, self.cylinder.z0));
+        for angle in 0..=360 {
+            let angle_r = radians(angle as f64);
+            let x = r * vscale(angle_r) * angle_r.cos();
+            let y = r * vscale(angle_r) * angle_r.sin();
             p1.push(Vector::new(x, y, self.cylinder.z1));
         }
 
-        Paths::from_vec(vec![
-            p0,
-            p1,
-            vec![
-                Vector::new(a0.x, a0.y, self.cylinder.z0),
-                Vector::new(a1.x, a1.y, self.cylinder.z1),
-            ],
-            vec![
-                Vector::new(b0.x, b0.y, self.cylinder.z0),
-                Vector::new(b1.x, b1.y, self.cylinder.z1),
-            ],
-        ])
+        // Bottom circle
+        let mut p0 = Vec::new();
+        for angle in 0..=360 {
+            let angle_r = radians(angle as f64);
+            let x = r * vscale(angle_r) * angle_r.cos();
+            let y = r * vscale(angle_r) * angle_r.sin();
+            p0.push(Vector::new(x, y, self.cylinder.z0));
+        }
+
+        // Silhouette lines from tangent points
+        let a0 = Vector::new(r * theta1.cos(), r * theta1.sin(), self.cylinder.z0);
+        let a1 = Vector::new(r * theta1.cos(), r * theta1.sin(), self.cylinder.z1);
+        let b0 = Vector::new(r * theta2.cos(), r * theta2.sin(), self.cylinder.z0);
+        let b1 = Vector::new(r * theta2.cos(), r * theta2.sin(), self.cylinder.z1);
+
+        Paths::from_vec(vec![p0, p1, vec![a0, a1], vec![b0, b1]])
     }
 }
 
