@@ -2,6 +2,7 @@
 
 [![Typst Universe](https://img.shields.io/badge/Typst-Universe-239dad)](https://typst.app/universe/package/larnt/)
 [![crates.io](https://img.shields.io/crates/v/larnt)](https://crates.io/crates/larnt)
+[![Repo](https://img.shields.io/badge/GitHub-repo-444)](https://github.com/HellOwhatAs/larnt/tree/master/examples/larnt_typst)
 
 _3D line art engine using [rust rewrite](https://github.com/HellOwhatAs/larnt) of [fogleman/ln](https://github.com/fogleman/ln)._
 
