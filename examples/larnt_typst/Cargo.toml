@@ -1,5 +1,5 @@
 [package]
-name = "ln_typst_plugin"
+name = "larnt_typst_plugin"
 version = "0.1.0"
 edition = "2024"
 

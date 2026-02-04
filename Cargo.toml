@@ -2,8 +2,11 @@
 name = "larnt"
 version = "0.1.0"
 edition = "2021"
-description = "The 3D Line Art Engine - A vector-based 3D renderer written in Rust"
+authors = ["HellOwhatAs"]
+description = "3D Line Art Engine - Rust rewrite of fogleman/ln."
 license = "MIT"
+readme = "README.md"
+repository = "https://github.com/HellOwhatAs/larnt"
 
 [dependencies]
 image = { version = "0.25", default-features = false }

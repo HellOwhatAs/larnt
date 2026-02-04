@@ -39,6 +39,8 @@ larnt = "0.1.0"
 To understand how `larnt` works, it's useful to start with the `Shape` trait:
 
 ```rust
+use larnt::{Box, Hit, Paths, Ray, Vector};
+
 pub trait Shape {
     fn compile(&mut self) {}
     fn bounding_box(&self) -> Box;
@@ -163,7 +165,7 @@ Now `StripedCube` instances can be added to the scene.
 You can easily construct complex solids using Intersection, Difference.
 
 ```rust
-use larnt::{new_difference, new_intersection, radians, Cylinder, Matrix, Sphere, TransformedShape, Vector};
+use larnt::{new_difference, new_intersection, radians, Cube, Cylinder, Matrix, Sphere, TransformedShape, Vector};
 use std::sync::Arc;
 
 let shape = new_difference(vec![

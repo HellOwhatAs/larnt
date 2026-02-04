@@ -1,4 +1,4 @@
-#let larnt = plugin("./ln_typst_plugin.wasm")
+#let larnt = plugin("./larnt_typst_plugin.wasm")
 
 /// The cone shape.
 /// Can be warped with `outline()` to create outline cone.
