@@ -1,7 +1,7 @@
 // Takes about 20s to render.
 #set page(margin: 0pt, height: auto)
 #import "@preview/suiji:0.5.1"
-#import "../lib.typ": *
+#import "@preview/larnt:0.1.0": *
 
 #let rng = suiji.gen-rng-f(42)
 
@@ -22,9 +22,12 @@
       )
     }
   }
-  render(
-    eye: (8.0, 8.0, 1.0),
-    center: (0., 0., -4.25),
-    ..shapes,
+  image(
+    render(
+      eye: (8.0, 8.0, 1.0),
+      center: (0., 0., -4.25),
+      ..shapes,
+    ),
+    width: 100%,
   )
 }

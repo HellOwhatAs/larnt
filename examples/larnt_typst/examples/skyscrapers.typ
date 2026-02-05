@@ -1,6 +1,6 @@
 #set page(margin: 0pt, height: auto)
 #import "@preview/suiji:0.5.1"
-#import "../lib.typ": *
+#import "@preview/larnt:0.1.0": *
 
 #let rng = suiji.gen-rng-f(42)
 
@@ -26,9 +26,12 @@
       )
     }
   }
-  render(
-    eye: (1.75, 1.25, 6.0),
-    fovy: 100.0,
-    ..cubes,
+  image(
+    render(
+      eye: (1.75, 1.25, 6.0),
+      fovy: 100.0,
+      ..cubes,
+    ),
+    width: 100%,
   )
 }

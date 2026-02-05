@@ -1,7 +1,7 @@
 // Takes more than a minute to render.
 #set page(margin: 0pt, height: auto)
 #import "@preview/suiji:0.5.1"
-#import "../lib.typ": *
+#import "@preview/larnt:0.1.0": *
 
 #{
   let normalize(values, a, b) = {
@@ -50,9 +50,12 @@
       position = position.zip(v).map(x => x.sum())
     }
   }
-  render(
-    eye: (8.0, 8.0, 8.0),
-    step: 1.0,
-    ..shapes,
+  image(
+    render(
+      eye: (8.0, 8.0, 8.0),
+      step: 1.0,
+      ..shapes,
+    ),
+    width: 100%,
   )
 }

@@ -37,11 +37,15 @@
       )
     }
   }
-  lib.render(
-    eye: (8.0, 8.0, 1.0),
-    center: (0., 0., -4.25),
-    height: 800.,
-    ..shapes,
+  image(
+    lib.render(
+      eye: (8.0, 8.0, 1.0),
+      center: (0., 0., -4.25),
+      height: 800.,
+      width: 1024.,
+      ..shapes,
+    ),
+    width: 100%,
   )
 }
 

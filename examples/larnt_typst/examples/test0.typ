@@ -1,5 +1,5 @@
 #set page(margin: 0pt, height: auto)
-#import "../lib.typ": *
+#import "@preview/larnt:0.1.0": *
 
 #{
   let n = 8
@@ -14,9 +14,12 @@
       )
     }
   }
-  render(
-    eye: (8.0, 8.0, 1.0),
-    center: (0., 0., -4.25),
-    ..shapes,
+  image(
+    render(
+      eye: (8.0, 8.0, 1.0),
+      center: (0., 0., -4.25),
+      ..shapes,
+    ),
+    width: 100%,
   )
 }
