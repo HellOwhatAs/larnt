@@ -128,7 +128,7 @@ _3D line art engine using [rust rewrite](https://github.com/HellOwhatAs/larnt) o
 - Output SVG
 
 ## Usage
-For information, see the [manual.pdf](https://github.com/user-attachments/files/25073081/manual.pdf).
+For information, see the [manual.pdf](https://github.com/user-attachments/files/25088502/manual.pdf).
 
 Add the following code to your document:
 ```typst
