@@ -22,5 +22,9 @@ fn main() {
     let height = 1024.0;
 
     let paths = scene.render(eye, center, up, width, height, 50.0, 0.1, 100.0, 0.01);
+    paths
+        .to_image(width, height, 2.0)
+        .save("out.png")
+        .expect("Failed to save PNG");
     paths.write_to_svg("out.svg", width, height).unwrap();
 }

@@ -1,12 +1,79 @@
 # `larnt` The 3D Line Art Engine
 
-> This project is a Rust reimplementation of the original [Go implementation](https://github.com/fogleman/ln) by [Michael Fogleman](https://github.com/fogleman).
+[![crates.io](https://img.shields.io/crates/v/larnt)](https://crates.io/crates/larnt)
+[![Typst Universe](https://img.shields.io/badge/Typst-Universe-239dad)](https://typst.app/universe/package/larnt/)
+[![Repo](https://img.shields.io/badge/GitHub-repo-444)](https://github.com/HellOwhatAs/larnt/tree/master/examples/larnt_typst)
 
 `larnt` is a vector-based 3D renderer written in Rust. It is used to produce 2D vector graphics (think SVGs) depicting 3D scenes.
 
 *The output of an OpenGL pipeline is a rastered image. The output of `larnt` is a set of 2D vector paths.*
 
-![Examples](http://i.imgur.com/HY2Fg2t.png)
+> This project is a Rust rewrite of the original [Go implementation](https://github.com/fogleman/ln) by [Michael Fogleman](https://github.com/fogleman).
+
+## Examples
+<table>
+    <tr>
+        <td>
+            <a href="examples/basics.rs">
+                <img  alt="basics"
+                    src="https://github.com/user-attachments/assets/d989173e-2e17-4e51-b40d-1d90fece2c7e" />
+            </a>
+        </td>
+        <td>
+            <a href="examples/beads.rs">
+                <img  alt="beads"
+                    src="https://github.com/user-attachments/assets/4dec924e-84a5-4e68-963c-f91bbf23b527" />
+            </a>
+        </td>
+        <td>
+            <a href="examples/csg.rs">
+                <img  alt="csg"
+                    src="https://github.com/user-attachments/assets/dbc90e39-4373-4de1-acd4-55fc07220ebf" />
+            </a>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <a href="examples/example1.rs">
+                <img  alt="example1"
+                    src="https://github.com/user-attachments/assets/49cbdc1f-55b4-41ee-b346-43372b74abc9" />
+            </a>
+        </td>
+        <td>
+            <a href="examples/function2.rs">
+                <img  alt="function2"
+                    src="https://github.com/user-attachments/assets/5353c28c-33a6-4a14-a6b0-5fcd85dcb932" />
+            </a>
+        </td>
+        <td>
+            <a href="examples/graph.rs">
+                <img  alt="graph"
+                    src="https://github.com/user-attachments/assets/e0b3d6bc-e656-4e3c-bf52-cf4c8cadb78e" />
+            </a>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <a href="examples/skyscrapers.rs">
+                <img  alt="skyscrapers"
+                    src="https://github.com/user-attachments/assets/35e9d8f2-80fa-4da3-a5bd-8d5d81f832f2" />
+            </a>
+        </td>
+        <td>
+            <a href="examples/suzanne.rs">
+                <img  alt="suzanne"
+                    src="https://github.com/user-attachments/assets/f5971deb-94dc-4688-beeb-43cf463aab64" />
+            </a>
+        </td>
+        <td>
+            <a href="examples/test.rs">
+                <img  alt="test"
+                    src="https://github.com/user-attachments/assets/a4031cad-9a6f-4a0a-bfcf-87a5b49f6a4a" />
+        </td>
+    </tr>
+</table>
+
+*Click on the example image to jump to the code.*
 
 ## Installation
 
@@ -109,8 +176,7 @@ fn main() {
 ```
 
 ### The Output
-
-![Cube](http://i.imgur.com/d2dGrOJ.png)
+<img width="250px" alt="example0" src="https://github.com/user-attachments/assets/3ab195bf-0e3d-4304-b68d-e7dac0b501d9" />
 
 ## Custom Texturing
 
@@ -188,5 +254,3 @@ let shape = new_difference(vec![
 This is `(Sphere & Cube) - (Cylinder | Cylinder | Cylinder)`.
 
 Unfortunately, it's difficult to compute the joint formed at the boundaries of these combined shapes, so sufficient texturing is needed on the original solids for a decent result.
-
-![Example](http://i.imgur.com/gk8UtVK.gif)

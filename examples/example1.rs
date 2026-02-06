@@ -21,9 +21,9 @@ fn main() {
     let eye = Vector::new(6.0, 5.0, 3.0);
     let center = Vector::new(0.0, 0.0, 0.0);
     let up = Vector::new(0.0, 0.0, 1.0);
-    let width = 1920.0;
-    let height = 1200.0;
-    let fovy = 30.0;
+    let width = 1024.0;
+    let height = 1024.0;
+    let fovy = 50.0;
 
     let paths = scene.render(eye, center, up, width, height, fovy, 0.1, 100.0, 0.01);
     paths.write_to_png("out.png", width, height);

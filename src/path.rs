@@ -32,7 +32,7 @@ use crate::bounding_box::Box;
 use crate::filter::Filter;
 use crate::matrix::Matrix;
 use crate::vector::Vector;
-use image::{ImageBuffer, Rgb};
+use image::{ImageBuffer, Pixel, Rgb};
 use std::io::Write;
 
 /// A single path represented as a sequence of 3D points.
@@ -185,6 +185,45 @@ impl Paths {
         std::fs::write(path, svg)
     }
 
+    /// Converts the paths to an ImageBuffer.
+    ///
+    /// # Arguments
+    ///
+    /// * `width` - The image width
+    /// * `height` - The image height
+    /// * `linewidth` - The thickness of the lines in pixels
+    pub fn to_image(
+        &self,
+        width: f64,
+        height: f64,
+        linewidth: f64,
+    ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
+        let scale = 1.0;
+        let w = (width * scale) as u32;
+        let h = (height * scale) as u32;
+
+        let mut img: ImageBuffer<Rgb<u8>, Vec<u8>> =
+            ImageBuffer::from_pixel(w, h, Rgb([255, 255, 255]));
+
+        for path_points in &self.paths {
+            for i in 0..path_points.len().saturating_sub(1) {
+                let p1 = &path_points[i];
+                let p2 = &path_points[i + 1];
+                draw_line(
+                    &mut img,
+                    p1.x * scale,
+                    h as f64 - p1.y * scale,
+                    p2.x * scale,
+                    h as f64 - p2.y * scale,
+                    linewidth,
+                    Rgb([0, 0, 0]),
+                );
+            }
+        }
+
+        img
+    }
+
     /// Writes the paths to a PNG image file.
     ///
     /// Renders the paths as black lines on a white background.
@@ -207,28 +246,7 @@ impl Paths {
     /// paths.write_to_png("output.png", 512.0, 512.0);
     /// ```
     pub fn write_to_png(&self, path: &str, width: f64, height: f64) {
-        let scale = 1.0;
-        let w = (width * scale) as u32;
-        let h = (height * scale) as u32;
-
-        let mut img: ImageBuffer<Rgb<u8>, Vec<u8>> =
-            ImageBuffer::from_pixel(w, h, Rgb([255, 255, 255]));
-
-        for path_points in &self.paths {
-            for i in 0..path_points.len().saturating_sub(1) {
-                let p1 = &path_points[i];
-                let p2 = &path_points[i + 1];
-                draw_line(
-                    &mut img,
-                    (p1.x * scale) as i32,
-                    (h as f64 - p1.y * scale) as i32,
-                    (p2.x * scale) as i32,
-                    (h as f64 - p2.y * scale) as i32,
-                    Rgb([0, 0, 0]),
-                );
-            }
-        }
-
+        let img = self.to_image(width, height, 2.5);
         img.save(path).expect("Failed to save PNG");
     }
 
@@ -250,38 +268,74 @@ impl Paths {
 
 fn draw_line(
     img: &mut ImageBuffer<Rgb<u8>, Vec<u8>>,
-    x0: i32,
-    y0: i32,
-    x1: i32,
-    y1: i32,
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
+    width: f64,
     color: Rgb<u8>,
 ) {
-    let dx = (x1 - x0).abs();
-    let dy = -(y1 - y0).abs();
-    let sx = if x0 < x1 { 1 } else { -1 };
-    let sy = if y0 < y1 { 1 } else { -1 };
-    let mut err = dx + dy;
-    let mut x = x0;
-    let mut y = y0;
-
     let w = img.width() as i32;
     let h = img.height() as i32;
+    let radius = width / 2.0;
 
-    loop {
-        if x >= 0 && x < w && y >= 0 && y < h {
-            img.put_pixel(x as u32, y as u32, color);
-        }
-        if x == x1 && y == y1 {
-            break;
-        }
-        let e2 = 2 * err;
-        if e2 >= dy {
-            err += dy;
-            x += sx;
-        }
-        if e2 <= dx {
-            err += dx;
-            y += sy;
+    let min_x = (x0.min(x1) - radius - 1.0).floor() as i32;
+    let max_x = (x0.max(x1) + radius + 1.0).ceil() as i32;
+    let min_y = (y0.min(y1) - radius - 1.0).floor() as i32;
+    let max_y = (y0.max(y1) + radius + 1.0).ceil() as i32;
+
+    let min_x = min_x.max(0);
+    let max_x = max_x.min(w);
+    let min_y = min_y.max(0);
+    let max_y = max_y.min(h);
+
+    let dx = x1 - x0;
+    let dy = y1 - y0;
+    let line_len_sq = dx * dx + dy * dy;
+
+    for y in min_y..max_y {
+        for x in min_x..max_x {
+            let px = x as f64;
+            let py = y as f64;
+
+            let t = if line_len_sq == 0.0 {
+                0.0
+            } else {
+                let dot = (px - x0) * dx + (py - y0) * dy;
+                (dot / line_len_sq).clamp(0.0, 1.0)
+            };
+
+            let closest_x = x0 + t * dx;
+            let closest_y = y0 + t * dy;
+
+            let dist_x = px - closest_x;
+            let dist_y = py - closest_y;
+            let dist = (dist_x * dist_x + dist_y * dist_y).sqrt();
+
+            let alpha = if dist <= radius - 0.5 {
+                1.0
+            } else if dist >= radius + 0.5 {
+                0.0
+            } else {
+                1.0 - (dist - (radius - 0.5))
+            };
+
+            if alpha > 0.0 {
+                let pixel_x = x as u32;
+                let pixel_y = y as u32;
+                let bg_pixel = img.get_pixel(pixel_x, pixel_y);
+                let bg_channels = bg_pixel.channels();
+                let fg_channels = color.channels();
+                let mut new_channels = [0u8; 3];
+
+                for i in 0..3 {
+                    let bg_val = bg_channels[i] as f64;
+                    let fg_val = fg_channels[i] as f64;
+                    new_channels[i] = (bg_val * (1.0 - alpha) + fg_val * alpha) as u8;
+                }
+
+                img.put_pixel(pixel_x, pixel_y, *Rgb::from_slice(&new_channels));
+            }
         }
     }
 }

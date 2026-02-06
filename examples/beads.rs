@@ -34,7 +34,7 @@ fn low_pass_noise(rng: &mut SmallRng, n: usize, alpha: f64, iterations: usize) -
 }
 
 fn main() {
-    let mut rng = SmallRng::seed_from_u64(1211);
+    let mut rng = SmallRng::seed_from_u64(42);
     let eye = Vector::new(8.0, 8.0, 8.0);
     let center = Vector::new(0.0, 0.0, 0.0);
     let up = Vector::new(0.0, 0.0, 1.0);
@@ -58,10 +58,16 @@ fn main() {
         }
     }
 
-    let width = 380.0 * 5.0;
-    let height = 315.0 * 5.0;
+    let width = 1024.;
+    let height = 1024.;
     let fovy = 50.0;
 
     let paths = scene.render(eye, center, up, width, height, fovy, 0.1, 100.0, 0.01);
-    paths.write_to_svg("out.svg", width, height).unwrap();
+    paths
+        .to_image(width, height, 0.8)
+        .save("out.png")
+        .expect("Failed to save PNG");
+    paths
+        .write_to_svg("out.svg", width, height)
+        .expect("Failed to write SVG");
 }

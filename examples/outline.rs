@@ -25,4 +25,7 @@ fn main() {
 
     let paths = scene.render(eye, center, up, width, height, fovy, 0.1, 100.0, 0.01);
     paths.write_to_png("out.png", width, height);
+    paths
+        .write_to_svg("out.svg", width, height)
+        .expect("Failed to write SVG");
 }

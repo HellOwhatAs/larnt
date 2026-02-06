@@ -1,7 +1,28 @@
+use image::{codecs::gif::GifEncoder, Delay, DynamicImage, Frame, ImageBuffer, Rgb};
 use larnt::{new_transformed_outline_cylinder, radians, OutlineSphere, Scene, Vector};
-use std::sync::Arc;
+use std::{fs::File, sync::Arc, time::Duration};
 
-fn render(frame: i32) {
+fn save_gif_from_iter(
+    frames_iter: impl Iterator<Item = ImageBuffer<Rgb<u8>, Vec<u8>>>,
+    output_path: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let file = File::create(output_path)?;
+    let mut encoder = GifEncoder::new(file);
+
+    encoder.set_repeat(image::codecs::gif::Repeat::Infinite)?;
+
+    let gif_frames = frames_iter.map(|rgb_img| {
+        let rgba_img = DynamicImage::ImageRgb8(rgb_img).into_rgba8();
+        let delay = Delay::from_saturating_duration(Duration::from_millis(50));
+
+        Frame::from_parts(rgba_img, 0, 0, delay)
+    });
+
+    encoder.encode_frames(gif_frames)?;
+    Ok(())
+}
+
+fn render(frame: i32) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
     let cx = radians(frame as f64).cos();
     let cy = radians(frame as f64).sin();
     let mut scene = Scene::new();
@@ -80,11 +101,10 @@ fn render(frame: i32) {
     let width = 750.0;
     let height = 750.0;
     let paths = scene.render(eye, center, up, width, height, 60.0, 0.1, 100.0, 0.01);
-    paths.write_to_png(&format!("out{:03}.png", frame), width, height);
+    paths.to_image(width, height, 2.5)
 }
 
 fn main() {
-    for i in (0..360).step_by(2) {
-        render(i);
-    }
+    let image_iter = (0..360).step_by(3).map(|i| render(i));
+    save_gif_from_iter(image_iter, "output.gif").unwrap();
 }
