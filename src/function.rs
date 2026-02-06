@@ -32,18 +32,20 @@ where
     pub bx: Box,
     pub direction: Direction,
     pub texture: FunctionTexture,
+    pub step: f64,
 }
 
 impl<F> Function<F>
 where
     F: Fn(f64, f64) -> f64 + Send + Sync,
 {
-    pub fn new(func: F, bx: Box, direction: Direction) -> Self {
+    pub fn new(func: F, bx: Box, direction: Direction, step: f64) -> Self {
         Function {
             func,
             bx,
             direction,
             texture: FunctionTexture::default(),
+            step,
         }
     }
 
@@ -70,16 +72,29 @@ where
     }
 
     fn intersect(&self, ray: Ray) -> Hit {
-        let step = 1.0 / 64.0;
-        let sign = self.contains(ray.position(step), 0.0);
+        let n = self.bx.min.sub(ray.origin).div(ray.direction);
+        let f = self.bx.max.sub(ray.origin).div(ray.direction);
+        let (n, f) = (n.min(f), n.max(f));
+        let t0 = n.x.max(n.y).max(n.z);
+        let t1 = f.x.min(f.y).min(f.z);
 
-        let mut t = step;
-        while t < 10.0 {
+        let (mut t, t_max) = {
+            if t0 < 1e-3 && t1 > 1e-3 {
+                (self.step, t1)
+            } else if t0 >= 1e-3 && t0 < t1 {
+                (t0, t1)
+            } else {
+                return Hit::no_hit();
+            }
+        };
+
+        let sign = self.contains(ray.position(t), 0.0);
+        while t < t_max {
+            t += self.step;
             let v = ray.position(t);
             if self.contains(v, 0.0) != sign && self.bx.contains(v) {
                 return Hit::new(t);
             }
-            t += step;
         }
         Hit::no_hit()
     }
