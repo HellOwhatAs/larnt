@@ -12,9 +12,13 @@ pub enum Matrix {
 impl Matrix {
     fn to_matrix(self) -> larnt::Matrix {
         match self {
-            Matrix::Rotate { v, a } => larnt::Matrix::rotate(larnt::Vector::new(v[0], v[1], v[2]), a),
+            Matrix::Rotate { v, a } => {
+                larnt::Matrix::rotate(larnt::Vector::new(v[0], v[1], v[2]), a)
+            }
             Matrix::Scale { v } => larnt::Matrix::scale(larnt::Vector::new(v[0], v[1], v[2])),
-            Matrix::Translate { v } => larnt::Matrix::translate(larnt::Vector::new(v[0], v[1], v[2])),
+            Matrix::Translate { v } => {
+                larnt::Matrix::translate(larnt::Vector::new(v[0], v[1], v[2]))
+            }
         }
     }
 }
@@ -30,7 +34,7 @@ pub enum LnShape {
         min: [f64; 3],
         max: [f64; 3],
         texture: String,
-        stripes: Option<u64>,
+        stripes: u64,
     },
     Cylinder {
         radius: f64,
@@ -41,13 +45,14 @@ pub enum LnShape {
         center: [f64; 3],
         radius: f64,
         texture: String,
-        seed: Option<u64>,
+        seed: u64,
     },
     Function {
         samples: Vec<Vec<f64>>,
         bbox: ([f64; 3], [f64; 3]),
         direction: String,
         texture: String,
+        step: f64,
     },
     Triangle {
         v1: [f64; 3],
@@ -86,18 +91,18 @@ impl LnShape {
             } => {
                 let min_v = larnt::Vector::new(min[0], min[1], min[2]);
                 let max_v = larnt::Vector::new(max[0], max[1], max[2]);
-                Arc::new(larnt::Cube::new(min_v, max_v).with_texture(
-                    match (texture.as_str(), stripes) {
-                        ("Vanilla", _) => larnt::CubeTexture::Vanilla,
-                        ("Stripes", Some(n)) => larnt::CubeTexture::Striped(n),
+                Arc::new(
+                    larnt::Cube::new(min_v, max_v).with_texture(match texture.as_str() {
+                        "Vanilla" => larnt::CubeTexture::Vanilla,
+                        "Stripes" => larnt::CubeTexture::Striped(stripes),
                         _ => {
                             return Err(format!(
                                 "Invalid cube texture: {}, stripes: {:?}",
                                 texture, stripes
                             ));
                         }
-                    },
-                ))
+                    }),
+                )
             }
             LnShape::Cylinder { radius, v0, v1 } => Arc::new(larnt::new_transformed_cylinder(
                 up,
@@ -113,15 +118,13 @@ impl LnShape {
             } => {
                 let center_v = larnt::Vector::new(center[0], center[1], center[2]);
                 let sphere = larnt::Sphere::new(center_v, radius);
-                let sphere = match (texture.as_str(), seed) {
-                    ("LatLng", _) => sphere.with_texture(larnt::SphereTexture::LatLng),
-                    ("RandomEquators", Some(seed)) => {
+                let sphere = match texture.as_str() {
+                    "LatLng" => sphere.with_texture(larnt::SphereTexture::LatLng),
+                    "RandomEquators" => {
                         sphere.with_texture(larnt::SphereTexture::RandomEquators(seed))
                     }
-                    ("RandomDots", Some(seed)) => {
-                        sphere.with_texture(larnt::SphereTexture::RandomDots(seed))
-                    }
-                    ("RandomCircles", Some(seed)) => {
+                    "RandomDots" => sphere.with_texture(larnt::SphereTexture::RandomDots(seed)),
+                    "RandomCircles" => {
                         sphere.with_texture(larnt::SphereTexture::RandomCircles(seed))
                     }
                     _ => {
@@ -138,6 +141,7 @@ impl LnShape {
                 bbox,
                 direction,
                 texture,
+                step,
             } => {
                 if samples.len() < 2 || samples[0].len() < 2 {
                     return Err("Function samples must be at least 2x2".to_string());
@@ -168,6 +172,7 @@ impl LnShape {
                             ));
                         }
                     },
+                    step,
                 )
                 .with_texture(match texture.as_str() {
                     "Grid" => larnt::FunctionTexture::Grid,
