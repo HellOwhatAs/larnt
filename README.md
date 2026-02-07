@@ -2,7 +2,7 @@
 
 [![crates.io](https://img.shields.io/crates/v/larnt)](https://crates.io/crates/larnt)
 [![Typst Universe](https://img.shields.io/badge/Typst-Universe-239dad)](https://typst.app/universe/package/larnt/)
-[![Repo](https://img.shields.io/badge/GitHub-repo-444)](https://github.com/HellOwhatAs/larnt/tree/master/examples/larnt_typst)
+[![Repo](https://img.shields.io/badge/GitHub-repo-444)](https://github.com/HellOwhatAs/larnt/)
 
 `larnt` is a vector-based 3D renderer written in Rust. It is used to produce 2D vector graphics (think SVGs) depicting 3D scenes.
 
@@ -15,60 +15,51 @@
     <tr>
         <td>
             <a href="examples/basics.rs">
-                <img  alt="basics"
-                    src="https://github.com/user-attachments/assets/d989173e-2e17-4e51-b40d-1d90fece2c7e" />
+                <img alt="basics" src="https://github.com/user-attachments/assets/4857bf81-1cae-4b21-960e-7cbcc805a9a5" />
             </a>
         </td>
         <td>
             <a href="examples/beads.rs">
-                <img  alt="beads"
-                    src="https://github.com/user-attachments/assets/4dec924e-84a5-4e68-963c-f91bbf23b527" />
+                <img alt="beads" src="https://github.com/user-attachments/assets/2015e98f-54f2-48f4-b88a-0cbae66f5ac1" />
             </a>
         </td>
         <td>
             <a href="examples/csg.rs">
-                <img  alt="csg"
-                    src="https://github.com/user-attachments/assets/dbc90e39-4373-4de1-acd4-55fc07220ebf" />
+                <img alt="csg" src="https://github.com/user-attachments/assets/5f70e7ca-ea2d-4804-8948-57b11251f4eb" />
             </a>
         </td>
     </tr>
     <tr>
         <td>
             <a href="examples/example1.rs">
-                <img  alt="example1"
-                    src="https://github.com/user-attachments/assets/49cbdc1f-55b4-41ee-b346-43372b74abc9" />
+                <img alt="example1" src="https://github.com/user-attachments/assets/a8b92a0c-4d07-41bd-8ce9-7fec12215b5d" />
             </a>
         </td>
         <td>
             <a href="examples/function2.rs">
-                <img  alt="function2"
-                    src="https://github.com/user-attachments/assets/5353c28c-33a6-4a14-a6b0-5fcd85dcb932" />
+                <img alt="function2" src="https://github.com/user-attachments/assets/d47697cc-ffb7-416a-ab2b-635e87160b1d" />
             </a>
         </td>
         <td>
             <a href="examples/graph.rs">
-                <img  alt="graph"
-                    src="https://github.com/user-attachments/assets/e0b3d6bc-e656-4e3c-bf52-cf4c8cadb78e" />
+                <img alt="graph" src="https://github.com/user-attachments/assets/b9b072a8-c81f-45a5-a40d-33559bea932e" />
             </a>
         </td>
     </tr>
     <tr>
         <td>
             <a href="examples/skyscrapers.rs">
-                <img  alt="skyscrapers"
-                    src="https://github.com/user-attachments/assets/35e9d8f2-80fa-4da3-a5bd-8d5d81f832f2" />
+                <img alt="skyscrapers" src="https://github.com/user-attachments/assets/3b0509fb-0aa2-4237-8c51-aa957f35be06" />
             </a>
         </td>
         <td>
             <a href="examples/suzanne.rs">
-                <img  alt="suzanne"
-                    src="https://github.com/user-attachments/assets/f5971deb-94dc-4688-beeb-43cf463aab64" />
+                <img alt="suzanne" src="https://github.com/user-attachments/assets/3288522d-61b4-4680-ba55-3d536e0e96ce" />
             </a>
         </td>
         <td>
             <a href="examples/test.rs">
-                <img  alt="test"
-                    src="https://github.com/user-attachments/assets/a4031cad-9a6f-4a0a-bfcf-87a5b49f6a4a" />
+                <img alt="test" src="https://github.com/user-attachments/assets/9abc50da-b1fe-4c23-bc46-588bd26e93d8" 
         </td>
     </tr>
 </table>
