@@ -22,7 +22,7 @@
 //! assert!((normalized.length() - 1.0).abs() < 1e-10);
 //! ```
 
-use rand::{rngs::SmallRng, Rng};
+use rand::Rng;
 use std::ops::{Add, Div, Mul, Sub};
 
 /// A 3D vector with x, y, and z components.
@@ -62,7 +62,7 @@ impl Vector {
     }
 
     /// Returns a random unit vector (uniformly distributed on the unit sphere).
-    pub fn random_unit_vector(rng: &mut SmallRng) -> Self {
+    pub fn random_unit_vector(rng: &mut impl Rng) -> Self {
         loop {
             let x = rng.gen::<f64>() * 2.0 - 1.0;
             let y = rng.gen::<f64>() * 2.0 - 1.0;

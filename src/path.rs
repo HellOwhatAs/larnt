@@ -32,6 +32,7 @@ use crate::bounding_box::Box;
 use crate::filter::Filter;
 use crate::matrix::Matrix;
 use crate::vector::Vector;
+#[cfg(feature = "image")]
 use image::{ImageBuffer, Pixel, Rgb};
 use std::io::Write;
 
@@ -192,6 +193,7 @@ impl Paths {
     /// * `width` - The image width
     /// * `height` - The image height
     /// * `linewidth` - The thickness of the lines in pixels
+    #[cfg(feature = "image")]
     pub fn to_image(
         &self,
         width: f64,
@@ -245,6 +247,7 @@ impl Paths {
     ///
     /// paths.write_to_png("output.png", 512.0, 512.0);
     /// ```
+    #[cfg(feature = "png")]
     pub fn write_to_png(&self, path: &str, width: f64, height: f64) {
         let img = self.to_image(width, height, 2.5);
         img.save(path).expect("Failed to save PNG");
@@ -266,6 +269,7 @@ impl Paths {
     }
 }
 
+#[cfg(feature = "image")]
 fn draw_line(
     img: &mut ImageBuffer<Rgb<u8>, Vec<u8>>,
     x0: f64,

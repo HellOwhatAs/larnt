@@ -1,7 +1,5 @@
 use larnt::{OutlineSphere, Scene, Vector};
-use rand::rngs::SmallRng;
-use rand::Rng;
-use rand::SeedableRng;
+use rand::{rngs::SmallRng, Rng, SeedableRng};
 
 fn normalize(values: &[f64], a: f64, b: f64) -> Vec<f64> {
     let lo = values.iter().cloned().fold(f64::INFINITY, f64::min);

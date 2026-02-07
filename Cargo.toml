@@ -9,8 +9,12 @@ readme = "README.md"
 repository = "https://github.com/HellOwhatAs/larnt"
 
 [dependencies]
-image = { version = "0.25", default-features = false }
+image = { version = "0.25", default-features = false, optional = true }
 rand = { version = "0.8", default-features = false, features = ["small_rng"] }
 
+[features]
+default = ["png"]
+png = ["image/png"]
+
 [dev-dependencies]
-image = "0.25"
+image = { version = "0.25", default-features = false, features = ["gif"] }
