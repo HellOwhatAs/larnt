@@ -7,6 +7,7 @@ pub enum Matrix {
     Rotate { v: [f64; 3], a: f64 },
     Scale { v: [f64; 3] },
     Translate { v: [f64; 3] },
+    Raw([f64; 16]),
 }
 
 impl Matrix {
@@ -19,7 +20,32 @@ impl Matrix {
             Matrix::Translate { v } => {
                 larnt::Matrix::translate(larnt::Vector::new(v[0], v[1], v[2]))
             }
+            Matrix::Raw(m) => larnt::Matrix {
+                x00: m[0],
+                x01: m[1],
+                x02: m[2],
+                x03: m[3],
+                x10: m[4],
+                x11: m[5],
+                x12: m[6],
+                x13: m[7],
+                x20: m[8],
+                x21: m[9],
+                x22: m[10],
+                x23: m[11],
+                x30: m[12],
+                x31: m[13],
+                x32: m[14],
+                x33: m[15],
+            },
         }
+    }
+
+    fn from_raw(mat: larnt::Matrix) -> Self {
+        Matrix::Raw([
+            mat.x00, mat.x01, mat.x02, mat.x03, mat.x10, mat.x11, mat.x12, mat.x13, mat.x20,
+            mat.x21, mat.x22, mat.x23, mat.x30, mat.x31, mat.x32, mat.x33,
+        ])
     }
 }
 
@@ -257,10 +283,29 @@ impl LnShape {
                     .collect::<Result<Vec<_>, _>>()?;
                 larnt::new_intersection(shapes)
             }
-            LnShape::Transformation { shape, matrix } => Arc::new(larnt::TransformedShape::new(
-                shape.to_shape(matrix.clone().to_matrix().inverse().mul_position(eye), up)?,
-                matrix.to_matrix(),
-            )),
+            LnShape::Transformation { shape, matrix } => {
+                if let LnShape::Transformation {
+                    shape: shape_inner,
+                    matrix: matrix_inner,
+                } = *shape
+                {
+                    let res = LnShape::Transformation {
+                        shape: shape_inner,
+                        matrix: Matrix::from_raw(matrix.to_matrix().mul(&matrix_inner.to_matrix())),
+                    }
+                    .to_shape(eye, up);
+                    match res {
+                        Ok(s) => s,
+                        Err(e) => return Err(e),
+                    }
+                } else {
+                    Arc::new(larnt::TransformedShape::new(
+                        shape
+                            .to_shape(matrix.clone().to_matrix().inverse().mul_position(eye), up)?,
+                        matrix.to_matrix(),
+                    ))
+                }
+            }
         })
     }
 }
