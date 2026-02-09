@@ -99,11 +99,11 @@ pub fn save_binary_stl(path: &str, mesh: &Mesh) -> std::io::Result<()> {
     writer.write_all(&header)?;
 
     // Write count
-    let count = mesh.num_triangles() as u32;
+    let count = mesh.triangles.len() as u32;
     writer.write_all(&count.to_le_bytes())?;
 
     // Write triangles
-    for triangle in &mesh.triangles() {
+    for triangle in &mesh.triangles {
         // Normal (placeholder - zeros)
         writer.write_all(&[0u8; 12])?;
 
