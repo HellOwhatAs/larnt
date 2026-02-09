@@ -1,5 +1,5 @@
 use larnt::{Cube, Scene, Vector};
-use rand::{rngs::SmallRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 fn make_cube(x: f64, y: f64, z: f64) -> Cube {
     let size = 0.5;
@@ -13,7 +13,7 @@ fn main() {
 
     for x in -2..=2 {
         for y in -2..=2 {
-            let z = rng.gen::<f64>();
+            let z = rng.random::<f64>();
             scene.add(make_cube(x as f64, y as f64, z));
         }
     }

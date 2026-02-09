@@ -1,5 +1,5 @@
-use image::{codecs::gif::GifEncoder, Delay, DynamicImage, Frame, ImageBuffer, Rgb};
-use larnt::{new_transformed_outline_cylinder, radians, OutlineSphere, Scene, Vector};
+use image::{Delay, DynamicImage, Frame, ImageBuffer, Rgb, codecs::gif::GifEncoder};
+use larnt::{OutlineSphere, Scene, Vector, new_transformed_outline_cylinder, radians};
 use std::{fs::File, sync::Arc, time::Duration};
 
 fn save_gif_from_iter(

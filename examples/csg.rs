@@ -1,8 +1,8 @@
 use image::codecs::gif::GifEncoder;
 use image::{Delay, DynamicImage, Frame, ImageBuffer, Rgb};
 use larnt::{
-    new_difference, new_intersection, radians, CubeTexture, Cylinder, Matrix, Scene, Shape, Sphere,
-    TransformedShape, Vector,
+    CubeTexture, Cylinder, Matrix, Scene, Shape, Sphere, TransformedShape, Vector, new_difference,
+    new_intersection, radians,
 };
 use std::fs::File;
 use std::sync::Arc;

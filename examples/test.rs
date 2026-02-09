@@ -1,5 +1,5 @@
 use larnt::{Scene, Sphere, SphereTexture::RandomCircles, Vector};
-use rand::{rngs::SmallRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 fn main() {
     let mut scene = Scene::new();
@@ -10,7 +10,7 @@ fn main() {
         for y in -n..=n {
             scene.add(
                 Sphere::new(Vector::new(x as f64, y as f64, 0.0), 0.45)
-                    .with_texture(RandomCircles(rng.gen())),
+                    .with_texture(RandomCircles(rng.random())),
             );
         }
     }

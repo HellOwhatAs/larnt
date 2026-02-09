@@ -64,9 +64,9 @@ impl Vector {
     /// Returns a random unit vector (uniformly distributed on the unit sphere).
     pub fn random_unit_vector(rng: &mut impl Rng) -> Self {
         loop {
-            let x = rng.gen::<f64>() * 2.0 - 1.0;
-            let y = rng.gen::<f64>() * 2.0 - 1.0;
-            let z = rng.gen::<f64>() * 2.0 - 1.0;
+            let x = rng.random::<f64>() * 2.0 - 1.0;
+            let y = rng.random::<f64>() * 2.0 - 1.0;
+            let z = rng.random::<f64>() * 2.0 - 1.0;
             if x * x + y * y + z * z <= 1.0 {
                 return Vector::new(x, y, z).normalize();
             }

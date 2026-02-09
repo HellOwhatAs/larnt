@@ -174,10 +174,6 @@ impl Shape for BooleanShape {
 
 impl Filter for BooleanShape {
     fn filter(&self, v: Vector) -> Option<Vector> {
-        if self.contains(v, 0.0) {
-            Some(v)
-        } else {
-            None
-        }
+        if self.contains(v, 0.0) { Some(v) } else { None }
     }
 }

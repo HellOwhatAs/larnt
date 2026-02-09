@@ -1,5 +1,5 @@
 use larnt::{OutlineSphere, Scene, Vector};
-use rand::{rngs::SmallRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 fn normalize(values: &[f64], a: f64, b: f64) -> Vec<f64> {
     let lo = values.iter().cloned().fold(f64::INFINITY, f64::min);
@@ -24,7 +24,7 @@ fn low_pass(values: &[f64], alpha: f64) -> Vec<f64> {
 }
 
 fn low_pass_noise(rng: &mut SmallRng, n: usize, alpha: f64, iterations: usize) -> Vec<f64> {
-    let mut result: Vec<f64> = (0..n).map(|_| rng.gen()).collect();
+    let mut result: Vec<f64> = (0..n).map(|_| rng.random()).collect();
     for _ in 0..iterations {
         result = low_pass(&result, alpha);
     }

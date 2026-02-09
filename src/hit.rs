@@ -20,19 +20,11 @@ impl Hit {
     }
 
     pub fn min(&self, other: Hit) -> Hit {
-        if self.t <= other.t {
-            *self
-        } else {
-            other
-        }
+        if self.t <= other.t { *self } else { other }
     }
 
     pub fn max(&self, other: Hit) -> Hit {
-        if self.t > other.t {
-            *self
-        } else {
-            other
-        }
+        if self.t > other.t { *self } else { other }
     }
 }
 

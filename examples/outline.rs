@@ -1,5 +1,5 @@
 use larnt::{OutlineSphere, Scene, Vector};
-use rand::{rngs::SmallRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 fn main() {
     let mut rng = SmallRng::seed_from_u64(42);
@@ -12,7 +12,7 @@ fn main() {
 
     for x in -n..=n {
         for y in -n..=n {
-            let z = rng.gen::<f64>() * 3.0;
+            let z = rng.random::<f64>() * 3.0;
             let v = Vector::new(x as f64, y as f64, z);
             let sphere = OutlineSphere::new(eye, up, v, 0.45);
             scene.add(sphere);

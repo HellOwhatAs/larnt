@@ -29,7 +29,7 @@ use crate::ray::Ray;
 use crate::shape::Shape;
 use crate::util::radians;
 use crate::vector::Vector;
-use rand::{rngs::SmallRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 /// Texture style for Sphere shapes
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -184,7 +184,7 @@ impl Sphere {
             let mut m = Matrix::identity();
             for _ in 0..3 {
                 let v = Vector::random_unit_vector(&mut rng);
-                m = m.rotated(v, rng.gen::<f64>() * 2.0 * std::f64::consts::PI);
+                m = m.rotated(v, rng.random::<f64>() * 2.0 * std::f64::consts::PI);
             }
             m = m.translated(self.center);
 
@@ -226,7 +226,7 @@ impl Sphere {
             // Find a spot that doesn't overlap too much with existing circles
             loop {
                 v = Vector::random_unit_vector(&mut rng);
-                m = rng.gen::<f64>() * 0.25 + 0.05;
+                m = rng.random::<f64>() * 0.25 + 0.05;
 
                 let mut ok = true;
                 for (i, other) in seen.iter().enumerate() {
@@ -248,7 +248,7 @@ impl Sphere {
             let q = p.cross(v).normalize();
 
             // Draw n concentric circles, each smaller than the last
-            let n = rng.gen_range(1..=4);
+            let n = rng.random_range(1..=4);
             let mut current_m = m;
             for _ in 0..n {
                 let mut path = Vec::new();

@@ -113,11 +113,7 @@ impl Node {
                 h1
             } else {
                 let h2 = second.intersect(r, tsplit, tmax.min(h1.t));
-                if h1.t <= h2.t {
-                    h1
-                } else {
-                    h2
-                }
+                if h1.t <= h2.t { h1 } else { h2 }
             }
         }
     }

@@ -1,5 +1,5 @@
 use larnt::{Cube, Scene, Vector};
-use rand::{rngs::SmallRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 fn main() {
     let mut rng = SmallRng::seed_from_u64(42);
@@ -11,10 +11,10 @@ fn main() {
             if (x * x + y * y) as f64 > (n as f64).powi(2) {
                 continue;
             }
-            let p = rng.gen::<f64>() * 0.25 + 0.2;
+            let p = rng.random::<f64>() * 0.25 + 0.2;
             let fx = x as f64;
             let fy = y as f64;
-            let fz = rng.gen::<f64>() * 3.0 + 1.0;
+            let fz = rng.random::<f64>() * 3.0 + 1.0;
 
             // Skip one building to create a gap (matching original example)
             if x == 2 && y == 1 {
