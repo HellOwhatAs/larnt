@@ -24,8 +24,7 @@ fn save_gif_from_iter(
 }
 
 fn main() {
-    let mut mesh = load_obj("examples/suzanne.obj").expect("Failed to load OBJ");
-    mesh.fit_inside(
+    let mesh = load_obj("examples/suzanne.obj").expect("Failed to load OBJ").fit_inside(
         BBox::new(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)),
         Vector::new(0.5, 0.5, 0.5),
     );

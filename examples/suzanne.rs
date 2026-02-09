@@ -3,8 +3,9 @@ use std::sync::Arc;
 
 fn main() {
     let mut scene = Scene::new();
-    let mut mesh = load_obj("examples/suzanne.obj").expect("Failed to load OBJ");
-    mesh.unit_cube();
+    let mesh = load_obj("examples/suzanne.obj")
+        .expect("Failed to load OBJ")
+        .unit_cube();
 
     let transform = Matrix::rotate(Vector::new(0.0, 1.0, 0.0), 0.5);
     scene.add_arc(Arc::new(TransformedShape::new(Arc::new(mesh), transform)));

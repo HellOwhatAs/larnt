@@ -12,17 +12,53 @@ use crate::vector::Vector;
 use std::collections::HashSet;
 use std::sync::Arc;
 
+struct IndexTriangle {
+    v1: usize,
+    v2: usize,
+    v3: usize,
+}
+
+impl IndexTriangle {
+    fn paths(&self) -> [(usize, usize); 3] {
+        let [v1, v2, v3] = {
+            let mut vs = [self.v1, self.v2, self.v3];
+            vs.sort();
+            vs
+        };
+        [(v1, v2), (v2, v3), (v1, v3)]
+    }
+}
+
 pub struct Mesh {
     pub bx: Box,
+    pub vertices: Vec<Vector>,
     pub triangles: Vec<Triangle>,
+    itriangles: Vec<IndexTriangle>,
     tree: Option<Arc<Tree>>,
 }
 
 impl Mesh {
     pub fn new(triangles: Vec<Triangle>) -> Self {
         let bx = Box::for_triangles(&triangles);
+        let vertices: Vec<Vector> = triangles
+            .iter()
+            .flat_map(|t| [t.v1, t.v2, t.v3])
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+        let itriangles = triangles
+            .iter()
+            .map(|t| {
+                let v1 = vertices.iter().position(|&v| v == t.v1).unwrap();
+                let v2 = vertices.iter().position(|&v| v == t.v2).unwrap();
+                let v3 = vertices.iter().position(|&v| v == t.v3).unwrap();
+                IndexTriangle { v1, v2, v3 }
+            })
+            .collect();
         Mesh {
             bx,
+            itriangles,
+            vertices,
             triangles,
             tree: None,
         }
@@ -32,38 +68,47 @@ impl Mesh {
         self.bx = Box::for_triangles(&self.triangles);
     }
 
-    pub fn unit_cube(&mut self) {
+    pub fn unit_cube(self) -> Self {
         self.fit_inside(
             Box::new(Vector::default(), Vector::new(1.0, 1.0, 1.0)),
             Vector::default(),
-        );
-        self.move_to(Vector::default(), Vector::new(0.5, 0.5, 0.5));
+        )
+        .move_to(Vector::default(), Vector::new(0.5, 0.5, 0.5))
     }
 
-    pub fn move_to(&mut self, position: Vector, anchor: Vector) {
+    pub fn move_to(self, position: Vector, anchor: Vector) -> Self {
         let matrix = Matrix::translate(position.sub(self.bx.anchor(anchor)));
-        self.transform(&matrix);
+        self.transform(&matrix)
     }
 
-    pub fn fit_inside(&mut self, bx: Box, anchor: Vector) {
+    pub fn fit_inside(self, bx: Box, anchor: Vector) -> Self {
         let scale = bx.size().div(self.bx.size()).min_component();
         let extra = bx.size().sub(self.bx.size().mul_scalar(scale));
         let mut matrix = Matrix::identity();
         matrix = matrix.translated(self.bx.min.mul_scalar(-1.0));
         matrix = matrix.scaled(Vector::new(scale, scale, scale));
         matrix = matrix.translated(bx.min.add(extra.mul(anchor)));
-        self.transform(&matrix);
+        self.transform(&matrix)
     }
 
-    pub fn transform(&mut self, matrix: &Matrix) {
-        for t in &mut self.triangles {
-            t.v1 = matrix.mul_position(t.v1);
-            t.v2 = matrix.mul_position(t.v2);
-            t.v3 = matrix.mul_position(t.v3);
-            t.update_bounding_box();
+    pub fn transform(mut self, matrix: &Matrix) -> Self {
+        for v in self.vertices.iter_mut() {
+            *v = matrix.mul_position(*v);
         }
+        self.triangles = self
+            .itriangles
+            .iter()
+            .map(|itr| {
+                Triangle::new(
+                    self.vertices[itr.v1],
+                    self.vertices[itr.v2],
+                    self.vertices[itr.v3],
+                )
+            })
+            .collect();
         self.update_bounding_box();
         self.tree = None;
+        self
     }
 
     pub fn voxelize(&self, size: f64) -> Vec<Cube> {
@@ -122,10 +167,14 @@ impl Shape for Mesh {
     }
 
     fn paths(&self) -> Paths {
-        let mut result = Paths::new();
-        for t in &self.triangles {
-            result.extend(t.paths());
-        }
-        result
+        Paths::from_vec(
+            self.itriangles
+                .iter()
+                .flat_map(|it| it.paths())
+                .collect::<HashSet<_>>()
+                .into_iter()
+                .map(|(a, b)| vec![self.vertices[a], self.vertices[b]])
+                .collect(),
+        )
     }
 }
