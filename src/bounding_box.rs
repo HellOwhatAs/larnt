@@ -1,7 +1,6 @@
 use crate::axis::Axis;
 use crate::ray::Ray;
 use crate::shape::Shape;
-use crate::triangle::Triangle;
 use crate::vector::Vector;
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -15,24 +14,10 @@ impl Box {
         Box { min, max }
     }
 
-    pub fn for_shapes(shapes: &[&dyn Shape]) -> Self {
-        if shapes.is_empty() {
-            return Box::default();
-        }
-        let mut bx = shapes[0].bounding_box();
-        for shape in shapes.iter().skip(1) {
+    pub fn for_shapes(shapes: &[impl Shape]) -> Self {
+        let mut bx = Box::default();
+        for shape in shapes {
             bx = bx.extend(shape.bounding_box());
-        }
-        bx
-    }
-
-    pub fn for_triangles(triangles: &[Triangle]) -> Self {
-        if triangles.is_empty() {
-            return Box::default();
-        }
-        let mut bx = triangles[0].bounding_box();
-        for tri in triangles.iter().skip(1) {
-            bx = bx.extend(tri.bounding_box());
         }
         bx
     }

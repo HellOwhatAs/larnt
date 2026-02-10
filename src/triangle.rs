@@ -16,20 +16,12 @@ pub struct Triangle {
 
 impl Triangle {
     pub fn new(v1: Vector, v2: Vector, v3: Vector) -> Self {
-        let mut t = Triangle {
+        Self {
             v1,
             v2,
             v3,
-            bx: Box::default(),
-        };
-        t.update_bounding_box();
-        t
-    }
-
-    pub fn update_bounding_box(&mut self) {
-        let min = self.v1.min(self.v2).min(self.v3);
-        let max = self.v1.max(self.v2).max(self.v3);
-        self.bx = Box::new(min, max);
+            bx: Box::new(v1.min(v2).min(v3), v1.max(v2).max(v3)),
+        }
     }
 
     pub fn intersect_vertices(v1: Vector, v2: Vector, v3: Vector, r: Ray) -> Hit {

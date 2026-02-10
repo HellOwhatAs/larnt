@@ -9,63 +9,48 @@ use crate::shape::Shape;
 use crate::tree::Tree;
 use crate::triangle::Triangle;
 use crate::vector::Vector;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-struct IndexTriangle {
-    v1: usize,
-    v2: usize,
-    v3: usize,
-}
-
-impl IndexTriangle {
-    fn paths(&self) -> [(usize, usize); 3] {
-        let [v1, v2, v3] = {
-            let mut vs = [self.v1, self.v2, self.v3];
-            vs.sort();
-            vs
-        };
-        [(v1, v2), (v2, v3), (v1, v3)]
-    }
-}
-
+/// Triangle mesh shape.
 pub struct Mesh {
-    pub bx: Box,
-    pub vertices: Vec<Vector>,
-    pub triangles: Vec<Triangle>,
-    itriangles: Vec<IndexTriangle>,
-    tree: Option<Arc<Tree>>,
+    bx: Box,
+    vertices: Vec<Vector>,
+    index_triangles: Vec<IndexTriangle>,
+    tree: Option<Tree>,
 }
 
 impl Mesh {
     pub fn new(triangles: Vec<Triangle>) -> Self {
-        let bx = Box::for_triangles(&triangles);
-        let vertices: Vec<Vector> = triangles
-            .iter()
-            .flat_map(|t| [t.v1, t.v2, t.v3])
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect();
+        let bx = Box::for_shapes(&triangles);
+        let mut merger = VertexMerger::new(1e-6);
         let itriangles = triangles
             .iter()
-            .map(|t| {
-                let v1 = vertices.iter().position(|&v| v == t.v1).unwrap();
-                let v2 = vertices.iter().position(|&v| v == t.v2).unwrap();
-                let v3 = vertices.iter().position(|&v| v == t.v3).unwrap();
-                IndexTriangle { v1, v2, v3 }
+            .map(|t| IndexTriangle {
+                v1: merger.get_or_insert(t.v1),
+                v2: merger.get_or_insert(t.v2),
+                v3: merger.get_or_insert(t.v3),
             })
             .collect();
         Mesh {
             bx,
-            itriangles,
-            vertices,
-            triangles,
+            index_triangles: itriangles,
+            vertices: merger.vertices,
             tree: None,
         }
     }
 
-    pub fn update_bounding_box(&mut self) {
-        self.bx = Box::for_triangles(&self.triangles);
+    pub fn triangles(&self) -> Vec<Triangle> {
+        self.index_triangles
+            .iter()
+            .map(|itr| {
+                Triangle::new(
+                    self.vertices[itr.v1],
+                    self.vertices[itr.v2],
+                    self.vertices[itr.v3],
+                )
+            })
+            .collect()
     }
 
     pub fn unit_cube(self) -> Self {
@@ -95,18 +80,7 @@ impl Mesh {
         for v in self.vertices.iter_mut() {
             *v = matrix.mul_position(*v);
         }
-        self.triangles = self
-            .itriangles
-            .iter()
-            .map(|itr| {
-                Triangle::new(
-                    self.vertices[itr.v1],
-                    self.vertices[itr.v2],
-                    self.vertices[itr.v3],
-                )
-            })
-            .collect();
-        self.update_bounding_box();
+        self.bx = Box::for_shapes(&self.triangles());
         self.tree = None;
         self
     }
@@ -143,12 +117,12 @@ impl Mesh {
 impl Shape for Mesh {
     fn compile(&mut self) {
         if self.tree.is_none() {
-            let shapes: Vec<Arc<dyn Shape + Send + Sync>> = self
-                .triangles
-                .iter()
-                .map(|t| Arc::new(t.clone()) as Arc<dyn Shape + Send + Sync>)
-                .collect();
-            self.tree = Some(Arc::new(Tree::new(shapes)));
+            self.tree = Some(Tree::new(
+                self.triangles()
+                    .into_iter()
+                    .map(|t| Arc::new(t) as Arc<dyn Shape + Send + Sync>)
+                    .collect(),
+            ));
         }
     }
 
@@ -168,7 +142,7 @@ impl Shape for Mesh {
 
     fn paths(&self) -> Paths {
         Paths::from_vec(
-            self.itriangles
+            self.index_triangles
                 .iter()
                 .flat_map(|it| it.paths())
                 .collect::<HashSet<_>>()
@@ -176,5 +150,77 @@ impl Shape for Mesh {
                 .map(|(a, b)| vec![self.vertices[a], self.vertices[b]])
                 .collect(),
         )
+    }
+}
+
+/// Triangle defined by indices into a vertex list.
+struct IndexTriangle {
+    v1: usize,
+    v2: usize,
+    v3: usize,
+}
+
+impl IndexTriangle {
+    fn paths(&self) -> [(usize, usize); 3] {
+        let [v1, v2, v3] = {
+            let mut vs = [self.v1, self.v2, self.v3];
+            vs.sort();
+            vs
+        };
+        [(v1, v2), (v2, v3), (v1, v3)]
+    }
+}
+
+struct VertexMerger {
+    pub vertices: Vec<Vector>,
+    grid: HashMap<(i64, i64, i64), Vec<usize>>,
+    epsilon: f64,
+    epsilon_sq: f64,
+}
+
+impl VertexMerger {
+    pub fn new(epsilon: f64) -> Self {
+        Self {
+            vertices: Vec::new(),
+            grid: HashMap::new(),
+            epsilon,
+            epsilon_sq: epsilon * epsilon,
+        }
+    }
+
+    /// Returns the index of the existing vertex if it's close enough,
+    /// or inserts a new vertex and returns its index.
+    pub fn get_or_insert(&mut self, v: Vector) -> usize {
+        let cell_size = self.epsilon;
+
+        let ix = (v.x / cell_size).floor() as i64;
+        let iy = (v.y / cell_size).floor() as i64;
+        let iz = (v.z / cell_size).floor() as i64;
+
+        let dxyz = (-1..=1)
+            .flat_map(|dx| (-1..=1).flat_map(move |dy| (-1..=1).map(move |dz| (dx, dy, dz))));
+        for (dx, dy, dz) in dxyz {
+            let key = (ix + dx, iy + dy, iz + dz);
+
+            if let Some(indices) = self.grid.get(&key) {
+                for &idx in indices {
+                    let existing_v = self.vertices[idx];
+
+                    if v.distance_squared(existing_v) < self.epsilon_sq {
+                        return idx;
+                    }
+                }
+            }
+        }
+
+        let new_idx = self.vertices.len();
+        self.vertices.push(v);
+
+        self.grid
+            .entry((ix, iy, iz))
+            .or_insert_with(Vec::new)
+            .push(new_idx);
+
+        new_idx
     }
 }
