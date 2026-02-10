@@ -29,10 +29,10 @@ pub static CLIP_BOX: Box = Box {
 impl<'a> Filter for ClipFilter<'a> {
     fn filter(&self, v: Vector) -> Option<Vector> {
         let w = self.matrix.mul_position_w(v);
-        if !self.scene.visible(self.eye, v) {
+        if !CLIP_BOX.contains(w) {
             return None;
         }
-        if !CLIP_BOX.contains(w) {
+        if !self.scene.visible(self.eye, v) {
             return None;
         }
         Some(w)
