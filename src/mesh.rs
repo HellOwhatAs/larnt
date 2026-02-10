@@ -141,13 +141,22 @@ impl Shape for Mesh {
     }
 
     fn paths(&self) -> Paths {
+        let mut normal_merger = VertexMerger::new(1e-6);
+        let mut counter = HashMap::new();
+        self.index_triangles.iter().for_each(|it| {
+            let normal = normal_merger.get_or_insert(it.normalized_normal(&self.vertices));
+            it.paths().into_iter().for_each(|path| {
+                counter
+                    .entry((path, normal))
+                    .and_modify(|i| *i += 1)
+                    .or_insert(1);
+            })
+        });
         Paths::from_vec(
-            self.index_triangles
-                .iter()
-                .flat_map(|it| it.paths())
-                .collect::<HashSet<_>>()
+            counter
                 .into_iter()
-                .map(|(a, b)| vec![self.vertices[a], self.vertices[b]])
+                .filter(|(_, count)| *count == 1)
+                .map(|(((a, b), _), _)| vec![self.vertices[a], self.vertices[b]])
                 .collect(),
         )
     }
@@ -168,6 +177,21 @@ impl IndexTriangle {
             vs
         };
         [(v1, v2), (v2, v3), (v1, v3)]
+    }
+
+    fn normalized_normal(&self, vertices: &[Vector]) -> Vector {
+        let v1 = vertices[self.v1];
+        let v2 = vertices[self.v2];
+        let v3 = vertices[self.v3];
+        let normal = (v2.sub(v1)).cross(v3.sub(v1)).normalize();
+        if normal.x < 0.0
+            || (normal.x == 0.0 && normal.y < 0.0)
+            || (normal.x == 0.0 && normal.y == 0.0 && normal.z < 0.0)
+        {
+            normal.mul_scalar(-1.0)
+        } else {
+            normal
+        }
     }
 }
 
