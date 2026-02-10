@@ -239,7 +239,7 @@ impl Scene {
         let mut paths = self.paths();
 
         if step > 0.0 {
-            paths = paths.chop_adaptive(&screen_mat, step);
+            paths = paths.chop_adaptive(&screen_mat, width, height, step);
         }
 
         let filter = ClipFilter {

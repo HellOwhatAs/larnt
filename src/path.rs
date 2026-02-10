@@ -117,11 +117,11 @@ impl Paths {
         Paths { paths }
     }
 
-    pub fn chop_adaptive(&self, screen_mat: &Matrix, step: f64) -> Paths {
+    pub fn chop_adaptive(&self, screen_mat: &Matrix, width: f64, height: f64, step: f64) -> Paths {
         let paths = self
             .paths
             .iter()
-            .map(|path| path_chop_adaptive(path, screen_mat, step))
+            .map(|path| path_chop_adaptive(path, screen_mat, width, height, step))
             .collect();
         Paths { paths }
     }
@@ -388,9 +388,42 @@ fn path_chop(path: &Path, step: f64) -> Path {
     result
 }
 
-// TODO
-fn path_chop_adaptive(path: &Path, _screen_mat: &Matrix, step: f64) -> Path {
-    path_chop(path, step)
+fn path_chop_adaptive(
+    path: &Path,
+    screen_mat: &Matrix,
+    width: f64,
+    height: f64,
+    step: f64,
+) -> Path {
+    let mut result = vec![path[0]];
+    let step_square = step.powi(2);
+    for i in 0..path.len().saturating_sub(1) {
+        let (a, b) = (path[i], path[i + 1]);
+        recursive_subdivide(a, b, screen_mat, width, height, step_square, &mut result);
+    }
+    result
+}
+
+fn recursive_subdivide(
+    a: Vector,
+    b: Vector,
+    screen_mat: &Matrix,
+    width: f64,
+    height: f64,
+    step_square: f64,
+    result: &mut Vec<Vector>,
+) {
+    let (sa, sb) = (screen_mat.mul_position_w(a), screen_mat.mul_position_w(b));
+    if (!(sa.x >= 0.0 && sa.x <= width && sa.y >= 0.0 && sa.y <= height)
+        && !(sb.x >= 0.0 && sb.x <= width && sb.y >= 0.0 && sb.y <= height))
+        || sa.distance_squared(sb) < step_square
+    {
+        result.push(b);
+    } else {
+        let mid = a.add(b).mul_scalar(0.5);
+        recursive_subdivide(a, mid, screen_mat, width, height, step_square, result);
+        recursive_subdivide(mid, b, screen_mat, width, height, step_square, result);
+    }
 }
 
 fn path_filter<F: Filter>(path: &Path, f: &F) -> Vec<Path> {
