@@ -117,6 +117,15 @@ impl Paths {
         Paths { paths }
     }
 
+    pub fn chop_adaptive(&self, screen_mat: &Matrix, step: f64) -> Paths {
+        let paths = self
+            .paths
+            .iter()
+            .map(|path| path_chop_adaptive(path, screen_mat, step))
+            .collect();
+        Paths { paths }
+    }
+
     /// Filters paths using a custom filter.
     pub fn filter<F: Filter>(&self, f: &F) -> Paths {
         let mut result = Vec::new();
@@ -377,6 +386,11 @@ fn path_chop(path: &Path, step: f64) -> Path {
         result.push(b);
     }
     result
+}
+
+// TODO
+fn path_chop_adaptive(path: &Path, _screen_mat: &Matrix, step: f64) -> Path {
+    path_chop(path, step)
 }
 
 fn path_filter<F: Filter>(path: &Path, f: &F) -> Vec<Path> {

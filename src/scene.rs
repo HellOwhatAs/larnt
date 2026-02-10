@@ -228,11 +228,18 @@ impl Scene {
         height: f64,
         step: f64,
     ) -> Paths {
+        let viewport_mat = Matrix::translate(Vector::new(1.0, 1.0, 0.0)).scaled(Vector::new(
+            width / 2.0,
+            height / 2.0,
+            0.0,
+        ));
+        let screen_mat = viewport_mat.mul(&matrix);
+
         self.compile();
         let mut paths = self.paths();
 
         if step > 0.0 {
-            paths = paths.chop(step);
+            paths = paths.chop_adaptive(&screen_mat, step);
         }
 
         let filter = ClipFilter {
@@ -246,14 +253,7 @@ impl Scene {
             paths = paths.simplify(1e-6);
         }
 
-        let matrix = Matrix::translate(Vector::new(1.0, 1.0, 0.0)).scaled(Vector::new(
-            width / 2.0,
-            height / 2.0,
-            0.0,
-        ));
-        paths = paths.transform(&matrix);
-
-        paths
+        paths.transform(&viewport_mat)
     }
 }
 
