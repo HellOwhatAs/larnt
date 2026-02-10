@@ -48,8 +48,8 @@ impl Plane {
 
     pub fn intersect_mesh(&self, m: &Mesh) -> Paths {
         let mut result = Vec::new();
-        for t in m.triangles().iter() {
-            if let Some((v1, v2)) = self.intersect_triangle(t) {
+        for t in m.triangles() {
+            if let Some((v1, v2)) = self.intersect_triangle(&t) {
                 result.push(vec![v1, v2]);
             }
         }

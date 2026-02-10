@@ -100,6 +100,25 @@ pub trait Shape {
     fn paths(&self) -> Paths;
 }
 
+/// Automatically implement `Shape` for references to shapes.
+impl<T: Shape + ?Sized> Shape for &T {
+    fn bounding_box(&self) -> Box {
+        (*self).bounding_box()
+    }
+
+    fn contains(&self, v: Vector, f: f64) -> bool {
+        (*self).contains(v, f)
+    }
+
+    fn intersect(&self, r: Ray) -> Hit {
+        (*self).intersect(r)
+    }
+
+    fn paths(&self) -> Paths {
+        (*self).paths()
+    }
+}
+
 /// A shape that represents empty space.
 ///
 /// This is useful as a placeholder or for testing. It has an empty bounding

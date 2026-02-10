@@ -22,7 +22,6 @@ pub struct Mesh {
 
 impl Mesh {
     pub fn new(triangles: Vec<Triangle>) -> Self {
-        let bx = Box::for_shapes(&triangles);
         let mut merger = VertexMerger::new(1e-6);
         let itriangles = triangles
             .iter()
@@ -33,24 +32,21 @@ impl Mesh {
             })
             .collect();
         Mesh {
-            bx,
+            bx: Box::for_shapes(triangles.into_iter()),
             index_triangles: itriangles,
             vertices: merger.vertices,
             tree: None,
         }
     }
 
-    pub fn triangles(&self) -> Vec<Triangle> {
-        self.index_triangles
-            .iter()
-            .map(|itr| {
-                Triangle::new(
-                    self.vertices[itr.v1],
-                    self.vertices[itr.v2],
-                    self.vertices[itr.v3],
-                )
-            })
-            .collect()
+    pub fn triangles(&self) -> impl Iterator<Item = Triangle> + ExactSizeIterator {
+        self.index_triangles.iter().map(|itr| {
+            Triangle::new(
+                self.vertices[itr.v1],
+                self.vertices[itr.v2],
+                self.vertices[itr.v3],
+            )
+        })
     }
 
     pub fn unit_cube(self) -> Self {
@@ -80,7 +76,7 @@ impl Mesh {
         for v in self.vertices.iter_mut() {
             *v = matrix.mul_position(*v);
         }
-        self.bx = Box::for_shapes(&self.triangles());
+        self.bx = Box::for_shapes(self.triangles());
         self.tree = None;
         self
     }

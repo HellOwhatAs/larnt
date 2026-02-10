@@ -14,7 +14,7 @@ impl Box {
         Box { min, max }
     }
 
-    pub fn for_shapes(shapes: &[impl Shape]) -> Self {
+    pub fn for_shapes(shapes: impl Iterator<Item = impl Shape>) -> Self {
         let mut bx = Box::default();
         for shape in shapes {
             bx = bx.extend(shape.bounding_box());
