@@ -30,6 +30,7 @@ use crate::shape::Shape;
 use crate::util::radians;
 use crate::vector::Vector;
 use rand::{Rng, SeedableRng, rngs::SmallRng};
+use std::f64::consts::PI;
 
 /// Texture style for Sphere shapes
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -347,12 +348,15 @@ impl Shape for OutlineSphere {
         self.sphere.intersect(r)
     }
 
-    fn paths(&self, _screen_mat: &Matrix, _width: f64, _height: f64, _step: f64) -> Paths {
+    fn paths(&self, screen_mat: &Matrix, _width: f64, _height: f64, step: f64) -> Paths {
         let center = self.sphere.center;
         let radius = self.sphere.radius;
 
         let hyp = center.sub(self.eye).length();
         let opp = radius;
+        if hyp < opp {
+            return Paths::new();
+        }
         let theta = (opp / hyp).asin();
         let adj = opp / theta.tan();
         let d = theta.cos() * adj;
@@ -371,15 +375,63 @@ impl Shape for OutlineSphere {
         let v = w.cross(u).normalize();
         let c = self.eye.add(w.mul_scalar(d));
 
-        let mut path = Vec::new();
-        for i in 0..=360 {
-            let a = radians(i as f64);
-            let mut p = c;
-            p = p.add(u.mul_scalar(a.cos() * r));
-            p = p.add(v.mul_scalar(a.sin() * r));
-            path.push(p);
-        }
+        let mut path = vec![0.0];
+        let step_sq = step.powi(2);
+        recursive_arc_subdivide(0.0, PI, r, &(c, u, v), screen_mat, step_sq, &mut path);
+        recursive_arc_subdivide(PI, PI * 2.0, r, &(c, u, v), screen_mat, step_sq, &mut path);
 
-        Paths::from_vec(vec![path])
+        let rs = {
+            let mut rs: Vec<f64> = std::iter::once(0.0)
+                .chain(path.windows(2).map(|x| {
+                    let (alpha, beta) = (x[0], x[1]);
+                    let cos_theta = ((beta - alpha) / 2.0).cos();
+                    r / cos_theta
+                }))
+                .collect();
+            let (back, front) = (rs.last().copied().unwrap(), rs[1]);
+            rs[0] = back;
+            rs.push(front);
+            rs
+        };
+
+        Paths::from_vec(vec![
+            path.iter()
+                .enumerate()
+                .map(|(i, beta)| {
+                    let max_r = rs[i].max(rs[i + 1]);
+                    c.add(u.mul_scalar(beta.cos() * max_r))
+                        .add(v.mul_scalar(beta.sin() * max_r))
+                })
+                .collect(),
+        ])
+    }
+}
+
+fn recursive_arc_subdivide(
+    alpha: f64,
+    beta: f64,
+    r: f64,
+    cuv: &(Vector, Vector, Vector),
+    screen_mat: &Matrix,
+    step_sq: f64,
+    path: &mut Vec<f64>,
+) {
+    let (mid, theta) = ((beta + alpha) / 2.0, (beta - alpha) / 2.0);
+    let a = (cuv.0)
+        .add((cuv.1).mul_scalar(mid.cos() * r))
+        .add((cuv.2).mul_scalar(mid.sin() * r));
+    let b = {
+        let cos_theta = theta.cos();
+        (cuv.0)
+            .mul_scalar(cos_theta)
+            .add(a.mul_scalar(1.0 - cos_theta))
+    };
+
+    let (sa, sb) = (screen_mat.mul_position_w(a), screen_mat.mul_position_w(b));
+    if theta < PI / 180.0 || sa.distance_squared(sb) < step_sq && theta < PI / 6.0 {
+        path.push(beta);
+    } else {
+        recursive_arc_subdivide(alpha, mid, r, cuv, screen_mat, step_sq, path);
+        recursive_arc_subdivide(mid, beta, r, cuv, screen_mat, step_sq, path);
     }
 }
