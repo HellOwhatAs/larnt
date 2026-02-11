@@ -18,7 +18,7 @@ fn main() {
     let fovy = 50.0; // vertical field of view, degrees
     let znear = 0.1; // near z plane
     let zfar = 10.0; // far z plane
-    let step = 0.01; // how finely to chop the paths for visibility testing
+    let step = 1.0; // how finely to chop the paths for visibility testing
 
     scene.add(Cube::new(
         Vector::new(0.0, 0.0, 0.0),

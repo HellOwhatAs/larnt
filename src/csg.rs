@@ -32,6 +32,7 @@
 use crate::bounding_box::Box;
 use crate::filter::Filter;
 use crate::hit::Hit;
+use crate::matrix::Matrix;
 use crate::path::Paths;
 use crate::ray::Ray;
 use crate::shape::{EmptyShape, Shape};
@@ -163,10 +164,10 @@ impl Shape for BooleanShape {
         self.intersect(Ray::new(r.position(h.t + 0.01), r.direction))
     }
 
-    fn paths(&self) -> Paths {
-        let mut p = self.a.paths();
-        p.extend(self.b.paths());
-        p = p.chop(0.01);
+    fn paths(&self, screen_mat: &Matrix, width: f64, height: f64, step: f64) -> Paths {
+        let mut p = self.a.paths(screen_mat, width, height, step);
+        p.extend(self.b.paths(screen_mat, width, height, step));
+        p = p.chop_adaptive(screen_mat, width, height, step);
         p = p.filter(self);
         p
     }

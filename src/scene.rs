@@ -153,10 +153,10 @@ impl Scene {
     }
 
     /// Returns all paths from all shapes in the scene.
-    pub fn paths(&self) -> Paths {
+    pub fn paths(&self, screen_mat: &Matrix, width: f64, height: f64, step: f64) -> Paths {
         let mut result = Paths::new();
         for shape in &self.shapes {
-            result.extend(shape.paths());
+            result.extend(shape.paths(screen_mat, width, height, step));
         }
         result
     }
@@ -231,12 +231,12 @@ impl Scene {
         let viewport_mat = Matrix::translate(Vector::new(1.0, 1.0, 0.0)).scaled(Vector::new(
             width / 2.0,
             height / 2.0,
-            0.0,
+            1.0,
         ));
         let screen_mat = viewport_mat.mul(&matrix);
 
         self.compile();
-        let mut paths = self.paths();
+        let mut paths = self.paths(&screen_mat, width, height, step);
 
         if step > 0.0 {
             paths = paths.chop_adaptive(&screen_mat, width, height, step);

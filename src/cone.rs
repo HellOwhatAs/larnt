@@ -71,7 +71,7 @@ impl Shape for Cone {
         Hit::no_hit()
     }
 
-    fn paths(&self) -> Paths {
+    fn paths(&self, _screen_mat: &Matrix, _width: f64, _height: f64, _step: f64) -> Paths {
         let mut result = Vec::new();
         let mut a = 0;
         while a < 360 {
@@ -117,7 +117,7 @@ impl Shape for OutlineCone {
         self.cone.intersect(r)
     }
 
-    fn paths(&self) -> Paths {
+    fn paths(&self, _screen_mat: &Matrix, _width: f64, _height: f64, _step: f64) -> Paths {
         // For a cone with apex at (0,0,h) and base circle radius r at z=0,
         // the silhouette generators are found by solving:
         // E.x * cos(θ) + E.y * sin(θ) = r * (1 - E.z / h)

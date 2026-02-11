@@ -125,7 +125,7 @@ impl Shape for Sphere {
         Hit::no_hit()
     }
 
-    fn paths(&self) -> Paths {
+    fn paths(&self, _screen_mat: &Matrix, _width: f64, _height: f64, _step: f64) -> Paths {
         match self.texture {
             SphereTexture::LatLng => self.paths_lat_lng(),
             SphereTexture::RandomEquators(seed) => self.paths_random_equators(seed),
@@ -347,7 +347,7 @@ impl Shape for OutlineSphere {
         self.sphere.intersect(r)
     }
 
-    fn paths(&self) -> Paths {
+    fn paths(&self, _screen_mat: &Matrix, _width: f64, _height: f64, _step: f64) -> Paths {
         let center = self.sphere.center;
         let radius = self.sphere.radius;
 

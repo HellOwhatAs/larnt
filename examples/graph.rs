@@ -100,7 +100,7 @@ fn render(frame: i32) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
 
     let width = 750.0;
     let height = 750.0;
-    let paths = scene.render(eye, center, up, width, height, 60.0, 0.1, 100.0, 0.01);
+    let paths = scene.render(eye, center, up, width, height, 60.0, 0.1, 100.0, 1.0);
     paths.to_image(width, height, 2.5)
 }
 

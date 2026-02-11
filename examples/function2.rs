@@ -21,7 +21,7 @@ fn main() {
     let width = 1024.0;
     let height = 1024.0;
 
-    let paths = scene.render(eye, center, up, width, height, 70.0, 0.1, 100.0, 0.1);
+    let paths = scene.render(eye, center, up, width, height, 70.0, 0.1, 100.0, 1.0);
     paths
         .to_image(width, height, 0.8)
         .save("out.png")

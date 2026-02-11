@@ -20,6 +20,7 @@
 
 use crate::bounding_box::Box;
 use crate::hit::Hit;
+use crate::matrix::Matrix;
 use crate::path::Paths;
 use crate::ray::Ray;
 use crate::shape::Shape;
@@ -114,35 +115,15 @@ impl Shape for Cube {
         Hit::no_hit()
     }
 
-    fn paths(&self) -> Paths {
+    fn paths(&self, _screen_mat: &Matrix, _width: f64, _height: f64, _step: f64) -> Paths {
         match self.texture {
-            CubeTexture::Vanilla => self.paths_vanilla(),
+            CubeTexture::Vanilla => self.paths_striped(1),
             CubeTexture::Striped(stripes) => self.paths_striped(stripes),
         }
     }
 }
 
 impl Cube {
-    fn paths_vanilla(&self) -> Paths {
-        let (x1, y1, z1) = (self.min.x, self.min.y, self.min.z);
-        let (x2, y2, z2) = (self.max.x, self.max.y, self.max.z);
-
-        Paths::from_vec(vec![
-            vec![Vector::new(x1, y1, z1), Vector::new(x1, y1, z2)],
-            vec![Vector::new(x1, y1, z1), Vector::new(x1, y2, z1)],
-            vec![Vector::new(x1, y1, z1), Vector::new(x2, y1, z1)],
-            vec![Vector::new(x1, y1, z2), Vector::new(x1, y2, z2)],
-            vec![Vector::new(x1, y1, z2), Vector::new(x2, y1, z2)],
-            vec![Vector::new(x1, y2, z1), Vector::new(x1, y2, z2)],
-            vec![Vector::new(x1, y2, z1), Vector::new(x2, y2, z1)],
-            vec![Vector::new(x1, y2, z2), Vector::new(x2, y2, z2)],
-            vec![Vector::new(x2, y1, z1), Vector::new(x2, y1, z2)],
-            vec![Vector::new(x2, y1, z1), Vector::new(x2, y2, z1)],
-            vec![Vector::new(x2, y1, z2), Vector::new(x2, y2, z2)],
-            vec![Vector::new(x2, y2, z1), Vector::new(x2, y2, z2)],
-        ])
-    }
-
     fn paths_striped(&self, stripes: u64) -> Paths {
         let (x1, y1, z1) = (self.min.x, self.min.y, self.min.z);
         let (x2, y2, z2) = (self.max.x, self.max.y, self.max.z);

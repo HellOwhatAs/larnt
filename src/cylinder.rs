@@ -103,7 +103,7 @@ impl Shape for Cylinder {
         Hit::no_hit()
     }
 
-    fn paths(&self) -> Paths {
+    fn paths(&self, _screen_mat: &Matrix, _width: f64, _height: f64, _step: f64) -> Paths {
         let mut result = Vec::new();
         let mut a = 0;
         while a < 360 {
@@ -154,7 +154,7 @@ impl Shape for OutlineCylinder {
         self.cylinder.intersect(r)
     }
 
-    fn paths(&self) -> Paths {
+    fn paths(&self, _screen_mat: &Matrix, _width: f64, _height: f64, _step: f64) -> Paths {
         // For a cylinder with radius r aligned along Z-axis, the silhouette
         // generators are found by solving:
         // E.x * cos(θ) + E.y * sin(θ) = r

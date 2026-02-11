@@ -15,7 +15,7 @@ fn main() {
     let fovy = 50.0; // vertical field of view, degrees
     let znear = 0.1; // near z plane
     let zfar = 100.0; // far z plane
-    let step = 0.0001; // how finely to chop the paths for visibility testing
+    let step = 0.001; // how finely to chop the paths for visibility testing
 
     scene.add(OutlineCone::new(eye, up, 1.0, 1.0));
 

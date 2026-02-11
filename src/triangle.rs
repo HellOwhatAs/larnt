@@ -1,6 +1,7 @@
 use crate::bounding_box::Box;
 use crate::common::EPS;
 use crate::hit::Hit;
+use crate::matrix::Matrix;
 use crate::path::Paths;
 use crate::ray::Ray;
 use crate::shape::Shape;
@@ -82,7 +83,7 @@ impl Shape for Triangle {
         Self::intersect_vertices(self.v1, self.v2, self.v3, r)
     }
 
-    fn paths(&self) -> Paths {
+    fn paths(&self, _screen_mat: &Matrix, _width: f64, _height: f64, _step: f64) -> Paths {
         Paths::from_vec(vec![
             vec![self.v1, self.v2],
             vec![self.v2, self.v3],

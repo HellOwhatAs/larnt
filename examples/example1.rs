@@ -25,7 +25,7 @@ fn main() {
     let height = 1024.0;
     let fovy = 50.0;
 
-    let paths = scene.render(eye, center, up, width, height, fovy, 0.1, 100.0, 0.01);
+    let paths = scene.render(eye, center, up, width, height, fovy, 0.1, 100.0, 1.0);
     paths.write_to_png("out.png", width, height);
     paths
         .write_to_svg("out.svg", width, height)

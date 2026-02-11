@@ -19,7 +19,7 @@ fn main() {
     let fovy = 50.0; // vertical field of view, degrees
     let znear = 0.1; // near z plane
     let zfar = 10.0; // far z plane
-    let step = 0.01; // how finely to chop the paths for visibility testing
+    let step = 1.0; // how finely to chop the paths for visibility testing
 
     // compute 2D paths that depict the 3D scene
     let paths = scene.render(eye, center, up, width, height, fovy, znear, zfar, step);

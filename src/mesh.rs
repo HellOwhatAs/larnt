@@ -136,7 +136,7 @@ impl Shape for Mesh {
             .map_or(Hit::no_hit(), |tree| tree.intersect(r))
     }
 
-    fn paths(&self) -> Paths {
+    fn paths(&self, _screen_mat: &Matrix, _width: f64, _height: f64, _step: f64) -> Paths {
         let mut normal_merger = VertexMerger::new(1e-6);
         let mut counter = HashMap::new();
         self.index_triangles.iter().for_each(|it| {

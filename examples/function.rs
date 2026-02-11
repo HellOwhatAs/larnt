@@ -5,11 +5,11 @@ fn main() {
     let bbox = BBox::new(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0));
 
     scene.add(
-        Function::new(|x, y| x * y, bbox, Direction::Below, 0.1)
+        Function::new(|x, y| x * y, bbox, Direction::Below, 0.01)
             .with_texture(FunctionTexture::Spiral),
     );
     scene.add(
-        Function::new(|_, _| 0.0, bbox, Direction::Below, 0.1).with_texture(FunctionTexture::Grid),
+        Function::new(|_, _| 0.0, bbox, Direction::Below, 0.01).with_texture(FunctionTexture::Grid),
     );
     scene.add(
         Sphere::new(Vector::new(0.0, -0.6, 0.0), 0.25)
@@ -22,7 +22,7 @@ fn main() {
     let width = 1024.0;
     let height = 1024.0;
 
-    let paths = scene.render(eye, center, up, width, height, 40.0, 0.1, 100.0, 0.1);
+    let paths = scene.render(eye, center, up, width, height, 40.0, 0.1, 100.0, 1.0);
     paths
         .to_image(width, height, 1.5)
         .save("out.png")

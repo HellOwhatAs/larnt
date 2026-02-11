@@ -4,22 +4,14 @@ use rand::{Rng, SeedableRng, rngs::SmallRng};
 fn main() {
     let mut rng = SmallRng::seed_from_u64(42);
     let mut scene = Scene::new();
-    let n = 200;
+    let n = 860;
 
     for x in -n..=n {
         for y in -n..=n {
-            if (x * x + y * y) as f64 > (n as f64).powi(2) {
-                continue;
-            }
             let p = rng.random::<f64>() * 0.25 + 0.2;
             let fx = x as f64;
             let fy = y as f64;
             let fz = rng.random::<f64>() * 3.0 + 1.0;
-
-            // Skip one building to create a gap (matching original example)
-            if x == 2 && y == 1 {
-                continue;
-            }
 
             let shape = Cube::new(
                 Vector::new(fx - p, fy - p, 0.0),
@@ -32,10 +24,10 @@ fn main() {
     let eye = Vector::new(13.75, 6.25, 18.0);
     let center = Vector::new(-8.0, -10.0, 0.0);
     let up = Vector::new(0.0, 0.0, 1.0);
-    let width = 1024.0;
-    let height = 1024.0;
+    let width = 2560.0;
+    let height = 2560.0;
 
-    let paths = scene.render(eye, center, up, width, height, 65.0, 0.1, 300.0, 0.01);
+    let paths = scene.render(eye, center, up, width, height, 65.0, 0.1, 1000.0, 1.0);
     paths
         .to_image(width, height, 1.5)
         .save("out.png")

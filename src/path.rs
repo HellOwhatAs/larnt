@@ -396,10 +396,10 @@ fn path_chop_adaptive(
     step: f64,
 ) -> Path {
     let mut result = vec![path[0]];
-    let step_square = step.powi(2);
+    let step_sq = step.powi(2);
     for i in 0..path.len().saturating_sub(1) {
         let (a, b) = (path[i], path[i + 1]);
-        recursive_subdivide(a, b, screen_mat, width, height, step_square, &mut result);
+        recursive_subdivide(a, b, screen_mat, width, height, step_sq, &mut result);
     }
     result
 }
@@ -410,19 +410,22 @@ fn recursive_subdivide(
     screen_mat: &Matrix,
     width: f64,
     height: f64,
-    step_square: f64,
+    step_sq: f64,
     result: &mut Vec<Vector>,
 ) {
     let (sa, sb) = (screen_mat.mul_position_w(a), screen_mat.mul_position_w(b));
-    if (!(sa.x >= 0.0 && sa.x <= width && sa.y >= 0.0 && sa.y <= height)
-        && !(sb.x >= 0.0 && sb.x <= width && sb.y >= 0.0 && sb.y <= height))
-        || sa.distance_squared(sb) < step_square
+    if (sa.x < 0.0 && sb.x < 0.0
+        || sa.y < 0.0 && sb.y < 0.0
+        || sa.x > width && sb.x > width
+        || sa.y > height && sb.y > height)
+        || sa.distance_squared(sb) < step_sq
+        || a.distance_squared(b) < crate::common::EPS
     {
         result.push(b);
     } else {
         let mid = a.add(b).mul_scalar(0.5);
-        recursive_subdivide(a, mid, screen_mat, width, height, step_square, result);
-        recursive_subdivide(mid, b, screen_mat, width, height, step_square, result);
+        recursive_subdivide(a, mid, screen_mat, width, height, step_sq, result);
+        recursive_subdivide(mid, b, screen_mat, width, height, step_sq, result);
     }
 }
 

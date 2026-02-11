@@ -16,7 +16,7 @@ fn main() {
     let width = 1024.0;
     let height = 1024.0;
 
-    let paths = scene.render(eye, center, up, width, height, 35.0, 0.1, 100.0, 0.001);
+    let paths = scene.render(eye, center, up, width, height, 35.0, 0.1, 100.0, 1.0);
     paths.write_to_png("out.png", width, height);
     paths
         .write_to_svg("out.svg", width, height)
