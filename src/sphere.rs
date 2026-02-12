@@ -40,8 +40,8 @@ pub enum SphereTexture {
     LatLng,
     /// Random rotated equators (great circles)
     RandomEquators(u64),
-    /// Random point dots on the surface
-    RandomDots(u64),
+    /// Random fuzz on the surface
+    RandomFuzz(u64),
     /// Random concentric circles pattern
     RandomCircles(u64),
 }
@@ -129,9 +129,13 @@ impl Shape for Sphere {
     fn paths(&self, screen_mat: &Matrix, _width: f64, _height: f64, step: f64) -> Paths {
         match self.texture {
             SphereTexture::LatLng => self.paths_lat_lng(),
-            SphereTexture::RandomEquators(seed) => self.paths_random_equators(seed),
-            SphereTexture::RandomDots(seed) => self.paths_random_dots(seed),
-            SphereTexture::RandomCircles(seed) => self.paths_random_circles(screen_mat, step, seed),
+            SphereTexture::RandomEquators(seed) => {
+                self.paths_random_equators(screen_mat, step, 100, seed)
+            }
+            SphereTexture::RandomFuzz(seed) => self.paths_random_fuzz(1000, 1.1, seed),
+            SphereTexture::RandomCircles(seed) => {
+                self.paths_random_circles(screen_mat, step, 140, seed)
+            }
         }
     }
 }
@@ -171,57 +175,61 @@ impl Sphere {
     }
 
     /// Random rotated equators (great circles)
-    fn paths_random_equators(&self, seed: u64) -> Paths {
+    fn paths_random_equators(&self, screen_mat: &Matrix, step: f64, n: usize, seed: u64) -> Paths {
         let mut rng = SmallRng::seed_from_u64(seed);
-        // Create a single equator path
-        let mut equator = Vec::new();
-        for lng in 0..=360 {
-            let v = lat_lng_to_xyz(0.0, lng as f64, self.radius);
-            equator.push(v);
-        }
+        let step_sq = step.powi(2);
+        let (c, r) = (self.center, self.radius);
 
-        let mut paths = Vec::new();
-        for _ in 0..100 {
-            let mut m = Matrix::identity();
-            for _ in 0..3 {
-                let v = Vector::random_unit_vector(&mut rng);
-                m = m.rotated(v, rng.random::<f64>() * 2.0 * std::f64::consts::PI);
-            }
-            m = m.translated(self.center);
+        let mut paths = Vec::with_capacity(n);
+        for _ in 0..n {
+            let mut path = vec![0.0];
+            let (u, v) = {
+                let [u, w] = [(); 2].map(|_| Vector::random_unit_vector(&mut rng));
+                (u, w.cross(u).normalize())
+            };
+            recursive_arc_subdivide(0.0, PI * 2.0, r, &(c, u, v), screen_mat, step_sq, &mut path);
 
-            // Transform the equator path
-            let transformed: Vec<Vector> = equator.iter().map(|p| m.mul_position(*p)).collect();
-            paths.push(transformed);
+            let expanded_radius = radius_expansion(&path, r);
+            paths.push(
+                path.iter()
+                    .enumerate()
+                    .map(|(i, beta)| {
+                        let max_r = expanded_radius[i].max(expanded_radius[i + 1]);
+                        c.add(u.mul_scalar(beta.cos() * max_r))
+                            .add(v.mul_scalar(beta.sin() * max_r))
+                    })
+                    .collect(),
+            );
         }
 
         Paths::from_vec(paths)
     }
 
     /// Random point dots on the surface
-    fn paths_random_dots(&self, seed: u64) -> Paths {
+    fn paths_random_fuzz(&self, num: usize, scale: f64, seed: u64) -> Paths {
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut paths = Vec::new();
 
-        for _ in 0..20000 {
-            let v = Vector::random_unit_vector(&mut rng)
-                .mul_scalar(self.radius)
-                .add(self.center);
-            // Each "dot" is a zero-length path (two identical points)
-            paths.push(vec![v, v]);
+        for _ in 0..num {
+            let v = Vector::random_unit_vector(&mut rng);
+            paths.push(vec![
+                v.mul_scalar(self.radius).add(self.center),
+                v.mul_scalar(self.radius * scale).add(self.center),
+            ]);
         }
 
         Paths::from_vec(paths)
     }
 
     /// Random concentric circles pattern
-    fn paths_random_circles(&self, screen_mat: &Matrix, step: f64, seed: u64) -> Paths {
+    fn paths_random_circles(&self, screen_mat: &Matrix, step: f64, num: usize, seed: u64) -> Paths {
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut paths = Vec::new();
         let mut seen: Vec<Vector> = Vec::new();
         let mut radii: Vec<f64> = Vec::new();
         let step_sq = step.powi(2);
 
-        for _ in 0..140 {
+        for _ in 0..num {
             let mut v: Vector;
             let mut m: f64;
 
