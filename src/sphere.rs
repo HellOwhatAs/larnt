@@ -128,7 +128,7 @@ impl Shape for Sphere {
 
     fn paths(&self, screen_mat: &Matrix, _width: f64, _height: f64, step: f64) -> Paths {
         match self.texture {
-            SphereTexture::LatLng => self.paths_lat_lng(),
+            SphereTexture::LatLng => self.paths_lat_lng(screen_mat, step, 10, 10),
             SphereTexture::RandomEquators(seed) => {
                 self.paths_random_equators(screen_mat, step, 100, seed)
             }
@@ -142,33 +142,66 @@ impl Shape for Sphere {
 
 impl Sphere {
     /// Latitude/longitude grid texture (default)
-    fn paths_lat_lng(&self) -> Paths {
+    fn paths_lat_lng(&self, screen_mat: &Matrix, step: f64, n: i32, o: i32) -> Paths {
         let mut paths = Vec::new();
-        let n = 10;
-        let o = 10;
+        let step_sq = step.powi(2);
 
         // Latitude lines
-        let mut lat = -90 + o;
-        while lat <= 90 - o {
-            let mut path = Vec::new();
-            for lng in 0..=360 {
-                let v = lat_lng_to_xyz(lat as f64, lng as f64, self.radius).add(self.center);
-                path.push(v);
+        {
+            let mut lat = -90 + o;
+            while lat <= 90 - o {
+                let (c, r) = {
+                    let latr = radians(lat as f64);
+                    let mut c = self.center;
+                    c.z += self.radius * latr.sin();
+                    let r = self.radius * latr.cos();
+                    (c, r)
+                };
+                let (u, v) = (Vector::new(1., 0., 0.), Vector::new(0., 1., 0.));
+                let mut p = vec![0.0];
+                recursive_arc_subdivide(0.0, PI * 2.0, r, &(c, u, v), screen_mat, step_sq, &mut p);
+
+                let expanded_radius = radius_expansion(&p, r);
+                let path = p
+                    .iter()
+                    .enumerate()
+                    .map(|(i, beta)| {
+                        let max_r = expanded_radius[i].max(expanded_radius[i + 1]);
+                        c.add(u.mul_scalar(beta.cos() * max_r))
+                            .add(v.mul_scalar(beta.sin() * max_r))
+                    })
+                    .collect();
+                paths.push(path);
+                lat += n;
             }
-            paths.push(path);
-            lat += n;
         }
 
         // Longitude lines
-        let mut lng = 0;
-        while lng < 360 {
-            let mut path = Vec::new();
-            for lat in -(90 - o)..=(90 - o) {
-                let v = lat_lng_to_xyz(lat as f64, lng as f64, self.radius).add(self.center);
-                path.push(v);
+        {
+            let mut lng = 0;
+            let u = Vector::new(0.0, 0.0, 1.0);
+            while lng < 360 {
+                let (c, r) = (self.center, self.radius);
+                let v = {
+                    let lngr = radians(lng as f64);
+                    Vector::new(lngr.cos(), lngr.sin(), 0.0)
+                };
+                let [alpha, beta] = [o, 180 - o].map(|x| radians(x as f64));
+                let mut p = vec![alpha];
+                recursive_arc_subdivide(alpha, beta, r, &(c, u, v), screen_mat, step_sq, &mut p);
+                let expanded_radius = radius_expansion(&p, r);
+                let path = p
+                    .iter()
+                    .enumerate()
+                    .map(|(i, beta)| {
+                        let max_r = expanded_radius[i].max(expanded_radius[i + 1]);
+                        c.add(u.mul_scalar(beta.cos() * max_r))
+                            .add(v.mul_scalar(beta.sin() * max_r))
+                    })
+                    .collect();
+                paths.push(path);
+                lng += n;
             }
-            paths.push(path);
-            lng += n;
         }
 
         Paths::from_vec(paths)
