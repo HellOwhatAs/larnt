@@ -126,12 +126,12 @@ impl Shape for Sphere {
         Hit::no_hit()
     }
 
-    fn paths(&self, _screen_mat: &Matrix, _width: f64, _height: f64, _step: f64) -> Paths {
+    fn paths(&self, screen_mat: &Matrix, _width: f64, _height: f64, step: f64) -> Paths {
         match self.texture {
             SphereTexture::LatLng => self.paths_lat_lng(),
             SphereTexture::RandomEquators(seed) => self.paths_random_equators(seed),
             SphereTexture::RandomDots(seed) => self.paths_random_dots(seed),
-            SphereTexture::RandomCircles(seed) => self.paths_random_circles(seed),
+            SphereTexture::RandomCircles(seed) => self.paths_random_circles(screen_mat, step, seed),
         }
     }
 }
@@ -214,11 +214,12 @@ impl Sphere {
     }
 
     /// Random concentric circles pattern
-    fn paths_random_circles(&self, seed: u64) -> Paths {
+    fn paths_random_circles(&self, screen_mat: &Matrix, step: f64, seed: u64) -> Paths {
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut paths = Vec::new();
         let mut seen: Vec<Vector> = Vec::new();
         let mut radii: Vec<f64> = Vec::new();
+        let step_sq = step.powi(2);
 
         for _ in 0..140 {
             let mut v: Vector;
@@ -252,17 +253,27 @@ impl Sphere {
             let n = rng.random_range(1..=4);
             let mut current_m = m;
             for _ in 0..n {
-                let mut path = Vec::new();
-                for j in (0..=360).step_by(5) {
-                    let a = radians(j as f64);
-                    let mut x = v;
-                    x = x.add(p.mul_scalar(a.cos() * current_m));
-                    x = x.add(q.mul_scalar(a.sin() * current_m));
-                    x = x.normalize();
-                    x = x.mul_scalar(self.radius).add(self.center);
-                    path.push(x);
-                }
-                paths.push(path);
+                let mut path = vec![0.0];
+                let (r, c) = {
+                    let norm = (v.length_squared() + current_m.powi(2)).sqrt();
+                    let r = current_m * self.radius / norm;
+                    let c = v.mul_scalar(self.radius / norm).add(self.center);
+                    (r, c)
+                };
+                use recursive_arc_subdivide as recurse;
+                recurse(0.0, PI * 2.0, r, &(c, p, q), screen_mat, step_sq, &mut path);
+
+                let expanded_radius = radius_expansion(&path, r);
+                paths.push(
+                    path.iter()
+                        .enumerate()
+                        .map(|(i, beta)| {
+                            let max_r = expanded_radius[i].max(expanded_radius[i + 1]);
+                            c.add(p.mul_scalar(beta.cos() * max_r))
+                                .add(q.mul_scalar(beta.sin() * max_r))
+                        })
+                        .collect(),
+                );
                 current_m *= 0.75;
             }
         }
@@ -377,34 +388,34 @@ impl Shape for OutlineSphere {
 
         let mut path = vec![0.0];
         let step_sq = step.powi(2);
-        recursive_arc_subdivide(0.0, PI, r, &(c, u, v), screen_mat, step_sq, &mut path);
-        recursive_arc_subdivide(PI, PI * 2.0, r, &(c, u, v), screen_mat, step_sq, &mut path);
+        recursive_arc_subdivide(0.0, PI * 2.0, r, &(c, u, v), screen_mat, step_sq, &mut path);
 
-        let radius = {
-            let mut radius: Vec<f64> = std::iter::once(0.0)
-                .chain(path.windows(2).map(|x| {
-                    let (alpha, beta) = (x[0], x[1]);
-                    let cos_theta = ((beta - alpha) / 2.0).cos();
-                    r / cos_theta
-                }))
-                .collect();
-            let (back, front) = (radius.last().copied().unwrap(), radius[1]);
-            radius[0] = back;
-            radius.push(front);
-            radius
-        };
-
+        let expanded_radius = radius_expansion(&path, r);
         Paths::from_vec(vec![
             path.iter()
                 .enumerate()
                 .map(|(i, beta)| {
-                    let max_r = radius[i].max(radius[i + 1]);
+                    let max_r = expanded_radius[i].max(expanded_radius[i + 1]);
                     c.add(u.mul_scalar(beta.cos() * max_r))
                         .add(v.mul_scalar(beta.sin() * max_r))
                 })
                 .collect(),
         ])
     }
+}
+
+fn radius_expansion(path: &[f64], r: f64) -> Vec<f64> {
+    let mut radius: Vec<f64> = std::iter::once(0.0)
+        .chain(path.windows(2).map(|x| {
+            let (alpha, beta) = (x[0], x[1]);
+            let cos_theta = ((beta - alpha) / 2.0).cos();
+            r / cos_theta
+        }))
+        .collect();
+    let (back, front) = (radius.last().copied().unwrap(), radius[1]);
+    radius[0] = back;
+    radius.push(front);
+    radius
 }
 
 fn recursive_arc_subdivide(
@@ -425,7 +436,7 @@ fn recursive_arc_subdivide(
         )
     });
     if theta < PI / 180.0
-        || sa.distance_squared(sb) * theta / theta.sin() < step_sq && theta < PI / 6.0
+        || sa.distance_squared(sb) * theta / theta.sin() < step_sq && theta < PI / 3.0
     {
         path.push(beta);
     } else {
