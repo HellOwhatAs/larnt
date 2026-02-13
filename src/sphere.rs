@@ -158,8 +158,7 @@ impl Sphere {
                     (c, r)
                 };
                 let (u, v) = (Vector::new(1., 0., 0.), Vector::new(0., 1., 0.));
-                let mut p = vec![0.0];
-                recursive_arc_subdivide(0.0, PI * 2.0, r, &(c, u, v), screen_mat, step_sq, &mut p);
+                let p = recursive_arc_subdivide(0.0, PI * 2.0, r, &(c, u, v), screen_mat, step_sq);
 
                 let expanded_radius = radius_expansion(&p, r);
                 let path = p
@@ -187,8 +186,7 @@ impl Sphere {
                     Vector::new(lngr.cos(), lngr.sin(), 0.0)
                 };
                 let [alpha, beta] = [o, 180 - o].map(|x| radians(x as f64));
-                let mut p = vec![alpha];
-                recursive_arc_subdivide(alpha, beta, r, &(c, u, v), screen_mat, step_sq, &mut p);
+                let p = recursive_arc_subdivide(alpha, beta, r, &(c, u, v), screen_mat, step_sq);
                 let expanded_radius = radius_expansion(&p, r);
                 let path = p
                     .iter()
@@ -215,12 +213,11 @@ impl Sphere {
 
         let mut paths = Vec::with_capacity(n);
         for _ in 0..n {
-            let mut path = vec![0.0];
             let (u, v) = {
                 let [u, w] = [(); 2].map(|_| Vector::random_unit_vector(&mut rng));
                 (u, w.cross(u).normalize())
             };
-            recursive_arc_subdivide(0.0, PI * 2.0, r, &(c, u, v), screen_mat, step_sq, &mut path);
+            let path = recursive_arc_subdivide(0.0, PI * 2.0, r, &(c, u, v), screen_mat, step_sq);
 
             let expanded_radius = radius_expansion(&path, r);
             paths.push(
@@ -294,15 +291,14 @@ impl Sphere {
             let n = rng.random_range(1..=4);
             let mut current_m = m;
             for _ in 0..n {
-                let mut path = vec![0.0];
                 let (r, c) = {
                     let norm = (v.length_squared() + current_m.powi(2)).sqrt();
                     let r = current_m * self.radius / norm;
                     let c = v.mul_scalar(self.radius / norm).add(self.center);
                     (r, c)
                 };
-                use recursive_arc_subdivide as recurse;
-                recurse(0.0, PI * 2.0, r, &(c, p, q), screen_mat, step_sq, &mut path);
+                let path =
+                    recursive_arc_subdivide(0.0, PI * 2.0, r, &(c, p, q), screen_mat, step_sq);
 
                 let expanded_radius = radius_expansion(&path, r);
                 paths.push(
@@ -426,10 +422,7 @@ impl Shape for OutlineSphere {
         };
         let v = w.cross(u).normalize();
         let c = self.eye.add(w.mul_scalar(d));
-
-        let mut path = vec![0.0];
-        let step_sq = step.powi(2);
-        recursive_arc_subdivide(0.0, PI * 2.0, r, &(c, u, v), screen_mat, step_sq, &mut path);
+        let path = recursive_arc_subdivide(0.0, PI * 2.0, r, &(c, u, v), screen_mat, step.powi(2));
 
         let expanded_radius = radius_expansion(&path, r);
         Paths::from_vec(vec![
@@ -466,22 +459,27 @@ fn recursive_arc_subdivide(
     cuv: &(Vector, Vector, Vector),
     screen_mat: &Matrix,
     step_sq: f64,
-    path: &mut Vec<f64>,
-) {
-    let (mid, theta) = ((beta + alpha) / 2.0, (beta - alpha) / 2.0);
-    let [sa, sb] = [alpha, beta].map(|x| {
+) -> Vec<f64> {
+    let screen_view = |x: f64| {
         screen_mat.mul_position_w(
             (cuv.0)
                 .add((cuv.1).mul_scalar(x.cos() * r))
                 .add((cuv.2).mul_scalar(x.sin() * r)),
         )
-    });
-    if theta < PI / 180.0
-        || sa.distance_squared(sb) * theta / theta.sin() < step_sq && theta < PI / 3.0
-    {
-        path.push(beta);
-    } else {
-        recursive_arc_subdivide(alpha, mid, r, cuv, screen_mat, step_sq, path);
-        recursive_arc_subdivide(mid, beta, r, cuv, screen_mat, step_sq, path);
-    }
+    };
+    let mut path = vec![alpha];
+    crate::path::recursive_subdivide(
+        ((alpha, screen_view(alpha)), (beta, screen_view(beta))),
+        &|(alpha, _), (beta, _)| {
+            let mid = (beta + alpha) / 2.0;
+            (mid, screen_view(mid))
+        },
+        &|(alpha, sa), (beta, sb)| {
+            let theta = (beta - alpha) / 2.0;
+            theta < PI / 180.0
+                || sa.distance_squared(sb) * theta / theta.sin() < step_sq && theta < PI / 3.0
+        },
+        &mut |(x, _)| path.push(x),
+    );
+    path
 }

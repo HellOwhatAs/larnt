@@ -397,35 +397,44 @@ fn path_chop_adaptive(
 ) -> Path {
     let mut result = vec![path[0]];
     let step_sq = step.powi(2);
-    for i in 0..path.len().saturating_sub(1) {
-        let (a, b) = (path[i], path[i + 1]);
-        recursive_subdivide(a, b, screen_mat, width, height, step_sq, &mut result);
-    }
+    path.iter()
+        .map(|&v| (v, screen_mat.mul_position_w(v)))
+        .collect::<Vec<_>>()
+        .windows(2)
+        .for_each(|window| {
+            recursive_subdivide(
+                (window[0], window[1]),
+                &|(a, _), (b, _)| {
+                    let mid = a.add(b).mul_scalar(0.5);
+                    (mid, screen_mat.mul_position_w(mid))
+                },
+                &|(a, sa), (b, sb)| {
+                    (sa.x < 0.0 && sb.x < 0.0
+                        || sa.y < 0.0 && sb.y < 0.0
+                        || sa.x > width && sb.x > width
+                        || sa.y > height && sb.y > height)
+                        || sa.distance_squared(sb) < step_sq
+                        || a.distance_squared(b) < crate::common::EPS
+                },
+                &mut |(x, _)| result.push(x),
+            )
+        });
     result
 }
 
-fn recursive_subdivide(
-    a: Vector,
-    b: Vector,
-    screen_mat: &Matrix,
-    width: f64,
-    height: f64,
-    step_sq: f64,
-    result: &mut Vec<Vector>,
+pub fn recursive_subdivide<T: Copy>(
+    ab: (T, T),
+    divider: &impl Fn(T, T) -> T,
+    terminator: &impl Fn(T, T) -> bool,
+    collector: &mut impl FnMut(T),
 ) {
-    let (sa, sb) = (screen_mat.mul_position_w(a), screen_mat.mul_position_w(b));
-    if (sa.x < 0.0 && sb.x < 0.0
-        || sa.y < 0.0 && sb.y < 0.0
-        || sa.x > width && sb.x > width
-        || sa.y > height && sb.y > height)
-        || sa.distance_squared(sb) < step_sq
-        || a.distance_squared(b) < crate::common::EPS
-    {
-        result.push(b);
+    let (a, b) = ab;
+    if terminator(a, b) {
+        collector(b);
     } else {
-        let mid = a.add(b).mul_scalar(0.5);
-        recursive_subdivide(a, mid, screen_mat, width, height, step_sq, result);
-        recursive_subdivide(mid, b, screen_mat, width, height, step_sq, result);
+        let mid = divider(a, b);
+        recursive_subdivide((a, mid), divider, terminator, collector);
+        recursive_subdivide((mid, b), divider, terminator, collector);
     }
 }
 
