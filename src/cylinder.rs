@@ -19,11 +19,12 @@
 use crate::bounding_box::Box;
 use crate::hit::Hit;
 use crate::matrix::Matrix;
-use crate::path::Paths;
+use crate::path::{Paths, adaptive_arc, adaptive_arc_inner};
 use crate::ray::Ray;
 use crate::shape::{RenderArgs, Shape, TransformedShape};
 use crate::util::radians;
 use crate::vector::Vector;
+use std::f64::consts::PI;
 use std::sync::Arc;
 
 /// Texture options for cylinders.
@@ -102,20 +103,29 @@ impl Cylinder {
 
         let sqrt_ab = (a * a + b * b).sqrt();
 
+        let (u, v) = (Vector::new(1.0, 0.0, 0.0), Vector::new(0.0, 1.0, 0.0));
+        let step_sq = args.step.powi(2);
+
         // Compute silhouette generator angles
         let ratio = c / sqrt_ab;
         if ratio.abs() > 1.0 {
             // Eye is inside the cylinder - no proper silhouette
             // Fall back to full circles
-            let mut p0 = Vec::new();
-            let mut p1 = Vec::new();
-            for angle in 0..=360 {
-                let x = r * radians(angle as f64).cos();
-                let y = r * radians(angle as f64).sin();
-                p0.push(Vector::new(x, y, self.z0));
-                p1.push(Vector::new(x, y, self.z1));
-            }
-            return Paths::from_vec(vec![p0, p1]);
+            return Paths::from_vec(
+                [self.z0, self.z1]
+                    .into_iter()
+                    .map(|z| {
+                        adaptive_arc_inner(
+                            0.0,
+                            PI * 2.0,
+                            r,
+                            &(Vector::new(0.0, 0.0, z), u, v),
+                            &args.screen_mat,
+                            step_sq,
+                        )
+                    })
+                    .collect(),
+            );
         }
 
         let eye_azimuth = b.atan2(a);
@@ -123,39 +133,33 @@ impl Cylinder {
         let theta1 = eye_azimuth + angular_offset;
         let theta2 = eye_azimuth - angular_offset;
 
-        // For visibility of arcs, scale outer edge by 1/cos(π/360)
-        let vscale = |angle_r: f64| {
-            if (angle_r - eye_azimuth).cos() >= ratio {
-                1.0 / (std::f64::consts::PI / 360.0).cos()
-            } else {
-                1.0
-            }
-        };
-        // Top circle
-        let mut p1 = Vec::new();
-        for angle in 0..=360 {
-            let angle_r = radians(angle as f64);
-            let x = r * vscale(angle_r) * angle_r.cos();
-            let y = r * vscale(angle_r) * angle_r.sin();
-            p1.push(Vector::new(x, y, self.z1));
-        }
-
-        // Bottom circle
-        let mut p0 = Vec::new();
-        for angle in 0..=360 {
-            let angle_r = radians(angle as f64);
-            let x = r * vscale(angle_r) * angle_r.cos();
-            let y = r * vscale(angle_r) * angle_r.sin();
-            p0.push(Vector::new(x, y, self.z0));
-        }
+        // Front and back arcs seperately to pass visibility tests
+        let mut paths = [adaptive_arc, adaptive_arc_inner]
+            .iter()
+            .zip([(theta2, theta1), (theta1, theta2 + PI * 2.0)])
+            .flat_map(|(func, (alpha, beta))| {
+                [self.z0, self.z1].into_iter().map(move |z| {
+                    func(
+                        alpha,
+                        beta,
+                        r,
+                        &(Vector::new(0.0, 0.0, z), u, v),
+                        &args.screen_mat,
+                        step_sq,
+                    )
+                })
+            })
+            .collect::<Vec<_>>();
 
         // Silhouette lines from tangent points
         let a0 = Vector::new(r * theta1.cos(), r * theta1.sin(), self.z0);
         let a1 = Vector::new(r * theta1.cos(), r * theta1.sin(), self.z1);
         let b0 = Vector::new(r * theta2.cos(), r * theta2.sin(), self.z0);
         let b1 = Vector::new(r * theta2.cos(), r * theta2.sin(), self.z1);
+        paths.push(vec![a0, a1]);
+        paths.push(vec![b0, b1]);
 
-        Paths::from_vec(vec![p0, p1, vec![a0, a1], vec![b0, b1]])
+        Paths::from_vec(paths)
     }
 }
 

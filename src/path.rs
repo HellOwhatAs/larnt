@@ -35,6 +35,7 @@ use crate::shape::RenderArgs;
 use crate::vector::Vector;
 #[cfg(feature = "image")]
 use image::{ImageBuffer, Pixel, Rgb};
+use std::f64::consts::PI;
 use std::io::Write;
 
 /// A single path represented as a sequence of 3D points.
@@ -423,6 +424,104 @@ fn path_chop_adaptive(
             )
         });
     result
+}
+
+/// Recursively subdivides an arc defined by angles `alpha` and `beta`
+/// into a sequence of angles that approximate the arc on screen within a certain step size.
+///
+/// The arc is defined by a center point `c` and two orthogonal vectors `u` and `v` that
+/// define the plane of the arc. The radius `r` determines how far from the center the
+/// arc points are. The `screen_mat` is used to project the 3D points onto the screen
+/// for distance calculations. The `step_sq` parameter controls how closely the subdivided points
+/// approximate the arc on screen, with smaller values resulting in more points for a smoother arc.
+pub fn recursive_arc_subdivide(
+    alpha: f64,
+    beta: f64,
+    r: f64,
+    cuv: &(Vector, Vector, Vector),
+    screen_mat: &Matrix,
+    step_sq: f64,
+) -> Vec<f64> {
+    let screen_view = |x: f64| {
+        screen_mat.mul_position_w(
+            (cuv.0)
+                .add((cuv.1).mul_scalar(x.cos() * r))
+                .add((cuv.2).mul_scalar(x.sin() * r)),
+        )
+    };
+    let mut path = vec![alpha];
+    crate::path::recursive_subdivide(
+        ((alpha, screen_view(alpha)), (beta, screen_view(beta))),
+        &|(alpha, _), (beta, _)| {
+            let mid = (beta + alpha) / 2.0;
+            (mid, screen_view(mid))
+        },
+        &|(alpha, sa), (beta, sb)| {
+            let theta = (beta - alpha) / 2.0;
+            theta < PI / 180.0
+                || sa.distance_squared(sb) * theta / theta.sin() < step_sq && theta < PI / 3.0
+        },
+        &mut |(x, _)| path.push(x),
+    );
+    path
+}
+
+pub fn radius_expansion(path: &[f64], r: f64) -> Vec<f64> {
+    let mut radius: Vec<f64> = std::iter::once(0.0)
+        .chain(path.windows(2).map(|x| {
+            let (alpha, beta) = (x[0], x[1]);
+            let cos_theta = ((beta - alpha) / 2.0).cos();
+            r / cos_theta
+        }))
+        .collect();
+    let (back, front) = (radius.last().copied().unwrap(), radius[1]);
+    radius[0] = back;
+    radius.push(front);
+    radius
+}
+
+/// Generates a sequence of points along an arc defined by angles `alpha` and `beta`,
+/// with adaptive subdivision to ensure smoothness on screen and radius expansion
+/// to pass visibility testing.
+pub fn adaptive_arc(
+    alpha: f64,
+    beta: f64,
+    r: f64,
+    cuv: &(Vector, Vector, Vector),
+    screen_mat: &Matrix,
+    step_sq: f64,
+) -> Vec<Vector> {
+    let path = recursive_arc_subdivide(alpha, beta, r, cuv, screen_mat, step_sq);
+    let expanded_radius = radius_expansion(&path, r);
+    let (c, u, v) = cuv;
+    path.iter()
+        .enumerate()
+        .map(|(i, beta)| {
+            let max_r = expanded_radius[i].max(expanded_radius[i + 1]);
+            c.add(u.mul_scalar(beta.cos() * max_r))
+                .add(v.mul_scalar(beta.sin() * max_r))
+        })
+        .collect()
+}
+
+/// Similar to `adaptive_arc`, but uses the original radius values
+/// instead of expanded values. This can be used for inner arcs.
+pub fn adaptive_arc_inner(
+    alpha: f64,
+    beta: f64,
+    r: f64,
+    cuv: &(Vector, Vector, Vector),
+    screen_mat: &Matrix,
+    step_sq: f64,
+) -> Vec<Vector> {
+    let path = recursive_arc_subdivide(alpha, beta, r, cuv, screen_mat, step_sq);
+    let (c, u, v) = cuv;
+    path.iter()
+        .map(|beta| {
+            c.add(u.mul_scalar(beta.cos() * r))
+                .add(v.mul_scalar(beta.sin() * r))
+        })
+        .collect()
 }
 
 pub fn recursive_subdivide<T: Copy>(

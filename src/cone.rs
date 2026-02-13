@@ -2,10 +2,12 @@ use crate::bounding_box::Box;
 use crate::hit::Hit;
 use crate::matrix::Matrix;
 use crate::path::Paths;
+use crate::path::adaptive_arc;
 use crate::ray::Ray;
 use crate::shape::{RenderArgs, Shape, TransformedShape};
 use crate::util::radians;
 use crate::vector::Vector;
+use std::f64::consts::PI;
 use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -70,26 +72,19 @@ impl Cone {
 
         let sqrt_ab = (a * a + b * b).sqrt();
 
-        // For visibility of arcs, scale by 1/cos(π/360)
-        let vscale = 1.0 / (std::f64::consts::PI / 360.0).cos();
+        let cuv = (
+            Vector::new(0.0, 0.0, 0.0),
+            Vector::new(1.0, 0.0, 0.0),
+            Vector::new(0.0, 1.0, 0.0),
+        );
 
         // Compute silhouette generator angles
         let ratio = c / sqrt_ab;
         if ratio.abs() > 1.0 {
             // Eye is inside the extended cone surface - no proper silhouette
             // Fall back to just the base circle
-            let mut p0 = Vec::new();
-            let vscale = if args.eye.z >= 0.0 && args.eye.z <= h {
-                1.0
-            } else {
-                vscale
-            };
-            for angle in 0..=360 {
-                let x = r * vscale * radians(angle as f64).cos();
-                let y = r * vscale * radians(angle as f64).sin();
-                p0.push(Vector::new(x, y, 0.0));
-            }
-            return Paths::from_vec(vec![p0]);
+            let path = adaptive_arc(0.0, PI * 2.0, r, &cuv, &args.screen_mat, args.step.powi(2));
+            return Paths::from_vec(vec![path]);
         }
 
         let eye_azimuth = b.atan2(a);
@@ -98,13 +93,7 @@ impl Cone {
         let theta2 = eye_azimuth - angular_offset;
 
         // Base circle path
-        let mut p0 = Vec::new();
-        for angle in 0..=360 {
-            let angle_r = radians(angle as f64);
-            let x = r * vscale * angle_r.cos();
-            let y = r * vscale * angle_r.sin();
-            p0.push(Vector::new(x, y, 0.0));
-        }
+        let p0 = adaptive_arc(0.0, PI * 2.0, r, &cuv, &args.screen_mat, args.step.powi(2));
 
         // Silhouette points on the base circle (with slight outward offset for visibility)
         let a0 = Vector::new(r * theta1.cos(), r * theta1.sin(), 0.0);
