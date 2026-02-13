@@ -31,6 +31,7 @@
 use crate::bounding_box::Box;
 use crate::filter::Filter;
 use crate::matrix::Matrix;
+use crate::shape::RenderArgs;
 use crate::vector::Vector;
 #[cfg(feature = "image")]
 use image::{ImageBuffer, Pixel, Rgb};
@@ -117,11 +118,13 @@ impl Paths {
         Paths { paths }
     }
 
-    pub fn chop_adaptive(&self, screen_mat: &Matrix, width: f64, height: f64, step: f64) -> Paths {
+    pub fn chop_adaptive(&self, args: &RenderArgs) -> Paths {
         let paths = self
             .paths
             .iter()
-            .map(|path| path_chop_adaptive(path, screen_mat, width, height, step))
+            .map(|path| {
+                path_chop_adaptive(path, &args.screen_mat, args.width, args.height, args.step)
+            })
             .collect();
         Paths { paths }
     }

@@ -97,7 +97,17 @@ pub trait Shape {
     /// These paths are the visual representation of the shape. For a cube,
     /// this might be the 12 edges. For a sphere, it could be latitude and
     /// longitude lines. Custom implementations can return any pattern.
-    fn paths(&self, screen_mat: &Matrix, width: f64, height: f64, step: f64) -> Paths;
+    fn paths(&self, args: &RenderArgs) -> Paths;
+}
+
+#[derive(Debug, Clone)]
+pub struct RenderArgs {
+    pub screen_mat: Matrix,
+    pub eye: Vector,
+    pub up: Vector,
+    pub width: f64,
+    pub height: f64,
+    pub step: f64,
 }
 
 /// Automatically implement `Shape` for references to shapes.
@@ -114,8 +124,8 @@ impl<T: Shape + ?Sized> Shape for &T {
         (*self).intersect(r)
     }
 
-    fn paths(&self, screen_mat: &Matrix, width: f64, height: f64, step: f64) -> Paths {
-        (*self).paths(screen_mat, width, height, step)
+    fn paths(&self, args: &RenderArgs) -> Paths {
+        (*self).paths(args)
     }
 }
 
@@ -139,7 +149,7 @@ impl Shape for EmptyShape {
         Hit::no_hit()
     }
 
-    fn paths(&self, _screen_mat: &Matrix, _width: f64, _height: f64, _step: f64) -> Paths {
+    fn paths(&self, _args: &RenderArgs) -> Paths {
         Paths::new()
     }
 }
@@ -208,9 +218,14 @@ impl Shape for TransformedShape {
         self.shape.intersect(self.inverse.mul_ray(r))
     }
 
-    fn paths(&self, screen_mat: &Matrix, width: f64, height: f64, step: f64) -> Paths {
+    fn paths(&self, args: &RenderArgs) -> Paths {
         self.shape
-            .paths(&screen_mat.mul(&self.matrix), width, height, step)
+            .paths(&RenderArgs {
+                screen_mat: args.screen_mat.mul(&self.matrix),
+                eye: self.inverse.mul_position(args.eye),
+                up: self.inverse.mul_direction(args.up),
+                ..args.clone()
+            })
             .transform(&self.matrix)
     }
 }

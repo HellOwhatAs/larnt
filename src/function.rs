@@ -1,9 +1,8 @@
 use crate::bounding_box::Box;
 use crate::hit::Hit;
-use crate::matrix::Matrix;
 use crate::path::Paths;
 use crate::ray::Ray;
-use crate::shape::Shape;
+use crate::shape::{RenderArgs, Shape};
 use crate::util::radians;
 use crate::vector::Vector;
 
@@ -100,7 +99,7 @@ where
         Hit::no_hit()
     }
 
-    fn paths(&self, _screen_mat: &Matrix, _width: f64, _height: f64, _step: f64) -> Paths {
+    fn paths(&self, _args: &RenderArgs) -> Paths {
         match self.texture {
             FunctionTexture::Grid => self.paths_grid(),
             FunctionTexture::Swirl => self.paths_swirl(),

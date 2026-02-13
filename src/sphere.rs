@@ -21,7 +21,6 @@
 //! scene.add(sphere_dots);
 //! ```
 
-use crate::bounding_box::Box;
 use crate::hit::Hit;
 use crate::matrix::Matrix;
 use crate::path::Paths;
@@ -29,6 +28,7 @@ use crate::ray::Ray;
 use crate::shape::Shape;
 use crate::util::radians;
 use crate::vector::Vector;
+use crate::{bounding_box::Box, shape::RenderArgs};
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 use std::f64::consts::PI;
 
@@ -126,15 +126,15 @@ impl Shape for Sphere {
         Hit::no_hit()
     }
 
-    fn paths(&self, screen_mat: &Matrix, _width: f64, _height: f64, step: f64) -> Paths {
+    fn paths(&self, args: &RenderArgs) -> Paths {
         match self.texture {
-            SphereTexture::LatLng => self.paths_lat_lng(screen_mat, step, 10, 10),
+            SphereTexture::LatLng => self.paths_lat_lng(&args.screen_mat, args.step, 10, 10),
             SphereTexture::RandomEquators(seed) => {
-                self.paths_random_equators(screen_mat, step, 100, seed)
+                self.paths_random_equators(&args.screen_mat, args.step, 100, seed)
             }
             SphereTexture::RandomFuzz(seed) => self.paths_random_fuzz(1000, 1.1, seed),
             SphereTexture::RandomCircles(seed) => {
-                self.paths_random_circles(screen_mat, step, 140, seed)
+                self.paths_random_circles(&args.screen_mat, args.step, 140, seed)
             }
         }
     }
@@ -396,7 +396,7 @@ impl Shape for OutlineSphere {
         self.sphere.intersect(r)
     }
 
-    fn paths(&self, screen_mat: &Matrix, _width: f64, _height: f64, step: f64) -> Paths {
+    fn paths(&self, args: &RenderArgs) -> Paths {
         let center = self.sphere.center;
         let radius = self.sphere.radius;
 
@@ -422,8 +422,14 @@ impl Shape for OutlineSphere {
         };
         let v = w.cross(u).normalize();
         let c = self.eye.add(w.mul_scalar(d));
-        let path = recursive_arc_subdivide(0.0, PI * 2.0, r, &(c, u, v), screen_mat, step.powi(2));
-
+        let path = recursive_arc_subdivide(
+            0.0,
+            PI * 2.0,
+            r,
+            &(c, u, v),
+            &args.screen_mat,
+            args.step.powi(2),
+        );
         let expanded_radius = radius_expansion(&path, r);
         Paths::from_vec(vec![
             path.iter()

@@ -27,7 +27,7 @@ use crate::hit::Hit;
 use crate::matrix::Matrix;
 use crate::path::Paths;
 use crate::ray::Ray;
-use crate::shape::Shape;
+use crate::shape::{RenderArgs, Shape};
 use crate::tree::Tree;
 use crate::vector::Vector;
 use std::sync::Arc;
@@ -153,10 +153,10 @@ impl Scene {
     }
 
     /// Returns all paths from all shapes in the scene.
-    pub fn paths(&self, screen_mat: &Matrix, width: f64, height: f64, step: f64) -> Paths {
+    pub fn paths(&self, args: &RenderArgs) -> Paths {
         let mut result = Paths::new();
         for shape in &self.shapes {
-            result.extend(shape.paths(screen_mat, width, height, step));
+            result.extend(shape.paths(args));
         }
         result
     }
@@ -213,7 +213,7 @@ impl Scene {
         let aspect = width / height;
         let matrix = Matrix::look_at(eye, center, up);
         let matrix = matrix.with_perspective(fovy, aspect, near, far);
-        self.render_with_matrix(matrix, eye, width, height, step)
+        self.render_with_matrix(matrix, eye, up, width, height, step)
     }
 
     /// Renders the scene with a custom transformation matrix.
@@ -224,6 +224,7 @@ impl Scene {
         &mut self,
         matrix: Matrix,
         eye: Vector,
+        up: Vector,
         width: f64,
         height: f64,
         step: f64,
@@ -233,13 +234,21 @@ impl Scene {
             height / 2.0,
             1.0,
         ));
-        let screen_mat = viewport_mat.mul(&matrix);
+
+        let args = RenderArgs {
+            screen_mat: viewport_mat.mul(&matrix),
+            eye,
+            up,
+            width,
+            height,
+            step,
+        };
 
         self.compile();
-        let mut paths = self.paths(&screen_mat, width, height, step);
+        let mut paths = self.paths(&args);
 
         if step > 0.0 {
-            paths = paths.chop_adaptive(&screen_mat, width, height, step);
+            paths = paths.chop_adaptive(&args);
         }
 
         let filter = ClipFilter {

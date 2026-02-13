@@ -32,10 +32,9 @@
 use crate::bounding_box::Box;
 use crate::filter::Filter;
 use crate::hit::Hit;
-use crate::matrix::Matrix;
 use crate::path::Paths;
 use crate::ray::Ray;
-use crate::shape::{EmptyShape, Shape};
+use crate::shape::{EmptyShape, RenderArgs, Shape};
 use crate::vector::Vector;
 use std::sync::Arc;
 
@@ -164,10 +163,10 @@ impl Shape for BooleanShape {
         self.intersect(Ray::new(r.position(h.t + 0.01), r.direction))
     }
 
-    fn paths(&self, screen_mat: &Matrix, width: f64, height: f64, step: f64) -> Paths {
-        let mut p = self.a.paths(screen_mat, width, height, step);
-        p.extend(self.b.paths(screen_mat, width, height, step));
-        p = p.chop_adaptive(screen_mat, width, height, step);
+    fn paths(&self, args: &RenderArgs) -> Paths {
+        let mut p = self.a.paths(args);
+        p.extend(self.b.paths(args));
+        p = p.chop_adaptive(args);
         p = p.filter(self);
         p
     }
