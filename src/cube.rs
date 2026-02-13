@@ -26,9 +26,10 @@ use crate::shape::{RenderArgs, Shape};
 use crate::vector::Vector;
 
 /// Texture style for the cube.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum CubeTexture {
     /// Plain cube with edges only.
+    #[default]
     Vanilla,
     /// Cube with striped pattern on faces.
     Striped(u64),
@@ -69,7 +70,7 @@ impl Cube {
             min,
             max,
             bx: Box::new(min, max),
-            texture: CubeTexture::Vanilla,
+            texture: CubeTexture::default(),
         }
     }
 
