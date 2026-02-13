@@ -6,11 +6,12 @@
 
 `larnt` is a vector-based 3D renderer written in Rust. It is used to produce 2D vector graphics (think SVGs) depicting 3D scenes.
 
-*The output of an OpenGL pipeline is a rastered image. The output of `larnt` is a set of 2D vector paths.*
+_The output of an OpenGL pipeline is a rastered image. The output of `larnt` is a set of 2D vector paths._
 
 > This project is a Rust rewrite of the original [Go implementation](https://github.com/fogleman/ln) by [Michael Fogleman](https://github.com/fogleman).
 
 ## Examples
+
 <table>
     <tr>
         <td>
@@ -64,7 +65,7 @@
     </tr>
 </table>
 
-*Click on the example image to jump to the code.*
+_Click on the example image to jump to the code._
 
 ## Installation
 
@@ -78,18 +79,18 @@ larnt = "0.1.0"
 ## Features
 
 - Primitives
-	- Sphere
-	- Cube
-	- Triangle
-	- Cylinder
-	- Cone
-	- 3D Functions
+  - Sphere
+  - Cube
+  - Triangle
+  - Cylinder
+  - Cone
+  - 3D Functions
 - Triangle Meshes
-	- OBJ & STL
+  - OBJ & STL
 - Vector-based "Texturing"
 - CSG (Constructive Solid Geometry) Operations
-	- Intersection
-	- Difference
+  - Intersection
+  - Difference
 - Output to PNG or SVG
 
 ## How it Works
@@ -167,6 +168,7 @@ fn main() {
 ```
 
 ### The Output
+
 <img width="250px" alt="example0" src="https://github.com/user-attachments/assets/3ab195bf-0e3d-4304-b68d-e7dac0b501d9" />
 
 ## Custom Texturing
@@ -176,7 +178,7 @@ shown in the skyscrapers example above. We can implement the `Shape` trait
 for a custom type.
 
 ```rust
-use larnt::{Cube, Shape, Paths, Vector, Box, Hit, Ray};
+use larnt::{Cube, Shape, RenderArgs, Paths, Vector, Box, Hit, Ray};
 
 struct StripedCube {
     cube: Cube,
@@ -196,11 +198,11 @@ impl Shape for StripedCube {
         self.cube.intersect(r)
     }
 
-    fn paths(&self) -> Paths {
+    fn paths(&self, _: &RenderArgs) -> Paths {
         let mut paths = Vec::new();
         let (x1, y1, z1) = (self.cube.min.x, self.cube.min.y, self.cube.min.z);
         let (x2, y2, z2) = (self.cube.max.x, self.cube.max.y, self.cube.max.z);
-        
+
         for i in 0..=self.stripes {
             let p = i as f64 / self.stripes as f64;
             let x = x1 + (x2 - x1) * p;
@@ -222,13 +224,19 @@ Now `StripedCube` instances can be added to the scene.
 You can easily construct complex solids using Intersection, Difference.
 
 ```rust
-use larnt::{new_difference, new_intersection, radians, Cube, Cylinder, Matrix, Sphere, TransformedShape, Vector};
+use larnt::{
+    Cube, CubeTexture, Cylinder, Matrix, Sphere, SphereTexture, TransformedShape, Vector,
+    new_difference, new_intersection, radians,
+};
 use std::sync::Arc;
 
 let shape = new_difference(vec![
     new_intersection(vec![
-        Arc::new(Sphere::new(Vector::default(), 1.0)),
-        Arc::new(Cube::new(Vector::new(-0.8, -0.8, -0.8), Vector::new(0.8, 0.8, 0.8))),
+        Arc::new(Sphere::new(Vector::default(), 1.0).with_texture(SphereTexture::LatLng)),
+        Arc::new(
+            Cube::new(Vector::new(-0.8, -0.8, -0.8), Vector::new(0.8, 0.8, 0.8))
+                .with_texture(CubeTexture::Striped(10)),
+        ),
     ]),
     Arc::new(Cylinder::new(0.4, -2.0, 2.0)),
     Arc::new(TransformedShape::new(

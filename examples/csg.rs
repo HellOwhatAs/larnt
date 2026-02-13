@@ -29,7 +29,8 @@ fn save_gif_from_iter(
 }
 
 fn main() {
-    let sphere: Arc<dyn Shape + Send + Sync> = Arc::new(Sphere::new(Vector::default(), 1.0));
+    let sphere: Arc<dyn Shape + Send + Sync> =
+        Arc::new(Sphere::new(Vector::default(), 1.0).with_texture(larnt::SphereTexture::LatLng));
     let cube: Arc<dyn Shape + Send + Sync> = Arc::new(
         larnt::Cube::new(Vector::new(-0.8, -0.8, -0.8), Vector::new(0.8, 0.8, 0.8))
             .with_texture(CubeTexture::Striped(40)),

@@ -1,6 +1,6 @@
 use larnt::{
-    Cube, CubeTexture, OutlineSphere, Scene, Sphere, SphereTexture, Vector, new_transformed_cone,
-    new_transformed_cylinder, new_transformed_outline_cone, new_transformed_outline_cylinder,
+    ConeTexture, Cube, CubeTexture, CylinderTexture, Scene, Sphere, SphereTexture, Vector,
+    new_transformed_cone, new_transformed_cylinder,
 };
 
 fn main() {
@@ -28,7 +28,7 @@ fn main() {
         Cube::new(Vector::new(1.5, 0.0, 0.0), Vector::new(2.5, 1.0, 1.0))
             .with_texture(CubeTexture::Striped(8)),
     );
-    scene.add(Sphere::new(Vector::new(0.5, 2.0, 0.5), 0.5));
+    scene.add(Sphere::new(Vector::new(0.5, 2.0, 0.5), 0.5).with_texture(SphereTexture::LatLng));
     scene.add(
         Sphere::new(Vector::new(2.0, 2.0, 0.5), 0.5).with_texture(SphereTexture::RandomCircles(42)),
     );
@@ -36,26 +36,30 @@ fn main() {
         Sphere::new(Vector::new(0.5, 3.5, 0.5), 0.5)
             .with_texture(SphereTexture::RandomEquators(42)),
     );
-    scene.add(OutlineSphere::new(Vector::new(2.0, 3.5, 0.5), 0.5));
+    scene.add(Sphere::new(Vector::new(2.0, 3.5, 0.5), 0.5));
     scene.add(new_transformed_cone(
         Vector::new(-1.0, 0.5, 0.0),
         Vector::new(-1.0, 0.5, 1.0),
         0.5,
+        ConeTexture::Striped(12),
     ));
-    scene.add(new_transformed_outline_cone(
+    scene.add(new_transformed_cone(
         Vector::new(-1.0, 2.0, 0.0),
         Vector::new(-1.0, 2.0, 1.0),
         0.5,
+        ConeTexture::Outline,
     ));
     scene.add(new_transformed_cylinder(
         Vector::new(3.5, 0.5, 0.0),
         Vector::new(3.5, 0.5, 1.0),
         0.5,
+        CylinderTexture::Striped(36),
     ));
-    scene.add(new_transformed_outline_cylinder(
+    scene.add(new_transformed_cylinder(
         Vector::new(3.5, 2.0, 0.0),
         Vector::new(3.5, 2.0, 1.0),
         0.5,
+        CylinderTexture::Outline,
     ));
 
     // compute 2D paths that depict the 3D scene

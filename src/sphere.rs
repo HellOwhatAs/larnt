@@ -1,7 +1,7 @@
 //! Sphere primitive.
 //!
 //! This module provides the [`Sphere`] shape with multiple texture options,
-//! and [`OutlineSphere`] which renders as a silhouette circle from the camera's
+//! the default outline texture renders as a silhouette circle from the camera's
 //! perspective.
 //!
 //! # Example
@@ -9,16 +9,16 @@
 //! ```
 //! use larnt::{Scene, Sphere, SphereTexture, Vector};
 //!
-//! // Create a unit sphere at the origin with the default lat/lng texture
+//! // Create a unit sphere at the origin with the default outline texture
 //! let sphere = Sphere::new(Vector::new(0.0, 0.0, 0.0), 1.0);
 //!
 //! // Or with a custom texture
-//! let sphere_dots = Sphere::new(Vector::new(2.0, 0.0, 0.0), 1.0)
-//!     .with_texture(SphereTexture::RandomDots(42));
+//! let sphere_fuzz = Sphere::new(Vector::new(2.0, 0.0, 0.0), 1.0)
+//!     .with_texture(SphereTexture::RandomFuzz(42));
 //!
 //! let mut scene = Scene::new();
 //! scene.add(sphere);
-//! scene.add(sphere_dots);
+//! scene.add(sphere_fuzz);
 //! ```
 
 use crate::hit::Hit;
@@ -33,10 +33,12 @@ use rand::{Rng, SeedableRng, rngs::SmallRng};
 use std::f64::consts::PI;
 
 /// Texture style for Sphere shapes
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum SphereTexture {
-    /// Latitude/longitude grid texture (default)
+    /// A sphere that renders as a silhouette circle from the camera's perspective.
     #[default]
+    Outline,
+    /// Latitude/longitude grid texture
     LatLng,
     /// Random rotated equators (great circles)
     RandomEquators(u64),
@@ -48,8 +50,8 @@ pub enum SphereTexture {
 
 /// A sphere defined by center and radius.
 ///
-/// The default paths generated are latitude and longitude lines, creating
-/// a globe-like appearance. You can use [`with_texture`](Sphere::with_texture)
+/// The default paths generated are a silhouette circle from the camera's perspective.
+/// You can use [`with_texture`](Sphere::with_texture)
 /// to select different texture styles.
 ///
 /// # Example
@@ -57,12 +59,12 @@ pub enum SphereTexture {
 /// ```
 /// use larnt::{Sphere, SphereTexture, Vector};
 ///
-/// // Sphere at origin with radius 2 (default lat/lng texture)
+/// // Sphere at origin with radius 2 (default outline texture)
 /// let sphere = Sphere::new(Vector::new(0.0, 0.0, 0.0), 2.0);
 ///
-/// // Sphere with dots texture
-/// let sphere_dots = Sphere::new(Vector::new(0.0, 0.0, 0.0), 2.0)
-///     .with_texture(SphereTexture::RandomDots(42));
+/// // Sphere with fuzz texture
+/// let sphere_fuzz = Sphere::new(Vector::new(0.0, 0.0, 0.0), 2.0)
+///     .with_texture(SphereTexture::RandomFuzz(42));
 /// ```
 #[derive(Debug, Clone)]
 pub struct Sphere {
@@ -128,6 +130,7 @@ impl Shape for Sphere {
 
     fn paths(&self, args: &RenderArgs) -> Paths {
         match self.texture {
+            SphereTexture::Outline => self.paths_outline(args),
             SphereTexture::LatLng => self.paths_lat_lng(&args.screen_mat, args.step, 10, 10),
             SphereTexture::RandomEquators(seed) => {
                 self.paths_random_equators(&args.screen_mat, args.step, 100, seed)
@@ -141,7 +144,55 @@ impl Shape for Sphere {
 }
 
 impl Sphere {
-    /// Latitude/longitude grid texture (default)
+    /// Outline texture: renders as a silhouette circle from the camera's perspective.
+    fn paths_outline(&self, args: &RenderArgs) -> Paths {
+        let center = self.center;
+        let radius = self.radius;
+
+        let hyp = center.sub(args.eye).length();
+        let opp = radius;
+        if hyp < opp {
+            return Paths::new();
+        }
+        let theta = (opp / hyp).asin();
+        let adj = opp / theta.tan();
+        let d = theta.cos() * adj;
+        let r = theta.sin() * adj;
+
+        let w = center.sub(args.eye).normalize();
+
+        // Handle case when w is parallel to up vector by finding a perpendicular vector
+        let cross = w.cross(args.up);
+        let u = if cross.length_squared() < 1e-18 {
+            // w is parallel to up, use the minimum axis approach to find a perpendicular
+            w.cross(w.min_axis()).normalize()
+        } else {
+            cross.normalize()
+        };
+        let v = w.cross(u).normalize();
+        let c = args.eye.add(w.mul_scalar(d));
+        let path = recursive_arc_subdivide(
+            0.0,
+            PI * 2.0,
+            r,
+            &(c, u, v),
+            &args.screen_mat,
+            args.step.powi(2),
+        );
+        let expanded_radius = radius_expansion(&path, r);
+        Paths::from_vec(vec![
+            path.iter()
+                .enumerate()
+                .map(|(i, beta)| {
+                    let max_r = expanded_radius[i].max(expanded_radius[i + 1]);
+                    c.add(u.mul_scalar(beta.cos() * max_r))
+                        .add(v.mul_scalar(beta.sin() * max_r))
+                })
+                .collect(),
+        ])
+    }
+
+    /// Latitude/longitude grid texture
     fn paths_lat_lng(&self, screen_mat: &Matrix, step: f64, n: i32, o: i32) -> Paths {
         let mut paths = Vec::new();
         let step_sq = step.powi(2);
@@ -337,105 +388,6 @@ pub fn lat_lng_to_xyz(lat: f64, lng: f64, radius: f64) -> Vector {
     let y = radius * lat.cos() * lng.sin();
     let z = radius * lat.sin();
     Vector::new(x, y, z)
-}
-
-/// A sphere that renders as a silhouette circle from the camera's perspective.
-///
-/// Unlike [`Sphere`] which draws latitude/longitude lines, `OutlineSphere`
-/// draws only the visible outline of the sphere as seen from the camera.
-/// This is useful for cleaner, more stylized renderings.
-///
-/// # Example
-///
-/// ```
-/// use larnt::{OutlineSphere, Scene, Vector};
-///
-/// let eye = Vector::new(4.0, 3.0, 2.0);
-/// let up = Vector::new(0.0, 0.0, 1.0);
-///
-/// let sphere = OutlineSphere::new(eye, up, Vector::new(0.0, 0.0, 0.0), 1.0);
-/// ```
-#[derive(Debug, Clone)]
-pub struct OutlineSphere {
-    /// The underlying sphere geometry.
-    pub sphere: Sphere,
-}
-
-impl OutlineSphere {
-    /// Creates a new outline sphere.
-    ///
-    /// # Arguments
-    ///
-    /// * `eye` - The camera position
-    /// * `up` - The up direction vector
-    /// * `center` - The center of the sphere
-    /// * `radius` - The radius of the sphere
-    pub fn new(center: Vector, radius: f64) -> Self {
-        OutlineSphere {
-            sphere: Sphere::new(center, radius),
-        }
-    }
-}
-
-impl Shape for OutlineSphere {
-    fn bounding_box(&self) -> Box {
-        self.sphere.bounding_box()
-    }
-
-    fn contains(&self, v: Vector, f: f64) -> bool {
-        self.sphere.contains(v, f)
-    }
-
-    fn intersect(&self, r: Ray) -> Hit {
-        self.sphere.intersect(r)
-    }
-
-    fn paths(&self, args: &RenderArgs) -> Paths {
-        let center = self.sphere.center;
-        let radius = self.sphere.radius;
-
-        let hyp = center.sub(args.eye).length();
-        let opp = radius;
-        if hyp < opp {
-            return Paths::new();
-        }
-        let theta = (opp / hyp).asin();
-        let adj = opp / theta.tan();
-        let d = theta.cos() * adj;
-        let r = theta.sin() * adj;
-
-        let w = center.sub(args.eye).normalize();
-
-        // Handle case when w is parallel to up vector by finding a perpendicular vector
-        let cross = w.cross(args.up);
-        let u = if cross.length_squared() < 1e-18 {
-            // w is parallel to up, use the minimum axis approach to find a perpendicular
-            w.cross(w.min_axis()).normalize()
-        } else {
-            cross.normalize()
-        };
-        let v = w.cross(u).normalize();
-        let c = args.eye.add(w.mul_scalar(d));
-        let path = recursive_arc_subdivide(
-            0.0,
-            PI * 2.0,
-            r,
-            &(c, u, v),
-            &args.screen_mat,
-            args.step.powi(2),
-        );
-        let expanded_radius = radius_expansion(&path, r);
-        Paths::from_vec(vec![
-            path.iter()
-                .enumerate()
-                .map(|(i, beta)| {
-                    let max_r = expanded_radius[i].max(expanded_radius[i + 1]);
-                    c.add(u.mul_scalar(beta.cos() * max_r))
-                        .add(v.mul_scalar(beta.sin() * max_r))
-                })
-                .collect(),
-        ])
-    }
 }
 
 fn radius_expansion(path: &[f64], r: f64) -> Vec<f64> {

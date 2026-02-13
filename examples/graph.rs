@@ -1,5 +1,5 @@
 use image::{Delay, DynamicImage, Frame, ImageBuffer, Rgb, codecs::gif::GifEncoder};
-use larnt::{OutlineSphere, Scene, Vector, new_transformed_outline_cylinder, radians};
+use larnt::{CylinderTexture, Scene, Sphere, Vector, new_transformed_cylinder, radians};
 use std::{fs::File, sync::Arc, time::Duration};
 
 fn save_gif_from_iter(
@@ -87,14 +87,14 @@ fn render(frame: i32) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
 
     // Add nodes as spheres
     for v in &nodes {
-        scene.add(OutlineSphere::new(*v, 0.333));
+        scene.add(Sphere::new(*v, 0.333));
     }
 
     // Add edges as cylinders
     for (i, j) in &edges {
         let v0 = nodes[*i];
         let v1 = nodes[*j];
-        let cylinder = new_transformed_outline_cylinder(v0, v1, 0.1);
+        let cylinder = new_transformed_cylinder(v0, v1, 0.1, CylinderTexture::Outline);
         scene.add_arc(Arc::new(cylinder));
     }
 

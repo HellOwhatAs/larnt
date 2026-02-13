@@ -1,4 +1,4 @@
-use larnt::{OutlineCylinder, Scene, Vector};
+use larnt::{Cylinder, Scene, Vector};
 
 fn main() {
     // create a scene and add a single cube
@@ -17,7 +17,7 @@ fn main() {
     let zfar = 10.0; // far z plane
     let step = 0.001; // how finely to chop the paths for visibility testing
 
-    scene.add(OutlineCylinder::new(1.0, 0.0, 1.0));
+    scene.add(Cylinder::new(1.0, 0.0, 1.0));
 
     // compute 2D paths that depict the 3D scene
     let paths = scene.render(eye, center, up, width, height, fovy, znear, zfar, step);

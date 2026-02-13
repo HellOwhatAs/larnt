@@ -1,4 +1,4 @@
-use larnt::{OutlineSphere, Scene, Vector};
+use larnt::{Scene, Sphere, Vector};
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 fn normalize(values: &[f64], a: f64, b: f64) -> Vec<f64> {
@@ -48,7 +48,7 @@ fn main() {
 
         let mut position = Vector::new(0.0, 0.0, 0.0);
         for i in 0..n {
-            let sphere = OutlineSphere::new(position, 0.1);
+            let sphere = Sphere::new(position, 0.1);
             scene.add(sphere);
             let s = (ss[i] + 1.0) / 2.0 * 0.1 + 0.01;
             let v = Vector::new(xs[i], ys[i], zs[i]).normalize().mul_scalar(s);
