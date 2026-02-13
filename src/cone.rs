@@ -90,16 +90,12 @@ impl Shape for Cone {
 #[derive(Debug, Clone)]
 pub struct OutlineCone {
     pub cone: Cone,
-    pub eye: Vector,
-    pub up: Vector,
 }
 
 impl OutlineCone {
-    pub fn new(eye: Vector, up: Vector, radius: f64, height: f64) -> Self {
+    pub fn new(radius: f64, height: f64) -> Self {
         OutlineCone {
             cone: Cone::new(radius, height),
-            eye,
-            up,
         }
     }
 }
@@ -117,7 +113,7 @@ impl Shape for OutlineCone {
         self.cone.intersect(r)
     }
 
-    fn paths(&self, _args: &RenderArgs) -> Paths {
+    fn paths(&self, args: &RenderArgs) -> Paths {
         // For a cone with apex at (0,0,h) and base circle radius r at z=0,
         // the silhouette generators are found by solving:
         // E.x * cos(θ) + E.y * sin(θ) = r * (1 - E.z / h)
@@ -128,9 +124,9 @@ impl Shape for OutlineCone {
         let r = self.cone.radius;
         let h = self.cone.height;
 
-        let a = self.eye.x;
-        let b = self.eye.y;
-        let c = r * (1.0 - self.eye.z / h);
+        let a = args.eye.x;
+        let b = args.eye.y;
+        let c = r * (1.0 - args.eye.z / h);
 
         let sqrt_ab = (a * a + b * b).sqrt();
 
@@ -143,7 +139,7 @@ impl Shape for OutlineCone {
             // Eye is inside the extended cone surface - no proper silhouette
             // Fall back to just the base circle
             let mut p0 = Vec::new();
-            let vscale = if self.eye.z >= 0.0 && self.eye.z <= h {
+            let vscale = if args.eye.z >= 0.0 && args.eye.z <= h {
                 1.0
             } else {
                 vscale
@@ -182,7 +178,8 @@ impl Shape for OutlineCone {
     }
 }
 
-pub fn new_transformed_cone(up: Vector, v0: Vector, v1: Vector, radius: f64) -> TransformedShape {
+pub fn new_transformed_cone(v0: Vector, v1: Vector, radius: f64) -> TransformedShape {
+    let up = Vector::new(0.0, 0.0, 1.0);
     let d = v1.sub(v0);
     let z = d.length();
     let a = d.normalize().dot(up).acos();
@@ -196,13 +193,8 @@ pub fn new_transformed_cone(up: Vector, v0: Vector, v1: Vector, radius: f64) -> 
     TransformedShape::new(Arc::new(c), m)
 }
 
-pub fn new_transformed_outline_cone(
-    eye: Vector,
-    up: Vector,
-    v0: Vector,
-    v1: Vector,
-    radius: f64,
-) -> TransformedShape {
+pub fn new_transformed_outline_cone(v0: Vector, v1: Vector, radius: f64) -> TransformedShape {
+    let up = Vector::new(0.0, 0.0, 1.0);
     let d = v1.sub(v0);
     let z = d.length();
     let a = d.normalize().dot(up).acos();
@@ -212,6 +204,6 @@ pub fn new_transformed_outline_cone(
     } else {
         Matrix::translate(v0)
     };
-    let c = OutlineCone::new(m.inverse().mul_position(eye), up, radius, z);
+    let c = OutlineCone::new(radius, z);
     TransformedShape::new(Arc::new(c), m)
 }

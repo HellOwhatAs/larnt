@@ -14,7 +14,7 @@ fn main() {
         for y in -n..=n {
             let z = rng.random::<f64>() * 3.0;
             let v = Vector::new(x as f64, y as f64, z);
-            let sphere = OutlineSphere::new(eye, up, v, 0.45);
+            let sphere = OutlineSphere::new(v, 0.45);
             scene.add(sphere);
         }
     }

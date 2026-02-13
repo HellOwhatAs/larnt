@@ -124,19 +124,13 @@ impl Shape for Cylinder {
 pub struct OutlineCylinder {
     /// The underlying cylinder geometry.
     pub cylinder: Cylinder,
-    /// The camera position.
-    pub eye: Vector,
-    /// The up direction.
-    pub up: Vector,
 }
 
 impl OutlineCylinder {
     /// Creates a new outline cylinder.
-    pub fn new(eye: Vector, up: Vector, radius: f64, z0: f64, z1: f64) -> Self {
+    pub fn new(radius: f64, z0: f64, z1: f64) -> Self {
         OutlineCylinder {
             cylinder: Cylinder::new(radius, z0, z1),
-            eye,
-            up,
         }
     }
 }
@@ -154,7 +148,7 @@ impl Shape for OutlineCylinder {
         self.cylinder.intersect(r)
     }
 
-    fn paths(&self, _args: &RenderArgs) -> Paths {
+    fn paths(&self, args: &RenderArgs) -> Paths {
         // For a cylinder with radius r aligned along Z-axis, the silhouette
         // generators are found by solving:
         // E.x * cos(θ) + E.y * sin(θ) = r
@@ -164,8 +158,8 @@ impl Shape for OutlineCylinder {
         // Solution: θ = atan2(b, a) ± acos(c / sqrt(a^2 + b^2))
         let r = self.cylinder.radius;
 
-        let a = self.eye.x;
-        let b = self.eye.y;
+        let a = args.eye.x;
+        let b = args.eye.y;
         let c = r;
 
         let sqrt_ab = (a * a + b * b).sqrt();
@@ -227,12 +221,8 @@ impl Shape for OutlineCylinder {
     }
 }
 
-pub fn new_transformed_cylinder(
-    up: Vector,
-    v0: Vector,
-    v1: Vector,
-    radius: f64,
-) -> TransformedShape {
+pub fn new_transformed_cylinder(v0: Vector, v1: Vector, radius: f64) -> TransformedShape {
+    let up = Vector::new(0.0, 0.0, 1.0);
     let d = v1.sub(v0);
     let z = d.length();
     let a = d.normalize().dot(up).acos();
@@ -253,18 +243,11 @@ pub fn new_transformed_cylinder(
 ///
 /// # Arguments
 ///
-/// * `eye` - Camera position for silhouette calculation
-/// * `up` - Up direction vector
 /// * `v0` - Start point of the cylinder
 /// * `v1` - End point of the cylinder
 /// * `radius` - Radius of the cylinder
-pub fn new_transformed_outline_cylinder(
-    eye: Vector,
-    up: Vector,
-    v0: Vector,
-    v1: Vector,
-    radius: f64,
-) -> TransformedShape {
+pub fn new_transformed_outline_cylinder(v0: Vector, v1: Vector, radius: f64) -> TransformedShape {
+    let up = Vector::new(0.0, 0.0, 1.0);
     let d = v1.sub(v0);
     let z = d.length();
     let a = d.normalize().dot(up).acos();
@@ -274,6 +257,6 @@ pub fn new_transformed_outline_cylinder(
     } else {
         Matrix::translate(v0)
     };
-    let c = OutlineCylinder::new(m.inverse().mul_position(eye), up, radius, 0.0, z);
+    let c = OutlineCylinder::new(radius, 0.0, z);
     TransformedShape::new(Arc::new(c), m)
 }

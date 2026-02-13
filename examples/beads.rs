@@ -48,7 +48,7 @@ fn main() {
 
         let mut position = Vector::new(0.0, 0.0, 0.0);
         for i in 0..n {
-            let sphere = OutlineSphere::new(eye, up, position, 0.1);
+            let sphere = OutlineSphere::new(position, 0.1);
             scene.add(sphere);
             let s = (ss[i] + 1.0) / 2.0 * 0.1 + 0.01;
             let v = Vector::new(xs[i], ys[i], zs[i]).normalize().mul_scalar(s);

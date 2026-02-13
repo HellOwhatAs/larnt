@@ -359,10 +359,6 @@ pub fn lat_lng_to_xyz(lat: f64, lng: f64, radius: f64) -> Vector {
 pub struct OutlineSphere {
     /// The underlying sphere geometry.
     pub sphere: Sphere,
-    /// The camera position (used to compute the silhouette).
-    pub eye: Vector,
-    /// The up direction (used to orient the silhouette).
-    pub up: Vector,
 }
 
 impl OutlineSphere {
@@ -374,11 +370,9 @@ impl OutlineSphere {
     /// * `up` - The up direction vector
     /// * `center` - The center of the sphere
     /// * `radius` - The radius of the sphere
-    pub fn new(eye: Vector, up: Vector, center: Vector, radius: f64) -> Self {
+    pub fn new(center: Vector, radius: f64) -> Self {
         OutlineSphere {
             sphere: Sphere::new(center, radius),
-            eye,
-            up,
         }
     }
 }
@@ -400,7 +394,7 @@ impl Shape for OutlineSphere {
         let center = self.sphere.center;
         let radius = self.sphere.radius;
 
-        let hyp = center.sub(self.eye).length();
+        let hyp = center.sub(args.eye).length();
         let opp = radius;
         if hyp < opp {
             return Paths::new();
@@ -410,10 +404,10 @@ impl Shape for OutlineSphere {
         let d = theta.cos() * adj;
         let r = theta.sin() * adj;
 
-        let w = center.sub(self.eye).normalize();
+        let w = center.sub(args.eye).normalize();
 
         // Handle case when w is parallel to up vector by finding a perpendicular vector
-        let cross = w.cross(self.up);
+        let cross = w.cross(args.up);
         let u = if cross.length_squared() < 1e-18 {
             // w is parallel to up, use the minimum axis approach to find a perpendicular
             w.cross(w.min_axis()).normalize()
@@ -421,7 +415,7 @@ impl Shape for OutlineSphere {
             cross.normalize()
         };
         let v = w.cross(u).normalize();
-        let c = self.eye.add(w.mul_scalar(d));
+        let c = args.eye.add(w.mul_scalar(d));
         let path = recursive_arc_subdivide(
             0.0,
             PI * 2.0,

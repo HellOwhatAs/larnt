@@ -36,29 +36,23 @@ fn main() {
         Sphere::new(Vector::new(0.5, 3.5, 0.5), 0.5)
             .with_texture(SphereTexture::RandomEquators(42)),
     );
-    scene.add(OutlineSphere::new(eye, up, Vector::new(2.0, 3.5, 0.5), 0.5));
+    scene.add(OutlineSphere::new(Vector::new(2.0, 3.5, 0.5), 0.5));
     scene.add(new_transformed_cone(
-        up,
         Vector::new(-1.0, 0.5, 0.0),
         Vector::new(-1.0, 0.5, 1.0),
         0.5,
     ));
     scene.add(new_transformed_outline_cone(
-        eye,
-        up,
         Vector::new(-1.0, 2.0, 0.0),
         Vector::new(-1.0, 2.0, 1.0),
         0.5,
     ));
     scene.add(new_transformed_cylinder(
-        up,
         Vector::new(3.5, 0.5, 0.0),
         Vector::new(3.5, 0.5, 1.0),
         0.5,
     ));
     scene.add(new_transformed_outline_cylinder(
-        eye,
-        up,
         Vector::new(3.5, 2.0, 0.0),
         Vector::new(3.5, 2.0, 1.0),
         0.5,

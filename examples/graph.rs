@@ -87,14 +87,14 @@ fn render(frame: i32) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
 
     // Add nodes as spheres
     for v in &nodes {
-        scene.add(OutlineSphere::new(eye, up, *v, 0.333));
+        scene.add(OutlineSphere::new(*v, 0.333));
     }
 
     // Add edges as cylinders
     for (i, j) in &edges {
         let v0 = nodes[*i];
         let v1 = nodes[*j];
-        let cylinder = new_transformed_outline_cylinder(eye, up, v0, v1, 0.1);
+        let cylinder = new_transformed_outline_cylinder(v0, v1, 0.1);
         scene.add_arc(Arc::new(cylinder));
     }
 

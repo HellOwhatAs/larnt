@@ -17,7 +17,7 @@ fn main() {
     let zfar = 10.0; // far z plane
     let step = 0.001; // how finely to chop the paths for visibility testing
 
-    scene.add(OutlineCylinder::new(eye, up, 1.0, 0.0, 1.0));
+    scene.add(OutlineCylinder::new(1.0, 0.0, 1.0));
 
     // compute 2D paths that depict the 3D scene
     let paths = scene.render(eye, center, up, width, height, fovy, znear, zfar, step);

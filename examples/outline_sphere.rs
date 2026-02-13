@@ -6,7 +6,7 @@ fn main() {
     let up = Vector::new(0.0, 0.0, 1.0);
 
     let mut scene = Scene::new();
-    scene.add(OutlineSphere::new(eye, up, eye.mul_scalar(-1.0), 1.0));
+    scene.add(OutlineSphere::new(eye.mul_scalar(-1.0), 1.0));
     let width = 1024.0;
     let height = 1024.0;
     let fovy = 50.0;
