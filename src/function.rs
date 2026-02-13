@@ -1,6 +1,6 @@
 use crate::bounding_box::Box;
 use crate::hit::Hit;
-use crate::path::Paths;
+use crate::path::{Paths, recursive_subdivide};
 use crate::ray::Ray;
 use crate::shape::{RenderArgs, Shape};
 use crate::util::radians;
@@ -99,9 +99,9 @@ where
         Hit::no_hit()
     }
 
-    fn paths(&self, _args: &RenderArgs) -> Paths {
+    fn paths(&self, args: &RenderArgs) -> Paths {
         match self.texture {
-            FunctionTexture::Grid => self.paths_grid(),
+            FunctionTexture::Grid => self.paths_grid(args, 1.0 / 8.0),
             FunctionTexture::Swirl => self.paths_swirl(),
             FunctionTexture::Spiral => self.paths_spiral(),
         }
@@ -119,39 +119,54 @@ where
     }
 
     /// Grid texture - lines along constant x and y (works with any function)
-    fn paths_grid(&self) -> Paths {
+    fn paths_grid(&self, args: &RenderArgs, grid_size: f64) -> Paths {
         let mut paths = Vec::new();
-        let step = 1.0 / 8.0;
-        let fine = 1.0 / 64.0;
+        let step_sq = args.step.powi(2);
 
         // Lines along constant x
         let mut x = self.bx.min.x;
+        let (a, b) = (self.bx.min.y, self.bx.max.y);
         while x <= self.bx.max.x {
-            let mut path = Vec::new();
-            let mut y = self.bx.min.y;
-            while y <= self.bx.max.y {
-                let mut z = (self.func)(x, y);
-                z = z.min(self.bx.max.z).max(self.bx.min.z);
-                path.push(Vector::new(x, y, z));
-                y += fine;
-            }
+            let f = |y| (self.func)(x, y).min(self.bx.max.z).max(self.bx.min.z);
+            let mut path = vec![Vector::new(x, a, f(a))];
+            recursive_subdivide(
+                ((a, path[0].z), (b, f(b))),
+                &|(a, _), (b, _)| {
+                    let mid = (a + b) / 2.0;
+                    (mid, f(mid))
+                },
+                &|(a, fa), (b, fb)| {
+                    let sa = args.screen_mat.mul_position_w(Vector::new(x, a, fa));
+                    let sb = args.screen_mat.mul_position_w(Vector::new(x, b, fb));
+                    sa.distance_squared(sb) < step_sq || (a - b).powi(2) < crate::common::EPS
+                },
+                &mut |(y, fy)| path.push(Vector::new(x, y, fy)),
+            );
             paths.push(path);
-            x += step;
+            x += grid_size;
         }
 
         // Lines along constant y
         let mut y = self.bx.min.y;
+        let (a, b) = (self.bx.min.x, self.bx.max.x);
         while y <= self.bx.max.y {
-            let mut path = Vec::new();
-            let mut x = self.bx.min.x;
-            while x <= self.bx.max.x {
-                let mut z = (self.func)(x, y);
-                z = z.min(self.bx.max.z).max(self.bx.min.z);
-                path.push(Vector::new(x, y, z));
-                x += fine;
-            }
+            let f = |x| (self.func)(x, y).min(self.bx.max.z).max(self.bx.min.z);
+            let mut path = vec![Vector::new(a, y, f(a))];
+            recursive_subdivide(
+                ((a, path[0].z), (b, f(b))),
+                &|(a, _), (b, _)| {
+                    let mid = (a + b) / 2.0;
+                    (mid, f(mid))
+                },
+                &|(a, fa), (b, fb)| {
+                    let sa = args.screen_mat.mul_position_w(Vector::new(a, y, fa));
+                    let sb = args.screen_mat.mul_position_w(Vector::new(b, y, fb));
+                    sa.distance_squared(sb) < step_sq || (a - b).powi(2) < crate::common::EPS
+                },
+                &mut |(x, fx)| path.push(Vector::new(x, y, fx)),
+            );
             paths.push(path);
-            y += step;
+            y += grid_size;
         }
 
         Paths::from_vec(paths)
