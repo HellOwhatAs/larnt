@@ -142,7 +142,7 @@ where
                 },
                 &mut |(y, fy)| path.push(Vector::new(x, y, fy)),
             );
-            paths.push(path);
+            paths.push(zvisible_offset(path, args.eye));
             x += grid_size;
         }
 
@@ -165,7 +165,7 @@ where
                 },
                 &mut |(x, fx)| path.push(Vector::new(x, y, fx)),
             );
-            paths.push(path);
+            paths.push(zvisible_offset(path, args.eye));
             y += grid_size;
         }
 
@@ -251,4 +251,31 @@ where
 
         Paths::from_vec(paths)
     }
+}
+
+fn zvisible_offset(path: Vec<Vector>, eye: Vector) -> Vec<Vector> {
+    let mut offsets = vec![0.0f64; path.len()];
+    let ez = eye.z;
+    for i in 1..path.len() - 1 {
+        let (a, c, b) = (path[i - 1], path[i], path[i + 1]);
+        let z = a.z
+            + (b.z - a.z)
+                * (((a.x - c.x).powi(2) + (a.y - c.y).powi(2))
+                    / ((a.x - b.x).powi(2) + (a.y - b.y).powi(2)))
+                .sqrt();
+        let offset = if (c.z > z) == (ez > z) { c.z - z } else { 0.0 };
+        if offset.abs() > offsets[i - 1].abs() {
+            offsets[i - 1] = offset;
+        }
+        if offset.abs() > offsets[i + 1].abs() {
+            offsets[i + 1] = offset;
+        }
+    }
+    path.into_iter()
+        .zip(offsets)
+        .map(|(mut v, z)| {
+            v.z += z;
+            v
+        })
+        .collect()
 }
