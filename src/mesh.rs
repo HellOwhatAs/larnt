@@ -104,7 +104,7 @@ impl Mesh {
         set.into_iter()
             .map(|(x, y, z)| {
                 let v = Vector::new(x as f64 / 1000.0, y as f64 / 1000.0, z as f64 / 1000.0);
-                Cube::new(v.sub_scalar(size / 2.0), v.add_scalar(size / 2.0))
+                Cube::builder(v.sub_scalar(size / 2.0), v.add_scalar(size / 2.0)).build()
             })
             .collect()
     }

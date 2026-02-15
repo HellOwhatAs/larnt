@@ -29,20 +29,36 @@ fn save_gif_from_iter(
 }
 
 fn main() {
-    let sphere: Arc<dyn Shape + Send + Sync> =
-        Arc::new(Sphere::new(Vector::default(), 1.0).with_texture(larnt::SphereTexture::LatLng));
+    let sphere: Arc<dyn Shape + Send + Sync> = Arc::new(
+        Sphere::builder(Vector::default(), 1.0)
+            .texture(larnt::SphereTexture::lat_lng().call())
+            .build(),
+    );
     let cube: Arc<dyn Shape + Send + Sync> = Arc::new(
-        larnt::Cube::new(Vector::new(-0.8, -0.8, -0.8), Vector::new(0.8, 0.8, 0.8))
-            .with_texture(CubeTexture::Striped(40)),
+        larnt::Cube::builder(Vector::new(-0.8, -0.8, -0.8), Vector::new(0.8, 0.8, 0.8))
+            .texture(CubeTexture::striped().stripes(40).call())
+            .build(),
     );
 
-    let cyl1: Arc<dyn Shape + Send + Sync> = Arc::new(Cylinder::new(0.4, -2.0, 2.0));
+    let cyl1: Arc<dyn Shape + Send + Sync> = Arc::new(
+        Cylinder::builder(0.4, -2.0, 2.0)
+            .texture(larnt::CylinderTexture::striped().call())
+            .build(),
+    );
     let cyl2: Arc<dyn Shape + Send + Sync> = Arc::new(TransformedShape::new(
-        Arc::new(Cylinder::new(0.4, -2.0, 2.0)),
+        Arc::new(
+            Cylinder::builder(0.4, -2.0, 2.0)
+                .texture(larnt::CylinderTexture::striped().call())
+                .build(),
+        ),
         Matrix::rotate(Vector::new(1.0, 0.0, 0.0), radians(90.0)),
     ));
     let cyl3: Arc<dyn Shape + Send + Sync> = Arc::new(TransformedShape::new(
-        Arc::new(Cylinder::new(0.4, -2.0, 2.0)),
+        Arc::new(
+            Cylinder::builder(0.4, -2.0, 2.0)
+                .texture(larnt::CylinderTexture::striped().call())
+                .build(),
+        ),
         Matrix::rotate(Vector::new(0.0, 1.0, 0.0), radians(90.0)),
     ));
 
@@ -54,12 +70,15 @@ fn main() {
         scene.add_arc(Arc::new(TransformedShape::new(Arc::clone(&shape), m)));
 
         let eye = Vector::new(0.0, 6.0, 2.0);
-        let center = Vector::new(0.0, 0.0, 0.0);
-        let up = Vector::new(0.0, 0.0, 1.0);
         let width = 750.0;
         let height = 750.0;
 
-        let paths = scene.render(eye, center, up, width, height, 20.0, 0.1, 100.0, 1.0);
+        let paths = scene
+            .render(eye)
+            .width(width)
+            .height(height)
+            .fovy(20.0)
+            .call();
         paths.to_image(width, height, 2.5)
     });
 

@@ -4,7 +4,7 @@ use rand::{Rng, SeedableRng, rngs::SmallRng};
 fn make_cube(x: f64, y: f64, z: f64) -> Cube {
     let size = 0.5;
     let v = Vector::new(x, y, z);
-    Cube::new(v.sub_scalar(size), v.add_scalar(size))
+    Cube::builder(v.sub_scalar(size), v.add_scalar(size)).build()
 }
 
 fn main() {
@@ -18,14 +18,14 @@ fn main() {
         }
     }
 
-    let eye = Vector::new(6.0, 5.0, 3.0);
-    let center = Vector::new(0.0, 0.0, 0.0);
-    let up = Vector::new(0.0, 0.0, 1.0);
     let width = 1024.0;
     let height = 1024.0;
-    let fovy = 50.0;
 
-    let paths = scene.render(eye, center, up, width, height, fovy, 0.1, 100.0, 1.0);
+    let paths = scene
+        .render(Vector::new(6.0, 5.0, 3.0))
+        .width(width)
+        .height(height)
+        .call();
     paths.write_to_png("out.png", width, height);
     paths
         .write_to_svg("out.svg", width, height)

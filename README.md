@@ -60,7 +60,8 @@ _The output of an OpenGL pipeline is a rastered image. The output of `larnt` is 
         </td>
         <td>
             <a href="examples/test.rs">
-                <img alt="test" src="https://github.com/user-attachments/assets/9abc50da-b1fe-4c23-bc46-588bd26e93d8" 
+                <img alt="test" src="https://github.com/user-attachments/assets/9abc50da-b1fe-4c23-bc46-588bd26e93d8" />
+            </a>
         </td>
     </tr>
 </table>
@@ -98,14 +99,14 @@ larnt = "0.1.0"
 To understand how `larnt` works, it's useful to start with the `Shape` trait:
 
 ```rust
-use larnt::{Box, Hit, Paths, Ray, Vector};
+use larnt::{Box, Hit, Paths, Ray, Vector, RenderArgs};
 
 pub trait Shape {
     fn compile(&mut self) {}
     fn bounding_box(&self) -> Box;
     fn contains(&self, v: Vector, f: f64) -> bool;
     fn intersect(&self, r: Ray) -> Hit;
-    fn paths(&self) -> Paths;
+    fn paths(&self, args: &RenderArgs) -> Paths;
 }
 ```
 
@@ -141,29 +142,34 @@ use larnt::{Cube, Scene, Vector};
 fn main() {
     // create a scene and add a single cube
     let mut scene = Scene::new();
-    scene.add(Cube::new(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)));
+    scene.add(Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build());
 
-    // define camera parameters
-    let eye = Vector::new(4.0, 3.0, 2.0);    // camera position
-    let center = Vector::new(0.0, 0.0, 0.0); // camera looks at
-    let up = Vector::new(0.0, 0.0, 1.0);     // up direction
-
-    // define rendering parameters
-    let width = 1024.0;  // rendered width
+    let eye = Vector::new(4.0, 3.0, 2.0); // camera position
+    let width = 1024.0; // rendered width
     let height = 1024.0; // rendered height
-    let fovy = 50.0;     // vertical field of view, degrees
-    let znear = 0.1;     // near z plane
-    let zfar = 10.0;     // far z plane
-    let step = 0.01;     // how finely to chop the paths for visibility testing
 
     // compute 2D paths that depict the 3D scene
-    let paths = scene.render(eye, center, up, width, height, fovy, znear, zfar, step);
+    let paths = scene
+        .render(eye)
+        .center(Vector::new(0.0, 0.0, 0.0)) // camera looks at
+        .up(Vector::new(0.0, 0.0, 1.0)) // up direction
+        .width(width) // rendered width
+        .height(height) // rendered height
+        .fovy(50.0) // vertical field of view, degrees
+        .near(0.1) // near plane
+        .far(1000.0) // far plane
+        // how finely to chop the paths for visibility testing
+        // unit is the same as the scene's units
+        .step(1.0)
+        .call();
 
     // render the paths in an image
     paths.write_to_png("out.png", width, height);
 
     // save the paths as an svg
-    paths.write_to_svg("out.svg", width, height).expect("Failed to write SVG");
+    paths
+        .write_to_svg("out.svg", width, height)
+        .expect("Failed to write SVG");
 }
 ```
 
@@ -232,19 +238,24 @@ use std::sync::Arc;
 
 let shape = new_difference(vec![
     new_intersection(vec![
-        Arc::new(Sphere::new(Vector::default(), 1.0).with_texture(SphereTexture::LatLng)),
         Arc::new(
-            Cube::new(Vector::new(-0.8, -0.8, -0.8), Vector::new(0.8, 0.8, 0.8))
-                .with_texture(CubeTexture::Striped(10)),
+            Sphere::builder(Vector::default(), 1.0)
+                .texture(SphereTexture::lat_lng().call())
+                .build(),
+        ),
+        Arc::new(
+            Cube::builder(Vector::new(-0.8, -0.8, -0.8), Vector::new(0.8, 0.8, 0.8))
+                .texture(CubeTexture::striped().stripes(10).call())
+                .build(),
         ),
     ]),
-    Arc::new(Cylinder::new(0.4, -2.0, 2.0)),
+    Arc::new(Cylinder::builder(0.4, -2.0, 2.0).build()),
     Arc::new(TransformedShape::new(
-        Arc::new(Cylinder::new(0.4, -2.0, 2.0)),
+        Arc::new(Cylinder::builder(0.4, -2.0, 2.0).build()),
         Matrix::rotate(Vector::new(1.0, 0.0, 0.0), radians(90.0)),
     )),
     Arc::new(TransformedShape::new(
-        Arc::new(Cylinder::new(0.4, -2.0, 2.0)),
+        Arc::new(Cylinder::builder(0.4, -2.0, 2.0).build()),
         Matrix::rotate(Vector::new(0.0, 1.0, 0.0), radians(90.0)),
     )),
 ]);

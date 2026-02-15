@@ -9,6 +9,7 @@ readme = "README.md"
 repository = "https://github.com/HellOwhatAs/larnt"
 
 [dependencies]
+bon = "3.9.0"
 image = { version = "0.25", default-features = false, optional = true }
 rand = { version = "0.9", default-features = false, features = ["small_rng"] }
 

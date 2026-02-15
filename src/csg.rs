@@ -7,23 +7,19 @@
 //!
 //! # Example
 //!
-//! ```no_run
-//! use larnt::{new_intersection, new_difference, Sphere, Cube, Vector, Scene, Shape};
+//! ```
+//! use larnt::{Cube, Scene, Shape, Sphere, Vector, new_difference, new_intersection};
 //! use std::sync::Arc;
 //!
 //! // Create a sphere-cube intersection minus a smaller sphere
-//! let sphere: Arc<dyn Shape + Send + Sync> = Arc::new(Sphere::new(Vector::default(), 1.0));
-//! let cube: Arc<dyn Shape + Send + Sync> = Arc::new(Cube::new(
-//!     Vector::new(-0.8, -0.8, -0.8),
-//!     Vector::new(0.8, 0.8, 0.8),
-//! ));
-//! let small_sphere: Arc<dyn Shape + Send + Sync> = Arc::new(Sphere::new(Vector::default(), 0.5));
-//!
+//! let sphere: Arc<dyn Shape + Send + Sync> =
+//!     Arc::new(Sphere::builder(Vector::default(), 1.0).build());
+//! let cube: Arc<dyn Shape + Send + Sync> =
+//!     Arc::new(Cube::builder(Vector::new(-0.8, -0.8, -0.8), Vector::new(0.8, 0.8, 0.8)).build());
+//! let small_sphere: Arc<dyn Shape + Send + Sync> =
+//!     Arc::new(Sphere::builder(Vector::default(), 0.5).build());
 //! // (Sphere ∩ Cube) - SmallSphere
-//! let shape = new_difference(vec![
-//!     new_intersection(vec![sphere, cube]),
-//!     small_sphere,
-//! ]);
+//! let shape = new_difference(vec![new_intersection(vec![sphere, cube]), small_sphere]);
 //!
 //! let mut scene = Scene::new();
 //! scene.add_arc(shape);
@@ -88,14 +84,13 @@ pub fn new_boolean_shape(
 /// # Example
 ///
 /// ```
-/// use larnt::{new_intersection, Sphere, Cube, Vector, Shape};
+/// use larnt::{Cube, Shape, Sphere, Vector, new_intersection};
 /// use std::sync::Arc;
 ///
-/// let sphere: Arc<dyn Shape + Send + Sync> = Arc::new(Sphere::new(Vector::default(), 1.0));
-/// let cube: Arc<dyn Shape + Send + Sync> = Arc::new(Cube::new(
-///     Vector::new(-0.8, -0.8, -0.8),
-///     Vector::new(0.8, 0.8, 0.8),
-/// ));
+/// let sphere: Arc<dyn Shape + Send + Sync> =
+///     Arc::new(Sphere::builder(Vector::default(), 1.0).build());
+/// let cube: Arc<dyn Shape + Send + Sync> =
+///     Arc::new(Cube::builder(Vector::new(-0.8, -0.8, -0.8), Vector::new(0.8, 0.8, 0.8)).build());
 ///
 /// let intersection = new_intersection(vec![sphere, cube]);
 /// ```
@@ -110,17 +105,16 @@ pub fn new_intersection(shapes: Vec<Arc<dyn Shape + Send + Sync>>) -> Arc<dyn Sh
 /// # Example
 ///
 /// ```
-/// use larnt::{new_difference, Sphere, Cube, Vector, Shape};
-/// use std::sync::Arc;
+///  use larnt::{Cube, Shape, Sphere, Vector, new_difference};
+///  use std::sync::Arc;
 ///
-/// let cube: Arc<dyn Shape + Send + Sync> = Arc::new(Cube::new(
-///     Vector::new(-1.0, -1.0, -1.0),
-///     Vector::new(1.0, 1.0, 1.0),
-/// ));
-/// let sphere: Arc<dyn Shape + Send + Sync> = Arc::new(Sphere::new(Vector::default(), 0.5));
+///  let cube: Arc<dyn Shape + Send + Sync> =
+///      Arc::new(Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build());
+///  let sphere: Arc<dyn Shape + Send + Sync> =
+///      Arc::new(Sphere::builder(Vector::default(), 0.5).build());
 ///
-/// // Cube with a spherical hole
-/// let difference = new_difference(vec![cube, sphere]);
+///  // Cube with a spherical hole
+///  let difference = new_difference(vec![cube, sphere]);
 /// ```
 pub fn new_difference(shapes: Vec<Arc<dyn Shape + Send + Sync>>) -> Arc<dyn Shape + Send + Sync> {
     new_boolean_shape(Op::Difference, shapes)

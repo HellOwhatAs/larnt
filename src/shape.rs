@@ -8,8 +8,8 @@
 //!
 //! To create a custom shape, implement the [`Shape`] trait:
 //!
-//! ```ignore
-//! use larnt::{Shape, Paths, Vector, Box, Hit, Ray};
+//! ```no_run
+//! use larnt::{Shape, RenderArgs, Paths, Vector, Box, Hit, Ray};
 //!
 //! struct MySphere {
 //!     center: Vector,
@@ -33,7 +33,7 @@
 //!         Hit::no_hit()
 //!     }
 //!
-//!     fn paths(&self) -> Paths {
+//!     fn paths(&self, args: &RenderArgs) -> Paths {
 //!         // Return paths that represent this shape's surface
 //!         Paths::new()
 //!     }
@@ -166,10 +166,10 @@ impl Shape for EmptyShape {
 /// use larnt::{Cube, Matrix, TransformedShape, Vector, radians};
 /// use std::sync::Arc;
 ///
-/// let cube = Arc::new(Cube::new(
+/// let cube = Arc::new(Cube::builder(
 ///     Vector::new(-1.0, -1.0, -1.0),
 ///     Vector::new(1.0, 1.0, 1.0),
-/// ));
+/// ).build());
 ///
 /// // Rotate cube 45 degrees around Z axis
 /// let transform = Matrix::rotate(Vector::new(0.0, 0.0, 1.0), radians(45.0));

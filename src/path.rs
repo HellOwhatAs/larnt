@@ -10,18 +10,13 @@
 //!
 //! # Example
 //!
-//! ```no_run
-//! use larnt::{Scene, Cube, Vector};
+//! ```
+//! use larnt::{Cube, Scene, Vector};
 //!
 //! let mut scene = Scene::new();
-//! scene.add(Cube::new(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)));
+//! scene.add(Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build());
 //!
-//! let paths = scene.render(
-//!     Vector::new(4.0, 3.0, 2.0),
-//!     Vector::new(0.0, 0.0, 0.0),
-//!     Vector::new(0.0, 0.0, 1.0),
-//!     1024.0, 1024.0, 50.0, 0.1, 10.0, 0.01,
-//! );
+//! let paths = scene.render(Vector::new(4.0, 3.0, 2.0)).call();
 //!
 //! // Output to different formats
 //! paths.write_to_png("output.png", 1024.0, 1024.0);
@@ -179,18 +174,13 @@ impl Paths {
     ///
     /// # Example
     ///
-    /// ```no_run
+    /// ```
     /// use larnt::{Scene, Cube, Vector};
     ///
     /// let mut scene = Scene::new();
-    /// scene.add(Cube::new(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)));
+    /// scene.add(Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build());
     ///
-    /// let paths = scene.render(
-    ///     Vector::new(4.0, 3.0, 2.0),
-    ///     Vector::new(0.0, 0.0, 0.0),
-    ///     Vector::new(0.0, 0.0, 1.0),
-    ///     1024.0, 1024.0, 50.0, 0.1, 10.0, 0.01,
-    /// );
+    /// let paths = scene.render(Vector::new(4.0, 3.0, 2.0)).call();
     ///
     /// paths.write_to_svg("output.svg", 1024.0, 1024.0).unwrap();
     /// ```
@@ -245,18 +235,13 @@ impl Paths {
     ///
     /// # Example
     ///
-    /// ```no_run
+    /// ```
     /// use larnt::{Scene, Sphere, Vector};
     ///
     /// let mut scene = Scene::new();
-    /// scene.add(Sphere::new(Vector::new(0.0, 0.0, 0.0), 1.0));
+    /// scene.add(Sphere::builder(Vector::new(0.0, 0.0, 0.0), 1.0).build());
     ///
-    /// let paths = scene.render(
-    ///     Vector::new(4.0, 3.0, 2.0),
-    ///     Vector::new(0.0, 0.0, 0.0),
-    ///     Vector::new(0.0, 0.0, 1.0),
-    ///     512.0, 512.0, 50.0, 0.1, 10.0, 0.01,
-    /// );
+    /// let paths = scene.render(Vector::new(4.0, 3.0, 2.0)).call();
     ///
     /// paths.write_to_png("output.png", 512.0, 512.0);
     /// ```

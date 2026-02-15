@@ -1,4 +1,4 @@
-use larnt::{Scene, Sphere, SphereTexture::RandomCircles, Vector};
+use larnt::{Scene, Sphere, SphereTexture, Vector};
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 fn main() {
@@ -9,19 +9,24 @@ fn main() {
     for x in -n..=n {
         for y in -n..=n {
             scene.add(
-                Sphere::new(Vector::new(x as f64, y as f64, 0.0), 0.45)
-                    .with_texture(RandomCircles(rng.random())),
+                Sphere::builder(Vector::new(x as f64, y as f64, 0.0), 0.45)
+                    .texture(SphereTexture::random_circles(rng.random()).call())
+                    .build(),
             );
         }
     }
 
     let eye = Vector::new(8.0, 8.0, 1.0);
     let center = Vector::new(0.0, 0.0, -4.25);
-    let up = Vector::new(0.0, 0.0, 1.0);
     let width = 1024.0;
     let height = 1024.0;
 
-    let paths = scene.render(eye, center, up, width, height, 50.0, 0.1, 100.0, 1.0);
+    let paths = scene
+        .render(eye)
+        .center(center)
+        .width(width)
+        .height(height)
+        .call();
     paths
         .to_image(width, height, 2.0)
         .save("out.png")

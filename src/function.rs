@@ -5,6 +5,7 @@ use crate::ray::Ray;
 use crate::shape::{RenderArgs, Shape};
 use crate::util::radians;
 use crate::vector::Vector;
+use bon::Builder;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
@@ -24,35 +25,21 @@ pub enum FunctionTexture {
     Spiral,
 }
 
+#[derive(Debug, Builder)]
 pub struct Function<F>
 where
     F: Fn(f64, f64) -> f64 + Send + Sync,
 {
+    #[builder(start_fn)]
     pub func: F,
+    #[builder(start_fn)]
     pub bx: Box,
+    #[builder(default = Direction::Below)]
     pub direction: Direction,
+    #[builder(default)]
     pub texture: FunctionTexture,
+    #[builder(default = 0.1)]
     pub step: f64,
-}
-
-impl<F> Function<F>
-where
-    F: Fn(f64, f64) -> f64 + Send + Sync,
-{
-    pub fn new(func: F, bx: Box, direction: Direction, step: f64) -> Self {
-        Function {
-            func,
-            bx,
-            direction,
-            texture: FunctionTexture::default(),
-            step,
-        }
-    }
-
-    pub fn with_texture(mut self, texture: FunctionTexture) -> Self {
-        self.texture = texture;
-        self
-    }
 }
 
 impl<F> Shape for Function<F>

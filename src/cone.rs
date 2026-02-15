@@ -7,6 +7,7 @@ use crate::ray::Ray;
 use crate::shape::{RenderArgs, Shape, TransformedShape};
 use crate::util::radians;
 use crate::vector::Vector;
+use bon::{Builder, bon, builder};
 use std::f64::consts::PI;
 use std::sync::Arc;
 
@@ -17,31 +18,33 @@ pub enum ConeTexture {
     Striped(u64),
 }
 
+#[bon]
+impl ConeTexture {
+    #[builder]
+    pub fn outline() -> Self {
+        ConeTexture::Outline
+    }
+
+    #[builder]
+    pub fn striped(#[builder(default = 8)] num: u64) -> Self {
+        ConeTexture::Striped(num)
+    }
+}
+
 /// A 3D cone shape defined by a circular base and an apex point.
 /// The cone is oriented along the z-axis, with the base centered at
 /// the origin (0,0,0) and the apex at (0,0,height).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
 pub struct Cone {
+    #[builder(start_fn)]
     pub radius: f64,
+    #[builder(start_fn)]
     pub height: f64,
+    #[builder(default)]
     pub texture: ConeTexture,
 }
 
 impl Cone {
-    pub fn new(radius: f64, height: f64) -> Self {
-        Cone {
-            radius,
-            height,
-            texture: ConeTexture::default(),
-        }
-    }
-
-    /// Sets the texture style for the cone.
-    pub fn with_texture(mut self, texture: ConeTexture) -> Self {
-        self.texture = texture;
-        self
-    }
-
     fn paths_striped(&self, num: u64) -> Paths {
         let mut result = Vec::new();
         for a in (0..360).step_by((360 / num) as usize) {
@@ -166,11 +169,12 @@ impl Shape for Cone {
     }
 }
 
+#[builder]
 pub fn new_transformed_cone(
-    v0: Vector,
-    v1: Vector,
-    radius: f64,
-    texture: ConeTexture,
+    #[builder(start_fn)] v0: Vector,
+    #[builder(start_fn)] v1: Vector,
+    #[builder(start_fn)] radius: f64,
+    #[builder(default)] texture: ConeTexture,
 ) -> TransformedShape {
     let up = Vector::new(0.0, 0.0, 1.0);
     let d = v1.sub(v0);
@@ -182,6 +186,6 @@ pub fn new_transformed_cone(
     } else {
         Matrix::translate(v0)
     };
-    let c = Cone::new(radius, z).with_texture(texture);
+    let c = Cone::builder(radius, z).texture(texture).build();
     TransformedShape::new(Arc::new(c), m)
 }

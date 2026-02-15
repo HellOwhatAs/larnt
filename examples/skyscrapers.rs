@@ -13,21 +13,28 @@ fn main() {
             let fy = y as f64;
             let fz = rng.random::<f64>() * 3.0 + 1.0;
 
-            let shape = Cube::new(
+            let shape = Cube::builder(
                 Vector::new(fx - p, fy - p, 0.0),
                 Vector::new(fx + p, fy + p, fz),
-            );
+            )
+            .build();
             scene.add(shape);
         }
     }
 
     let eye = Vector::new(13.75, 6.25, 18.0);
     let center = Vector::new(-8.0, -10.0, 0.0);
-    let up = Vector::new(0.0, 0.0, 1.0);
     let width = 2560.0;
     let height = 2560.0;
 
-    let paths = scene.render(eye, center, up, width, height, 65.0, 0.1, 1000.0, 1.0);
+    let paths = scene
+        .render(eye)
+        .center(center)
+        .width(width)
+        .height(height)
+        .fovy(65.0)
+        .far(1e3)
+        .call();
     paths
         .to_image(width, height, 1.5)
         .save("out.png")

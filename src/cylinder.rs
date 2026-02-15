@@ -1,8 +1,8 @@
 //! Cylinder primitive.
 //!
 //! This module provides the [`Cylinder`] shape (aligned along the Z axis)
-//! and [`OutlineCylinder`] which renders as a silhouette from the camera's
-//! perspective.
+//! and the default [`CylinderTexture`] [`CylinderTexture::Outline`] renders a silhouette
+//! from the camera's perspective.
 //!
 //! # Example
 //!
@@ -10,7 +10,7 @@
 //! use larnt::{Cylinder, Scene, Vector};
 //!
 //! // Create a cylinder with radius 1.0, from z=0 to z=2
-//! let cylinder = Cylinder::new(1.0, 0.0, 2.0);
+//! let cylinder = Cylinder::builder(1.0, 0.0, 2.0).build();
 //!
 //! let mut scene = Scene::new();
 //! scene.add(cylinder);
@@ -24,6 +24,7 @@ use crate::ray::Ray;
 use crate::shape::{RenderArgs, Shape, TransformedShape};
 use crate::util::radians;
 use crate::vector::Vector;
+use bon::{Builder, bon, builder};
 use std::f64::consts::PI;
 use std::sync::Arc;
 
@@ -33,6 +34,19 @@ pub enum CylinderTexture {
     #[default]
     Outline,
     Striped(u64),
+}
+
+#[bon]
+impl CylinderTexture {
+    #[builder]
+    pub fn outline() -> Self {
+        CylinderTexture::Outline
+    }
+
+    #[builder]
+    pub fn striped(#[builder(default = 36)] num: u64) -> Self {
+        CylinderTexture::Striped(num)
+    }
 }
 
 /// A cylinder aligned along the Z axis.
@@ -46,37 +60,25 @@ pub enum CylinderTexture {
 /// use larnt::{Cylinder, Vector};
 ///
 /// // Cylinder with radius 0.5, from z=-1 to z=1
-/// let cylinder = Cylinder::new(0.5, -1.0, 1.0);
+/// let cylinder = Cylinder::builder(0.5, -1.0, 1.0).build();
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
 pub struct Cylinder {
     /// The radius of the cylinder.
+    #[builder(start_fn)]
     pub radius: f64,
     /// The minimum Z coordinate.
+    #[builder(start_fn)]
     pub z0: f64,
     /// The maximum Z coordinate.
+    #[builder(start_fn)]
     pub z1: f64,
     /// The texture style for the cylinder.
+    #[builder(default)]
     pub texture: CylinderTexture,
 }
 
 impl Cylinder {
-    /// Creates a new cylinder with the given radius and Z-range.
-    pub fn new(radius: f64, z0: f64, z1: f64) -> Self {
-        Cylinder {
-            radius,
-            z0,
-            z1,
-            texture: CylinderTexture::default(),
-        }
-    }
-
-    /// Sets the texture style for the cylinder.
-    pub fn with_texture(mut self, texture: CylinderTexture) -> Self {
-        self.texture = texture;
-        self
-    }
-
     fn paths_striped(&self, num: u64) -> Paths {
         let mut result = Vec::new();
         for a in (0..360).step_by((360 / num) as usize) {
@@ -229,11 +231,12 @@ impl Shape for Cylinder {
 /// * `v1` - End point of the cylinder
 /// * `radius` - Radius of the cylinder
 /// * `texture` - Texture style for the cylinder
+#[builder]
 pub fn new_transformed_cylinder(
-    v0: Vector,
-    v1: Vector,
-    radius: f64,
-    texture: CylinderTexture,
+    #[builder(start_fn)] v0: Vector,
+    #[builder(start_fn)] v1: Vector,
+    #[builder(start_fn)] radius: f64,
+    #[builder(default)] texture: CylinderTexture,
 ) -> TransformedShape {
     let up = Vector::new(0.0, 0.0, 1.0);
     let d = v1.sub(v0);
@@ -245,6 +248,6 @@ pub fn new_transformed_cylinder(
     } else {
         Matrix::translate(v0)
     };
-    let c = Cylinder::new(radius, 0.0, z).with_texture(texture);
+    let c = Cylinder::builder(radius, 0.0, z).texture(texture).build();
     TransformedShape::new(Arc::new(c), m)
 }

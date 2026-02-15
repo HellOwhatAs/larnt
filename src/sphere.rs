@@ -10,11 +10,12 @@
 //! use larnt::{Scene, Sphere, SphereTexture, Vector};
 //!
 //! // Create a unit sphere at the origin with the default outline texture
-//! let sphere = Sphere::new(Vector::new(0.0, 0.0, 0.0), 1.0);
+//! let sphere = Sphere::builder(Vector::new(0.0, 0.0, 0.0), 1.0).build();
 //!
 //! // Or with a custom texture
-//! let sphere_fuzz = Sphere::new(Vector::new(2.0, 0.0, 0.0), 1.0)
-//!     .with_texture(SphereTexture::RandomFuzz(42));
+//! let sphere_fuzz = Sphere::builder(Vector::new(2.0, 0.0, 0.0), 1.0)
+//!     .texture(SphereTexture::random_fuzz(42).call())
+//!     .build();
 //!
 //! let mut scene = Scene::new();
 //! scene.add(sphere);
@@ -30,6 +31,7 @@ use crate::shape::Shape;
 use crate::util::radians;
 use crate::vector::Vector;
 use crate::{bounding_box::Box, shape::RenderArgs};
+use bon::{Builder, bon};
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 use std::f64::consts::PI;
 
@@ -39,21 +41,62 @@ pub enum SphereTexture {
     /// A sphere that renders as a silhouette circle from the camera's perspective.
     #[default]
     Outline,
-    /// Latitude/longitude grid texture
-    LatLng,
-    /// Random rotated equators (great circles)
-    RandomEquators(u64),
-    /// Random fuzz on the surface
-    RandomFuzz(u64),
-    /// Random concentric circles pattern
-    RandomCircles(u64),
+    /// Latitude/longitude grid texture (default n: 10, o: 10)
+    LatLng { n: i32, o: i32 },
+    /// Random rotated equators (great circles) (default n: 100)
+    RandomEquators { seed: u64, n: usize },
+    /// Random fuzz on the surface (default num: 1000, scale: 1.1)
+    RandomFuzz { seed: u64, num: usize, scale: f64 },
+    /// Random concentric circles pattern (default num: 140)
+    RandomCircles { seed: u64, num: usize },
+}
+
+#[bon]
+impl SphereTexture {
+    /// Create a sphere with the default outline texture.
+    #[builder]
+    pub fn outline() -> Self {
+        SphereTexture::Outline
+    }
+
+    /// Create a latitude/longitude grid texture with the specified number of lines and offset.
+    #[builder]
+    pub fn lat_lng(#[builder(default = 10)] n: i32, #[builder(default = 10)] o: i32) -> Self {
+        SphereTexture::LatLng { n, o }
+    }
+
+    /// Create a random equators texture with the specified number of great circles.
+    #[builder]
+    pub fn random_equators(
+        #[builder(start_fn)] seed: u64,
+        #[builder(default = 100)] n: usize,
+    ) -> Self {
+        SphereTexture::RandomEquators { seed, n }
+    }
+
+    /// Create a random fuzz texture with the specified number of points and scale.
+    #[builder]
+    pub fn random_fuzz(
+        #[builder(start_fn)] seed: u64,
+        #[builder(default = 1000)] num: usize,
+        #[builder(default = 1.1)] scale: f64,
+    ) -> Self {
+        SphereTexture::RandomFuzz { seed, num, scale }
+    }
+
+    /// Create a random concentric circles texture with the specified number of circles.
+    #[builder]
+    pub fn random_circles(
+        #[builder(start_fn)] seed: u64,
+        #[builder(default = 140)] num: usize,
+    ) -> Self {
+        SphereTexture::RandomCircles { seed, num }
+    }
 }
 
 /// A sphere defined by center and radius.
 ///
 /// The default paths generated are a silhouette circle from the camera's perspective.
-/// You can use [`with_texture`](Sphere::with_texture)
-/// to select different texture styles.
 ///
 /// # Example
 ///
@@ -61,42 +104,31 @@ pub enum SphereTexture {
 /// use larnt::{Sphere, SphereTexture, Vector};
 ///
 /// // Sphere at origin with radius 2 (default outline texture)
-/// let sphere = Sphere::new(Vector::new(0.0, 0.0, 0.0), 2.0);
+/// let sphere = Sphere::builder(Vector::new(0.0, 0.0, 0.0), 2.0).build();
 ///
 /// // Sphere with fuzz texture
-/// let sphere_fuzz = Sphere::new(Vector::new(0.0, 0.0, 0.0), 2.0)
-///     .with_texture(SphereTexture::RandomFuzz(42));
+/// let sphere_fuzz = Sphere::builder(Vector::new(0.0, 0.0, 0.0), 2.0)
+///     .texture(SphereTexture::random_fuzz(42).call())
+///     .build();
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
 pub struct Sphere {
     /// The center point of the sphere.
+    #[builder(start_fn)]
     pub center: Vector,
     /// The radius of the sphere.
+    #[builder(start_fn)]
     pub radius: f64,
     /// Cached bounding box.
-    pub bx: Box,
-    /// The texture style for the sphere.
-    pub texture: SphereTexture,
-}
-
-impl Sphere {
-    /// Creates a new sphere with the given center and radius.
-    pub fn new(center: Vector, radius: f64) -> Self {
+    #[builder(skip = {
         let min = Vector::new(center.x - radius, center.y - radius, center.z - radius);
         let max = Vector::new(center.x + radius, center.y + radius, center.z + radius);
-        Sphere {
-            center,
-            radius,
-            bx: Box::new(min, max),
-            texture: SphereTexture::default(),
-        }
-    }
-
-    /// Sets the texture style for the sphere.
-    pub fn with_texture(mut self, texture: SphereTexture) -> Self {
-        self.texture = texture;
-        self
-    }
+        Box::new(min, max)
+    })]
+    pub bx: Box,
+    /// The texture style for the sphere.
+    #[builder(default)]
+    pub texture: SphereTexture,
 }
 
 impl Shape for Sphere {
@@ -132,13 +164,15 @@ impl Shape for Sphere {
     fn paths(&self, args: &RenderArgs) -> Paths {
         match self.texture {
             SphereTexture::Outline => self.paths_outline(args),
-            SphereTexture::LatLng => self.paths_lat_lng(&args.screen_mat, args.step, 10, 10),
-            SphereTexture::RandomEquators(seed) => {
-                self.paths_random_equators(&args.screen_mat, args.step, 100, seed)
+            SphereTexture::LatLng { n, o } => self.paths_lat_lng(&args.screen_mat, args.step, n, o),
+            SphereTexture::RandomEquators { seed, n } => {
+                self.paths_random_equators(&args.screen_mat, args.step, n, seed)
             }
-            SphereTexture::RandomFuzz(seed) => self.paths_random_fuzz(1000, 1.1, seed),
-            SphereTexture::RandomCircles(seed) => {
-                self.paths_random_circles(&args.screen_mat, args.step, 140, seed)
+            SphereTexture::RandomFuzz { seed, num, scale } => {
+                self.paths_random_fuzz(num, scale, seed)
+            }
+            SphereTexture::RandomCircles { seed, num } => {
+                self.paths_random_circles(&args.screen_mat, args.step, num, seed)
             }
         }
     }
