@@ -5,24 +5,37 @@ use crate::ray::Ray;
 use crate::shape::{RenderArgs, Shape};
 use crate::util::radians;
 use crate::vector::Vector;
-use bon::Builder;
+use bon::{Builder, bon};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 pub enum Direction {
     Above,
     Below,
 }
 
 /// Texture style for Function shapes
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy)]
 pub enum FunctionTexture {
     /// Grid texture with lines along constant x and y (works with any function)
-    #[default]
-    Grid,
+    Grid(f64),
     /// Radial swirl texture (best for functions returning negative values like -1/(x²+y²))
     Swirl,
     /// Spiral path texture (works with any function)
     Spiral,
+}
+
+#[bon]
+impl FunctionTexture {
+    #[builder]
+    fn grid(#[builder(default = 1.0 / 8.0)] grid_size: f64) -> Self {
+        FunctionTexture::Grid(grid_size)
+    }
+}
+
+impl Default for FunctionTexture {
+    fn default() -> Self {
+        FunctionTexture::grid().call()
+    }
 }
 
 #[derive(Debug, Builder)]
@@ -51,10 +64,9 @@ where
     }
 
     fn contains(&self, v: Vector, _eps: f64) -> bool {
-        if self.direction == Direction::Below {
-            v.z < (self.func)(v.x, v.y)
-        } else {
-            v.z > (self.func)(v.x, v.y)
+        match self.direction {
+            Direction::Above => v.z > (self.func)(v.x, v.y),
+            Direction::Below => v.z < (self.func)(v.x, v.y),
         }
     }
 
@@ -88,7 +100,7 @@ where
 
     fn paths(&self, args: &RenderArgs) -> Paths {
         match self.texture {
-            FunctionTexture::Grid => self.paths_grid(args, 1.0 / 8.0),
+            FunctionTexture::Grid(grid_size) => self.paths_grid(args, grid_size),
             FunctionTexture::Swirl => self.paths_swirl(),
             FunctionTexture::Spiral => self.paths_spiral(),
         }
