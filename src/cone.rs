@@ -21,11 +21,6 @@ pub enum ConeTexture {
 #[bon]
 impl ConeTexture {
     #[builder]
-    pub fn outline() -> Self {
-        ConeTexture::Outline
-    }
-
-    #[builder]
     pub fn striped(#[builder(default = 8)] num: u64) -> Self {
         ConeTexture::Striped(num)
     }

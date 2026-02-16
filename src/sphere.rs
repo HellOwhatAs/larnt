@@ -53,12 +53,6 @@ pub enum SphereTexture {
 
 #[bon]
 impl SphereTexture {
-    /// Create a sphere with the default outline texture.
-    #[builder]
-    pub fn outline() -> Self {
-        SphereTexture::Outline
-    }
-
     /// Create a latitude/longitude grid texture with the specified number of lines and offset.
     #[builder]
     pub fn lat_lng(#[builder(default = 10)] n: i32, #[builder(default = 10)] o: i32) -> Self {

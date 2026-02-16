@@ -35,12 +35,6 @@ pub enum CubeTexture {
 
 #[bon]
 impl CubeTexture {
-    /// Create a plain cube texture with edges only.
-    #[builder]
-    pub fn vanilla() -> Self {
-        CubeTexture::Vanilla
-    }
-
     /// Create a striped texture with the specified number of stripes (default is 8).
     #[builder]
     pub fn striped(#[builder(default = 8)] stripes: u64) -> Self {

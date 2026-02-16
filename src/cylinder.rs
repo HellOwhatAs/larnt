@@ -39,11 +39,6 @@ pub enum CylinderTexture {
 #[bon]
 impl CylinderTexture {
     #[builder]
-    pub fn outline() -> Self {
-        CylinderTexture::Outline
-    }
-
-    #[builder]
     pub fn striped(#[builder(default = 36)] num: u64) -> Self {
         CylinderTexture::Striped(num)
     }
