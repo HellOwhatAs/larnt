@@ -49,35 +49,156 @@ impl Matrix {
     }
 }
 
+#[derive(Serialize, Deserialize, Default)]
+pub enum ConeTexture {
+    #[default]
+    Outline,
+    Striped(u64),
+}
+
+impl ConeTexture {
+    fn to_texture(self) -> larnt::ConeTexture {
+        match self {
+            ConeTexture::Outline => larnt::ConeTexture::Outline,
+            ConeTexture::Striped(n) => larnt::ConeTexture::Striped(n),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Default)]
+pub enum CubeTexture {
+    #[default]
+    Vanilla,
+    Striped(u64),
+}
+
+impl CubeTexture {
+    fn to_texture(self) -> larnt::CubeTexture {
+        match self {
+            CubeTexture::Vanilla => larnt::CubeTexture::Vanilla,
+            CubeTexture::Striped(n) => larnt::CubeTexture::Striped(n),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Default)]
+pub enum CylinderTexture {
+    #[default]
+    Outline,
+    Striped(u64),
+}
+
+impl CylinderTexture {
+    fn to_texture(self) -> larnt::CylinderTexture {
+        match self {
+            CylinderTexture::Outline => larnt::CylinderTexture::Outline,
+            CylinderTexture::Striped(n) => larnt::CylinderTexture::Striped(n),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Default)]
+pub enum SphereTexture {
+    #[default]
+    Outline,
+    LatLng {
+        n: i32,
+        o: i32,
+    },
+    RandomEquators {
+        seed: u64,
+        n: usize,
+    },
+    RandomFuzz {
+        seed: u64,
+        num: usize,
+        scale: f64,
+    },
+    RandomCircles {
+        seed: u64,
+        num: usize,
+    },
+}
+
+impl SphereTexture {
+    fn to_texture(self) -> larnt::SphereTexture {
+        match self {
+            SphereTexture::Outline => larnt::SphereTexture::Outline,
+            SphereTexture::LatLng { n, o } => larnt::SphereTexture::LatLng { n, o },
+            SphereTexture::RandomEquators { seed, n } => {
+                larnt::SphereTexture::RandomEquators { seed, n }
+            }
+            SphereTexture::RandomFuzz { seed, num, scale } => {
+                larnt::SphereTexture::RandomFuzz { seed, num, scale }
+            }
+            SphereTexture::RandomCircles { seed, num } => {
+                larnt::SphereTexture::RandomCircles { seed, num }
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum Direction {
+    Above,
+    Below,
+}
+
+impl Direction {
+    fn to_direction(self) -> larnt::Direction {
+        match self {
+            Direction::Above => larnt::Direction::Above,
+            Direction::Below => larnt::Direction::Below,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum FunctionTexture {
+    Grid(f64),
+    Swirl,
+    Spiral,
+}
+
+impl FunctionTexture {
+    fn to_texture(self) -> larnt::FunctionTexture {
+        match self {
+            FunctionTexture::Grid(step) => larnt::FunctionTexture::Grid(step),
+            FunctionTexture::Swirl => larnt::FunctionTexture::Swirl,
+            FunctionTexture::Spiral => larnt::FunctionTexture::Spiral,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub enum LnShape {
     Cone {
         radius: f64,
         v0: [f64; 3],
         v1: [f64; 3],
+        texture: ConeTexture,
     },
     Cube {
         min: [f64; 3],
         max: [f64; 3],
-        texture: String,
-        stripes: u64,
+        texture: CubeTexture,
     },
     Cylinder {
         radius: f64,
         v0: [f64; 3],
         v1: [f64; 3],
+        texture: CylinderTexture,
     },
     Sphere {
         center: [f64; 3],
         radius: f64,
-        texture: String,
-        seed: u64,
+        texture: SphereTexture,
     },
     Function {
         samples: Vec<Vec<f64>>,
         bbox: ([f64; 3], [f64; 3]),
-        direction: String,
-        texture: String,
+        direction: Direction,
+        texture: FunctionTexture,
         step: f64,
     },
     Triangle {
@@ -87,7 +208,6 @@ pub enum LnShape {
     },
     Mesh(Vec<LnShape>),
 
-    Outline(Box<LnShape>), // Cone, Cylinder, Sphere
     Difference(Vec<LnShape>),
     Intersection(Vec<LnShape>),
     Transformation {
@@ -97,70 +217,53 @@ pub enum LnShape {
 }
 
 impl LnShape {
-    pub fn to_shape(
-        self,
-        eye: larnt::Vector,
-        up: larnt::Vector,
-    ) -> Result<Arc<dyn larnt::Shape + Send + Sync>, String> {
+    pub fn to_shape(self) -> Result<Arc<dyn larnt::Shape + Send + Sync>, String> {
         Ok(match self {
-            LnShape::Cone { radius, v0, v1 } => Arc::new(larnt::new_transformed_cone(
-                up,
-                larnt::Vector::new(v0[0], v0[1], v0[2]),
-                larnt::Vector::new(v1[0], v1[1], v1[2]),
+            LnShape::Cone {
                 radius,
-            )),
-            LnShape::Cube {
-                min,
-                max,
+                v0,
+                v1,
                 texture,
-                stripes,
-            } => {
+            } => Arc::new(
+                larnt::new_transformed_cone(
+                    larnt::Vector::new(v0[0], v0[1], v0[2]),
+                    larnt::Vector::new(v1[0], v1[1], v1[2]),
+                    radius,
+                )
+                .texture(texture.to_texture())
+                .call(),
+            ),
+            LnShape::Cube { min, max, texture } => {
                 let min_v = larnt::Vector::new(min[0], min[1], min[2]);
                 let max_v = larnt::Vector::new(max[0], max[1], max[2]);
                 Arc::new(
-                    larnt::Cube::new(min_v, max_v).with_texture(match texture.as_str() {
-                        "Vanilla" => larnt::CubeTexture::Vanilla,
-                        "Stripes" => larnt::CubeTexture::Striped(stripes),
-                        _ => {
-                            return Err(format!(
-                                "Invalid cube texture: {}, stripes: {:?}",
-                                texture, stripes
-                            ));
-                        }
-                    }),
+                    larnt::Cube::builder(min_v, max_v)
+                        .texture(texture.to_texture())
+                        .build(),
                 )
             }
-            LnShape::Cylinder { radius, v0, v1 } => Arc::new(larnt::new_transformed_cylinder(
-                up,
-                larnt::Vector::new(v0[0], v0[1], v0[2]),
-                larnt::Vector::new(v1[0], v1[1], v1[2]),
+            LnShape::Cylinder {
                 radius,
-            )),
+                v0,
+                v1,
+                texture,
+            } => Arc::new(
+                larnt::new_transformed_cylinder(
+                    larnt::Vector::new(v0[0], v0[1], v0[2]),
+                    larnt::Vector::new(v1[0], v1[1], v1[2]),
+                    radius,
+                )
+                .texture(texture.to_texture())
+                .call(),
+            ),
             LnShape::Sphere {
                 center,
                 radius,
                 texture,
-                seed,
             } => {
                 let center_v = larnt::Vector::new(center[0], center[1], center[2]);
-                let sphere = larnt::Sphere::new(center_v, radius);
-                let sphere = match texture.as_str() {
-                    "LatLng" => sphere.with_texture(larnt::SphereTexture::LatLng),
-                    "RandomEquators" => {
-                        sphere.with_texture(larnt::SphereTexture::RandomEquators(seed))
-                    }
-                    "RandomDots" => sphere.with_texture(larnt::SphereTexture::RandomDots(seed)),
-                    "RandomCircles" => {
-                        sphere.with_texture(larnt::SphereTexture::RandomCircles(seed))
-                    }
-                    _ => {
-                        return Err(format!(
-                            "Invalid sphere parameters: center: {:?}, radius: {}, texture: {}, seed: {:?}",
-                            center, radius, texture, seed
-                        ));
-                    }
-                };
-                Arc::new(sphere)
+                let sphere = larnt::Sphere::builder(center_v, radius).texture(texture.to_texture());
+                Arc::new(sphere.build())
             }
             LnShape::Function {
                 samples,
@@ -182,36 +285,17 @@ impl LnShape {
                     (bbox.0[0], bbox.1[0]),
                     (bbox.0[1], bbox.1[1]),
                 );
-                let func = larnt::Function::new(
+                let func = larnt::Function::builder(
                     move |x, y| grid.get(x, y),
                     larnt::Box::new(
                         larnt::Vector::new(bbox.0[0], bbox.0[1], bbox.0[2]),
                         larnt::Vector::new(bbox.1[0], bbox.1[1], bbox.1[2]),
                     ),
-                    match direction.as_str() {
-                        "Below" => larnt::Direction::Below,
-                        "Above" => larnt::Direction::Above,
-                        _ => {
-                            return Err(format!(
-                                "Invalid function direction: {}. Must be 'Below' or 'Above'",
-                                direction
-                            ));
-                        }
-                    },
-                    step,
                 )
-                .with_texture(match texture.as_str() {
-                    "Grid" => larnt::FunctionTexture::Grid,
-                    "Swirl" => larnt::FunctionTexture::Swirl,
-                    "Spiral" => larnt::FunctionTexture::Spiral,
-                    _ => {
-                        return Err(format!(
-                            "Invalid function texture: {}. Must be 'Grid', 'Swirl', or 'Spiral'",
-                            texture
-                        ));
-                    }
-                });
-                Arc::new(func)
+                .direction(direction.to_direction())
+                .step(step)
+                .texture(texture.to_texture());
+                Arc::new(func.build())
             }
             LnShape::Triangle { v1, v2, v3 } => {
                 let v1_v = larnt::Vector::new(v1[0], v1[1], v1[2]);
@@ -234,52 +318,17 @@ impl LnShape {
                 }
                 Arc::new(larnt::Mesh::new(triangles))
             }
-            LnShape::Outline(ln_shape) => match *ln_shape {
-                LnShape::Cone { radius, v0, v1 } => Arc::new(larnt::new_transformed_outline_cone(
-                    eye,
-                    up,
-                    larnt::Vector::new(v0[0], v0[1], v0[2]),
-                    larnt::Vector::new(v1[0], v1[1], v1[2]),
-                    radius,
-                )),
-                LnShape::Cylinder { radius, v0, v1 } => {
-                    Arc::new(larnt::new_transformed_outline_cylinder(
-                        eye,
-                        up,
-                        larnt::Vector::new(v0[0], v0[1], v0[2]),
-                        larnt::Vector::new(v1[0], v1[1], v1[2]),
-                        radius,
-                    ))
-                }
-                LnShape::Sphere {
-                    center,
-                    radius,
-                    texture: _,
-                    seed: _,
-                } => Arc::new(larnt::OutlineSphere::new(
-                    eye,
-                    up,
-                    larnt::Vector::new(center[0], center[1], center[2]),
-                    radius,
-                )),
-                _ => {
-                    return Err(
-                        "Outline can only be applied to Cone, Cylinder, or Sphere shapes"
-                            .to_string(),
-                    );
-                }
-            },
             LnShape::Difference(ln_shapes) => {
                 let shapes = ln_shapes
                     .into_iter()
-                    .map(|s| s.to_shape(eye, up))
+                    .map(|s| s.to_shape())
                     .collect::<Result<Vec<_>, _>>()?;
                 larnt::new_difference(shapes)
             }
             LnShape::Intersection(ln_shapes) => {
                 let shapes = ln_shapes
                     .into_iter()
-                    .map(|s| s.to_shape(eye, up))
+                    .map(|s| s.to_shape())
                     .collect::<Result<Vec<_>, _>>()?;
                 larnt::new_intersection(shapes)
             }
@@ -293,15 +342,14 @@ impl LnShape {
                         shape: shape_inner,
                         matrix: Matrix::from_raw(matrix.to_matrix().mul(&matrix_inner.to_matrix())),
                     }
-                    .to_shape(eye, up);
+                    .to_shape();
                     match res {
                         Ok(s) => s,
                         Err(e) => return Err(e),
                     }
                 } else {
                     Arc::new(larnt::TransformedShape::new(
-                        shape
-                            .to_shape(matrix.clone().to_matrix().inverse().mul_position(eye), up)?,
+                        shape.to_shape()?,
                         matrix.to_matrix(),
                     ))
                 }
@@ -328,7 +376,17 @@ pub fn render(
 
     let mut scene = larnt::Scene::new();
     for shape in shapes {
-        scene.add_arc(shape.to_shape(eye, up)?);
+        scene.add_arc(shape.to_shape()?);
     }
-    Ok(scene.render(eye, center, up, width, height, fovy, near, far, step))
+    Ok(scene
+        .render(eye)
+        .center(center)
+        .up(up)
+        .width(width)
+        .height(height)
+        .fovy(fovy)
+        .near(near)
+        .far(far)
+        .step(step)
+        .call())
 }

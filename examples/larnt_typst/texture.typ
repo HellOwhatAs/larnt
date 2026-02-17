@@ -1,0 +1,10 @@
+#let outline() = "Outline"
+#let striped(num) = ("Striped": num)
+#let vanilla() = "Vanilla"
+#let lat_lng(n: 10, o: 10) = ("LatLng": (n: n, o: o))
+#let random_equators(seed, n: 100) = ("RandomEquators": (seed: seed, n: n))
+#let random_fuzz(seed, num: 500, scale: 1.1) = ("RandomFuzz": (seed: seed, num: num, scale: scale))
+#let random_circles(seed, num: 140) = ("RandomCircles": (seed: seed, num: num))
+#let grid(grid_size: 1.0 / 8.0) = ("Grid": grid_size)
+#let swirl() = "Swirl"
+#let spiral() = "Spiral"

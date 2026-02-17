@@ -30,8 +30,7 @@
           lib.sphere(
             (float(x), float(y), 0.),
             0.45,
-            texture: "RandomCircles",
-            seed: seed,
+            texture: lib.texture.random_circles(seed),
           )
         ),
       )
@@ -43,6 +42,7 @@
       center: (0., 0., -4.25),
       height: 800.,
       width: 1024.,
+      step: 2.0,
       ..shapes,
     ),
     width: 100%,

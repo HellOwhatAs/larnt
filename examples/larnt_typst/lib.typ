@@ -1,4 +1,5 @@
 #let larnt = plugin("./larnt_typst_plugin.wasm")
+#import "./texture.typ"
 
 /// The cone shape.
 /// Can be warped with `outline()` to create outline cone.
@@ -9,7 +10,7 @@
 ///   center: (1.2, 0., 0.2),
 ///   height: 512.,
 ///   cone(1., (0., 0., 0.), (0., 0., 1.)),
-///   outline(cone(1., (2.4, 0., 0.), (2.4, 0., 1.))),
+///   cone(1., (2.4, 0., 0.), (2.4, 0., 1.), texture: texture.striped(15)),
 /// ))
 /// ```
 ///
@@ -24,16 +25,24 @@
   /// The ending point of the cone's axis, given as an array of three floats representing the x, y, and z coordinates.
   /// -> array
   v1,
+  /// The texture pattern applied to the cone's surface. Can be `outline` or `striped`.
+  /// -> texture
+  texture: texture.outline(),
 ) = {
   assert(
     type(radius) == float and (v0, v1).all(v => type(v) == array and v.len() == 3 and v.all(i => type(i) == float)),
     message: "cone(radius, v0, v1) expects `radius` be a float and `v0`, `v1` be arrays of 3 floats",
+  )
+  assert(
+    texture == "Outline" or (type(texture) == dictionary and "Striped" in texture),
+    message: "cone(...) texture must be either `outline()` or `striped(num)`",
   )
   return (
     Cone: (
       radius: radius,
       v0: v0,
       v1: v1,
+      texture: texture,
     ),
   )
 }
@@ -44,10 +53,9 @@
 /// #image(render(
 ///   eye: (1.25, 2.5, 2.0),
 ///   center: (1.25, -1., -0.6),
-///   step: 0.01,
 ///   height: 460.,
 ///   cube((0., 0., 0.), (1., 1., 1.)),
-///   cube((1.5, 0., 0.), (2.5, 1., 1.), texture: "Stripes", stripes: 24),
+///   cube((1.5, 0., 0.), (2.5, 1., 1.), texture: texture.striped(24)),
 /// ))
 /// ```
 ///
@@ -59,24 +67,23 @@
   /// The maximum corner of the cube, given as an array of three floats representing the x, y, and z coordinates.
   /// -> array
   max,
-  /// The texture pattern applied to the cube's surface. Can be either "Vanilla" or "Stripes".
-  /// -> str
-  texture: "Vanilla",
-  /// The number of stripes to apply if the "Stripes" texture is selected.
-  /// -> int
-  stripes: 8,
+  /// The texture pattern applied to the cube's surface. Can be `vanilla` or `striped`.
+  /// -> texture
+  texture: texture.vanilla(),
 ) = {
   assert(
     (min, max).all(x => type(x) == array and x.len() == 3 and x.all(i => type(i) == float)),
-    message: "cube(min, max) expects two array of 3 floats",
+    message: "cube(min, max, ..) expects two array of 3 floats",
   )
-  assert(texture in ("Vanilla", "Stripes"), message: "cube(...) texture must be one of Vanilla, Stripes")
+  assert(
+    texture == "Vanilla" or (type(texture) == dictionary and "Striped" in texture),
+    message: "cube(...) texture must be either `vanilla()` or `striped(num)`",
+  )
   return (
     Cube: (
       min: min,
       max: max,
       texture: texture,
-      stripes: stripes,
     ),
   )
 }
@@ -89,7 +96,7 @@
 ///   center: (1.2, 0., .2),
 ///   height: 600.,
 ///   cylinder(0.7, (0., 0., 0.), (0., 0., 1.)),
-///   outline(cylinder(0.7, (2.4, 0., 0.), (2.4, 0., 1.))),
+///   cylinder(0.7, (2.4, 0., 0.), (2.4, 0., 1.), texture: texture.striped(64)),
 /// ))
 /// ```
 ///
@@ -104,16 +111,24 @@
   /// The ending point of the cylinder's axis, given as an array of three floats representing the x, y, and z coordinates.
   /// -> array
   v1,
+  /// The texture pattern applied to the cylinder's surface. Can be `outline` or `striped`.
+  /// -> texture
+  texture: texture.outline(),
 ) = {
   assert(
     type(radius) == float and (v0, v1).all(v => type(v) == array and v.len() == 3 and v.all(i => type(i) == float)),
     message: "cylinder(radius, v0, v1) expects `radius` be a float and `v0`, `v1` be arrays of 3 floats",
+  )
+  assert(
+    texture == "Outline" or (type(texture) == dictionary and "Striped" in texture),
+    message: "cylinder(...) texture must be either `outline()` or `striped(num)`",
   )
   return (
     Cylinder: (
       radius: radius,
       v0: v0,
       v1: v1,
+      texture: texture,
     ),
   )
 }
@@ -125,10 +140,10 @@
 ///   height: 512.,
 ///   fovy: 30.,
 ///   sphere((0., 0., 0.), 1.0),
-///   outline(sphere((0., -2.2, 0.), 1.0)),
-///   sphere((2.2, 0., 0.), 1.0, texture: "RandomCircles", seed: 42),
-///   sphere((0., 2.2, 0.), 1.0, texture: "RandomEquators", seed: 42),
-///   sphere((-2.2, 0., 0.), 1.0, texture: "RandomEquators"),
+///   sphere((0., -2.2, 0.), 1.0, texture: texture.lat_lng()),
+///   sphere((2.2, 0., 0.), 1.0, texture: texture.random_circles(42)),
+///   sphere((0., 2.2, 0.), 1.0, texture: texture.random_equators(42)),
+///   sphere((-2.2, 0., 0.), 1.0, texture: texture.random_fuzz(42, num: 5000)),
 /// ))
 /// ```
 /// -> shape
@@ -139,32 +154,29 @@
   /// The radius of the sphere.
   /// -> float
   radius,
-  /// The texture pattern applied to the sphere's surface. Can be one of "LatLng", "RandomEquators", or "RandomCircles".
-  /// -> str
-  texture: "LatLng",
-  /// The seed for random texture generation.
-  /// -> int
-  seed: 0,
+  /// The texture pattern applied to the sphere's surface. Can be one of `outline`, `lat_lng`, `random_equators`, `random_fuzz`, or `random_circles`.
+  /// -> texture
+  texture: texture.outline(),
 ) = {
   assert(
-    type(center) == array
-      and center.len() == 3
-      and center.all(i => type(i) == float)
-      and type(radius) == float
-      and type(texture) == str
-      and type(seed) == int,
-    message: "sphere(...) expects `center` be an array of 3 floats, `radius` be a float, `texture` be a string, and `seed` be an integer",
+    type(center) == array and center.len() == 3 and center.all(i => type(i) == float) and type(radius) == float,
+    message: "sphere(...) expects `center` be an array of 3 floats, `radius` be a float",
   )
   assert(
-    texture in ("LatLng", "RandomEquators", "RandomCircles"),
-    message: "sphere(...) texture must be one of LatLng, RandomEquators, RandomCircles",
+    texture == "Outline"
+      or (
+        type(texture) == dictionary
+          and (
+            "LatLng" in texture or "RandomEquators" in texture or "RandomFuzz" in texture or "RandomCircles" in texture
+          )
+      ),
+    message: "sphere(...) texture must be either `outline()`, `lat_lng()`, `random_equators(seed, n)`, `random_fuzz(seed, num, scale)`, or `random_circles(seed, num)`",
   )
   return (
     Sphere: (
       center: center,
       radius: radius,
       texture: texture,
-      seed: seed,
     ),
   )
 }
@@ -196,19 +208,6 @@
   /// The direction of the shape's surface. Can be either "Below" or "Above".
   /// -> str
   direction: "Below",
-  /// The texture pattern of the shape's surface. Can be one of "Grid", "Spiral", or "Swirl".
-  ///
-  /// ```example
-  /// #let (min, max) = ((-1., -1., -1.), (1., 1., 1.))
-  /// #image(render(
-  ///   eye: (2.5, 0.4, 1.5),
-  ///   func((x, y) => x * y, min, max, texture: "Spiral", step: .01),
-  ///   func((x, y) => 0.0, min, max, step: .01),
-  /// ))
-  /// ```
-  ///
-  /// -> str
-  texture: "Grid",
   /// The number of samples along each axis if `func` is a function. Higher number of samples results in more accurate rendering but longer rendering time.
   /// -> int
   n: 50,
@@ -222,7 +221,6 @@
   ///     eye: (14., 5., 14.),
   ///     center: (0., 5., 0.),
   ///     height: 640.,
-  ///     step: 0.01,
   ///     func(f, min, max, step: .5),
   ///     translate(func(f, min, max, step: 5.), (0., 10., 0.)),
   ///   ),
@@ -230,7 +228,20 @@
   /// ```
   ///
   /// -> float
-  step: 0.05,
+  step: 0.01,
+  /// The texture pattern of the shape's surface. Can be one of `grid`, `spiral`, or `swirl`.
+  ///
+  /// ```example
+  /// #let (min, max) = ((-1., -1., -1.), (1., 1., 1.))
+  /// #image(render(
+  ///   eye: (2.5, 0.4, 1.5),
+  ///   func((x, y) => x * y, min, max, texture: texture.spiral()),
+  ///   func((x, y) => 0.0, min, max, step: .01),
+  /// ))
+  /// ```
+  ///
+  /// -> texture
+  texture: texture.grid(),
 ) = {
   assert(
     (type(func) == function or type(func) == array)
@@ -240,17 +251,12 @@
       and type(max) == array
       and max.len() == 3
       and max.all(i => type(i) == float)
-      and type(direction) == str
-      and type(texture) == str,
-    message: "func(...) expects `func` be a function or array, `min` and `max` be arrays of 3 floats, `direction` and `texture` be strings",
+      and type(direction) == str,
+    message: "func(...) expects `func` be a function or array, `min` and `max` be arrays of 3 floats, `direction` be strings",
   )
   assert(
     direction in ("Below", "Above"),
     message: "func(...) direction must be one of Below, Above",
-  )
-  assert(
-    texture in ("Grid", "Spiral", "Swirl"),
-    message: "func(...) texture must be one of Grid, Spiral, or Swirl",
   )
   assert(step > 0, message: "func(...) step must be a positive float")
   return (
@@ -310,7 +316,19 @@
 }
 
 /// The mesh shape composed of triangles.
+/// The edge lines of adjacent and coplanar triangles will hide to create smooth surface.
 ///
+/// ```example
+/// #image(render(
+///   eye: (2., 2., 2.),
+///   center: (0., 0., 0.),
+///   height: 512.,
+///   mesh((
+///     triangle((0., 1., 0.), (1., 0., 0.), (0., 0., 0.)),
+///     triangle((0., 1., 0.), (1., 0., 0.), (1., 1., 0.))
+///   )),
+/// ))
+/// ```
 /// ```example
 /// #let (n, r, h) = (8, 1.5, 2.0)
 /// #let trs = (
@@ -325,7 +343,6 @@
 ///   )
 /// }))
 /// #image(render(
-///   step: 0.01,
 ///   fovy: 30.,
 ///   rotate(mesh(trs), (0., 1., 0.), 1.2),
 /// ))
@@ -349,41 +366,6 @@
   )
 }
 
-/// The outline wrapper for shapes. Can be used to create outline shapes like outline cone, outline cylinder, outline sphere.
-///
-/// ```example
-/// #let (co, cy, sp) = (
-///   cone(.5, (0., 0., 0.), (0., 0., 1.)),
-///   cylinder(.5, (0., 0., 0.), (0., 0., 1.)),
-///   sphere((0., 0., 0.5), .5),
-/// )
-/// #image(render(
-///   center: (1., 2., 0.),
-///   step: 0.01,
-///   translate(co, (0., 0., 0.)),
-///   translate(cy, (0., 2., 0.)),
-///   translate(sp, (0., 4., 0.)),
-///   translate(outline(co), (2., 0., 0.)),
-///   translate(outline(cy), (2., 2., 0.)),
-///   translate(outline(sp), (2., 4., 0.)),
-/// ))
-/// ```
-///
-/// -> shape
-#let outline(
-  /// The shape to be outlined. Must be a cone, cylinder, or sphere.
-  /// -> shape
-  shape,
-) = {
-  assert(
-    type(shape) == dictionary and ("Cone", "Cylinder", "Sphere").any(s => s in shape),
-    message: "outline(shape) expects cone, cylinder, or sphere shape",
-  )
-  return (
-    Outline: shape,
-  )
-}
-
 /// The difference operation for shapes.
 /// Can be used to create complex shapes by subtracting multiple shapes from a base shape.
 ///
@@ -391,14 +373,13 @@
 /// #image(render(
 ///   eye: (3., 2., 2.),
 ///   center: (0., 0.1, 0.),
-///   step: 0.05,
 ///   fovy: 30.,
 ///   difference(
-///     cube((0., 0., 0.), (1., 1., 1.), texture: "Stripes", stripes: 15),
-///     sphere((1., 1., 0.5), 0.5),
-///     sphere((0., 1., 0.5), 0.5),
-///     sphere((0., 0., 0.5), 0.5),
-///     sphere((1., 0., 0.5), 0.5),
+///     cube((0., 0., 0.), (1., 1., 1.), texture: texture.striped(15)),
+///     sphere((1., 1., 0.5), 0.5, texture: texture.lat_lng()),
+///     sphere((0., 1., 0.5), 0.5, texture: texture.lat_lng()),
+///     sphere((0., 0., 0.5), 0.5, texture: texture.lat_lng()),
+///     sphere((1., 0., 0.5), 0.5, texture: texture.lat_lng()),
 ///   ),
 /// ))
 /// ```
@@ -428,11 +409,10 @@
 /// #image(render(
 ///   eye: (3., 2., 2.),
 ///   center: (0., 0., 0.5),
-///   step: 0.05,
 ///   fovy: 20.,
 ///   intersection(
-///     sphere((0., 0., 0.5), 0.6),
-///     cube((-0.5, -0.5, 0.), (.5, 0.5, 1.0), texture: "Stripes", stripes: 32),
+///     sphere((0., 0., 0.5), 0.6, texture: texture.lat_lng(n: 10)),
+///     cube((-0.5, -0.5, 0.), (.5, 0.5, 1.0), texture: texture.striped(32)),
 ///   ),
 /// ))
 /// ```
@@ -540,20 +520,19 @@
 ///
 /// ```example
 /// #image(render(
-///  eye: (2., 7., 5.),
-///  center: (1.5, 2., 0.),
-///  step: 0.01,
-///  cube((0., 0., 0.), (1., 1., 1.)),
-///  cube((1.5, 0., 0.), (2.5, 1., 1.), texture: "Stripes", stripes: 8),
-///  sphere((0.5, 2., .5), 0.5),
-///  sphere((2., 2., .5), 0.5, texture: "RandomCircles"),
-///  sphere((0.5, 3.5, .5), 0.5, texture: "RandomEquators"),
-///  outline(sphere((2., 3.5, .5), 0.5)),
-///  cone(0.5, (-1., 0.5, 0.), (-1., 0.5, 1.)),
-///  translate(outline(cone(0.5, (0., 0., 0.), (0., 0., 1.))), (-1., 2.0, 0.)),
-///  cylinder(0.5, (3.5, 0.5, 0.), (3.5, 0.5, 1.)),
-///  translate(outline(cylinder(0.5, (0., 0., 0.), (0., 0., 1.))), (3.5, 2.0, 0.)),
-/// ))
+///   eye: (2., 7., 5.),
+///   center: (1.5, 2., 0.),
+///   cube((0., 0., 0.), (1., 1., 1.)),
+///   cube((1.5, 0., 0.), (2.5, 1., 1.), texture: texture.striped(8)),
+///   sphere((0.5, 2., .5), 0.5),
+///   sphere((2., 2., .5), 0.5, texture: texture.random_circles(42)),
+///   sphere((0.5, 3.5, .5), 0.5, texture: texture.random_equators(42)),
+///   sphere((2., 3.5, .5), 0.5, texture: texture.lat_lng()),
+///   sphere((3.5, 3.5, .5), 0.5, texture: texture.random_fuzz(42)),
+///   cone(.5, (-1., .5, 0.), (-1., .5, 1.)),
+///   cone(.5, (-1., 2., 0.), (-1., 2., 1.), texture: texture.striped(15)),
+///   cylinder(.5, (3.5, .5, 0.), (3.5, .5, 1.)),
+///   cylinder(.5, (3.5, 2., 0.), (3.5, 2., 1.), texture: texture.striped(32))))
 /// ```
 ///
 /// -> bytes
@@ -581,10 +560,10 @@
   near: 0.1,
   /// The far clipping plane distance.
   /// -> float
-  far: 100.0,
+  far: 1000.0,
   /// The step size for the algorithm. Smaller step size results in more accurate rendering but longer rendering time.
   /// -> float
-  step: 0.1,
+  step: 1.0,
   /// The 3D shapes to be rendered in the scene.
   /// -> shape
   ..shapes,
