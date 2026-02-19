@@ -1,5 +1,5 @@
 use image::codecs::gif::GifEncoder;
-use image::{Delay, DynamicImage, Frame, ImageBuffer, Rgb};
+use image::{Delay, Frame, ImageBuffer, Rgba};
 use larnt::{
     CubeTexture, Cylinder, Matrix, Scene, Shape, Sphere, TransformedShape, Vector, new_difference,
     new_intersection, radians,
@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 fn save_gif_from_iter(
-    frames_iter: impl Iterator<Item = ImageBuffer<Rgb<u8>, Vec<u8>>>,
+    frames_iter: impl Iterator<Item = ImageBuffer<Rgba<u8>, Vec<u8>>>,
     output_path: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let file = File::create(output_path)?;
@@ -17,10 +17,8 @@ fn save_gif_from_iter(
 
     encoder.set_repeat(image::codecs::gif::Repeat::Infinite)?;
 
-    let gif_frames = frames_iter.map(|rgb_img| {
-        let rgba_img = DynamicImage::ImageRgb8(rgb_img).into_rgba8();
+    let gif_frames = frames_iter.map(|rgba_img| {
         let delay = Delay::from_saturating_duration(Duration::from_millis(50));
-
         Frame::from_parts(rgba_img, 0, 0, delay)
     });
 
@@ -79,7 +77,7 @@ fn main() {
             .height(height)
             .fovy(20.0)
             .call();
-        paths.to_image(width, height, 2.5)
+        paths.to_image(width, height).linewidth(2.5).call()
     });
 
     save_gif_from_iter(image_iter, "output.gif").unwrap();

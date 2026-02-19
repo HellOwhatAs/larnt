@@ -8,7 +8,6 @@
   image(
     render(
       eye: (8., 8., 8.),
-      step: 0.01,
       func(f, min, max, step: .1),
     ),
     width: 100%,

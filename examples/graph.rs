@@ -1,9 +1,9 @@
-use image::{Delay, DynamicImage, Frame, ImageBuffer, Rgb, codecs::gif::GifEncoder};
+use image::{Delay, Frame, ImageBuffer, Rgba, codecs::gif::GifEncoder};
 use larnt::{Scene, Sphere, Vector, new_transformed_cylinder, radians};
 use std::{fs::File, sync::Arc, time::Duration};
 
 fn save_gif_from_iter(
-    frames_iter: impl Iterator<Item = ImageBuffer<Rgb<u8>, Vec<u8>>>,
+    frames_iter: impl Iterator<Item = ImageBuffer<Rgba<u8>, Vec<u8>>>,
     output_path: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let file = File::create(output_path)?;
@@ -11,10 +11,8 @@ fn save_gif_from_iter(
 
     encoder.set_repeat(image::codecs::gif::Repeat::Infinite)?;
 
-    let gif_frames = frames_iter.map(|rgb_img| {
-        let rgba_img = DynamicImage::ImageRgb8(rgb_img).into_rgba8();
+    let gif_frames = frames_iter.map(|rgba_img| {
         let delay = Delay::from_saturating_duration(Duration::from_millis(50));
-
         Frame::from_parts(rgba_img, 0, 0, delay)
     });
 
@@ -22,7 +20,7 @@ fn save_gif_from_iter(
     Ok(())
 }
 
-fn render(frame: i32) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
+fn render(frame: i32) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
     let cx = radians(frame as f64).cos();
     let cy = radians(frame as f64).sin();
     let mut scene = Scene::new();
@@ -103,7 +101,7 @@ fn render(frame: i32) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
         .height(height)
         .fovy(60.0)
         .call();
-    paths.to_image(width, height, 2.5)
+    paths.to_image(width, height).linewidth(2.5).call()
 }
 
 fn main() {

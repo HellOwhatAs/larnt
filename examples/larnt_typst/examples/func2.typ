@@ -7,9 +7,9 @@
   image(
     render(
       eye: (3., 0.5, 3.),
-      func((x, y) => x * y, min, max, texture: "Spiral", step: 0.01),
+      func((x, y) => x * y, min, max, texture: texture.spiral(), step: 0.01),
       func((x, y) => 0.0, min, max, step: 0.01),
-      sphere((0., -0.6, 0.), 0.25, texture: "RandomCircles"),
+      sphere((0., -0.6, 0.), 0.25, texture: texture.random_circles(42)),
     ),
     width: 100%,
   )

@@ -564,6 +564,9 @@
   /// The step size for the algorithm. Smaller step size results in more accurate rendering but longer rendering time.
   /// -> float
   step: 1.0,
+  /// The output format of the rendered image. Supports `"svg"` or `"png"` or `("png": ("linewidth": <float>))`.
+  // -> str
+  format: "svg",
   /// The 3D shapes to be rendered in the scene.
   /// -> shape
   ..shapes,
@@ -579,6 +582,7 @@
       near: near,
       far: far,
       step: step,
+      format: if format == "png" { ("png": ("linewidth": 1.0)) } else { format },
     )),
     cbor.encode(shapes.pos()),
   )

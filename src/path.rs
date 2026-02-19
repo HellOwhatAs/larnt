@@ -28,8 +28,9 @@ use crate::filter::Filter;
 use crate::matrix::Matrix;
 use crate::shape::RenderArgs;
 use crate::vector::Vector;
+use bon::bon;
 #[cfg(feature = "image")]
-use image::{ImageBuffer, Pixel, Rgb};
+use image::{ImageBuffer, Pixel, Rgba};
 use std::f64::consts::PI;
 use std::io::Write;
 
@@ -56,6 +57,51 @@ pub type Path = Vec<Vector>;
 pub struct Paths {
     /// The collection of paths.
     pub paths: Vec<Path>,
+}
+
+#[bon]
+impl Paths {
+    /// Converts the paths to an ImageBuffer.
+    ///
+    /// # Arguments
+    ///
+    /// * `width` - The image width
+    /// * `height` - The image height
+    /// * `linewidth` - The thickness of the lines in pixels
+    #[cfg(feature = "image")]
+    #[builder]
+    pub fn to_image(
+        &self,
+        #[builder(start_fn)] width: f64,
+        #[builder(start_fn)] height: f64,
+        #[builder(default = 1.0)] linewidth: f64,
+        #[builder(default = Rgba([255, 255, 255, 255]))] background: Rgba<u8>,
+        #[builder(default = Rgba([0, 0, 0, 255]))] foreground: Rgba<u8>,
+    ) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+        let scale = 1.0;
+        let w = (width * scale) as u32;
+        let h = (height * scale) as u32;
+
+        let mut img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_pixel(w, h, background);
+
+        for path_points in &self.paths {
+            for i in 0..path_points.len().saturating_sub(1) {
+                let p1 = &path_points[i];
+                let p2 = &path_points[i + 1];
+                draw_line(
+                    &mut img,
+                    p1.x * scale,
+                    h as f64 - p1.y * scale,
+                    p2.x * scale,
+                    h as f64 - p2.y * scale,
+                    linewidth,
+                    foreground,
+                );
+            }
+        }
+
+        img
+    }
 }
 
 impl Paths {
@@ -189,46 +235,6 @@ impl Paths {
         std::fs::write(path, svg)
     }
 
-    /// Converts the paths to an ImageBuffer.
-    ///
-    /// # Arguments
-    ///
-    /// * `width` - The image width
-    /// * `height` - The image height
-    /// * `linewidth` - The thickness of the lines in pixels
-    #[cfg(feature = "image")]
-    pub fn to_image(
-        &self,
-        width: f64,
-        height: f64,
-        linewidth: f64,
-    ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
-        let scale = 1.0;
-        let w = (width * scale) as u32;
-        let h = (height * scale) as u32;
-
-        let mut img: ImageBuffer<Rgb<u8>, Vec<u8>> =
-            ImageBuffer::from_pixel(w, h, Rgb([255, 255, 255]));
-
-        for path_points in &self.paths {
-            for i in 0..path_points.len().saturating_sub(1) {
-                let p1 = &path_points[i];
-                let p2 = &path_points[i + 1];
-                draw_line(
-                    &mut img,
-                    p1.x * scale,
-                    h as f64 - p1.y * scale,
-                    p2.x * scale,
-                    h as f64 - p2.y * scale,
-                    linewidth,
-                    Rgb([0, 0, 0]),
-                );
-            }
-        }
-
-        img
-    }
-
     /// Writes the paths to a PNG image file.
     ///
     /// Renders the paths as black lines on a white background.
@@ -247,7 +253,7 @@ impl Paths {
     /// ```
     #[cfg(feature = "png")]
     pub fn write_to_png(&self, path: &str, width: f64, height: f64) {
-        let img = self.to_image(width, height, 2.5);
+        let img = self.to_image(width, height).linewidth(2.5).call();
         img.save(path).expect("Failed to save PNG");
     }
 
@@ -269,13 +275,13 @@ impl Paths {
 
 #[cfg(feature = "image")]
 fn draw_line(
-    img: &mut ImageBuffer<Rgb<u8>, Vec<u8>>,
+    img: &mut ImageBuffer<Rgba<u8>, Vec<u8>>,
     x0: f64,
     y0: f64,
     x1: f64,
     y1: f64,
     width: f64,
-    color: Rgb<u8>,
+    color: Rgba<u8>,
 ) {
     let w = img.width() as i32;
     let h = img.height() as i32;
@@ -328,15 +334,15 @@ fn draw_line(
                 let bg_pixel = img.get_pixel(pixel_x, pixel_y);
                 let bg_channels = bg_pixel.channels();
                 let fg_channels = color.channels();
-                let mut new_channels = [0u8; 3];
+                let mut new_channels = [0u8; 4];
 
-                for i in 0..3 {
+                for i in 0..4 {
                     let bg_val = bg_channels[i] as f64;
                     let fg_val = fg_channels[i] as f64;
                     new_channels[i] = (bg_val * (1.0 - alpha) + fg_val * alpha) as u8;
                 }
 
-                img.put_pixel(pixel_x, pixel_y, *Rgb::from_slice(&new_channels));
+                img.put_pixel(pixel_x, pixel_y, *Rgba::from_slice(&new_channels));
             }
         }
     }

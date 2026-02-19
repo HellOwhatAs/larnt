@@ -29,7 +29,9 @@ fn main() {
         .fovy(70.0)
         .call();
     paths
-        .to_image(width, height, 0.8)
+        .to_image(width, height)
+        .linewidth(0.8)
+        .call()
         .save("out.png")
         .expect("Failed to save image");
     paths

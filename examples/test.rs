@@ -28,7 +28,9 @@ fn main() {
         .height(height)
         .call();
     paths
-        .to_image(width, height, 2.0)
+        .to_image(width, height)
+        .linewidth(2.0)
+        .call()
         .save("out.png")
         .expect("Failed to save PNG");
     paths.write_to_svg("out.svg", width, height).unwrap();

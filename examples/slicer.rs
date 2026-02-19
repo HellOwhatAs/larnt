@@ -1,10 +1,10 @@
 use std::{fs::File, time::Duration};
 
-use image::{Delay, DynamicImage, Frame, ImageBuffer, Rgb, codecs::gif::GifEncoder};
+use image::{Delay, Frame, ImageBuffer, Rgba, codecs::gif::GifEncoder};
 use larnt::{Box as BBox, Matrix, Plane, Vector, load_obj};
 
 fn save_gif_from_iter(
-    frames_iter: impl Iterator<Item = ImageBuffer<Rgb<u8>, Vec<u8>>>,
+    frames_iter: impl Iterator<Item = ImageBuffer<Rgba<u8>, Vec<u8>>>,
     output_path: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let file = File::create(output_path)?;
@@ -12,8 +12,7 @@ fn save_gif_from_iter(
 
     encoder.set_repeat(image::codecs::gif::Repeat::Infinite)?;
 
-    let gif_frames = frames_iter.map(|rgb_img| {
-        let rgba_img = DynamicImage::ImageRgb8(rgb_img).into_rgba8();
+    let gif_frames = frames_iter.map(|rgba_img| {
         let delay = Delay::from_saturating_duration(Duration::from_millis(50));
 
         Frame::from_parts(rgba_img, 0, 0, delay)
@@ -41,7 +40,7 @@ fn main() {
             let transform = Matrix::scale(Vector::new(size / 2.0, size / 2.0, 1.0))
                 .translated(Vector::new(size / 2.0, size / 2.0, 0.0));
             let paths = paths.transform(&transform);
-            paths.to_image(size, size, 2.5)
+            paths.to_image(size, size).linewidth(2.5).call()
         }),
         "output.gif",
     )

@@ -1,4 +1,4 @@
-// Takes more than a minute to render.
+// Takes about 15s to render.
 #set page(margin: 0pt, height: auto)
 #import "@preview/suiji:0.5.1"
 #import "@preview/larnt:0.1.0": *
@@ -43,7 +43,7 @@
 
     let position = (0., 0., 0.)
     for i in range(n) {
-      shapes.push(outline(sphere(position, 0.1)))
+      shapes.push(sphere(position, 0.1, texture: texture.outline()))
       let s = (ss.at(i) + 1) / 2 * 0.1 + 0.01
       let v = (xs.at(i), ys.at(i), zs.at(i))
       v = v.map(x => x / calc.norm(..v) * s)

@@ -11,7 +11,8 @@ crate-type = ["cdylib"]
 ciborium = "0.2.1"
 serde = "1.0"
 wasm-minimal-protocol = { git = "https://github.com/astrale-sharp/wasm-minimal-protocol", rev = "c51acd43095fe9da8fa943e064618e486fd2b58d" }
-larnt = { path = "../..", default-features = false }
+larnt = { path = "../.." }
+image = { version = "0.25", default-features = false }
 
 [profile.release]
 lto = true   # Enable link-time optimization
