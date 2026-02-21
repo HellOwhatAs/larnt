@@ -561,11 +561,41 @@
   /// The far clipping plane distance.
   /// -> float
   far: 1000.0,
-  /// The step size for the algorithm. Smaller step size results in more accurate rendering but longer rendering time.
+  /// Controls rendering precision, representing the maximum error distance (in screen-space units)
+  /// between a line and its true position. Smaller step size results in more accurate rendering but longer rendering time.
+  /// Because the error is measured in screen space, the perspective projection naturally provides an automatic
+  /// Level of Detail (LOD) effect.
+  ///
+  /// ```example
+  /// #let shapes = (
+  ///   cube((0., 0., 0.), (1., 1., 1.)),
+  ///   cube((1.5, 0., 0.), (2.5, 1., 1.), texture: texture.striped(8)),
+  ///   sphere((0.5, 2., .5), 0.5),
+  ///   sphere((2., 2., .5), 0.5, texture: texture.random_circles(42)),
+  ///   sphere((0.5, 3.5, .5), 0.5, texture: texture.random_equators(42)),
+  ///   sphere((2., 3.5, .5), 0.5, texture: texture.lat_lng()),
+  ///   sphere((3.5, 3.5, .5), 0.5, texture: texture.random_fuzz(42)),
+  ///   cone(.5, (-1., .5, 0.), (-1., .5, 1.)),
+  ///   cone(.5, (-1., 2., 0.), (-1., 2., 1.), texture: texture.striped(15)),
+  ///   cylinder(.5, (3.5, .5, 0.), (3.5, .5, 1.)),
+  ///   cylinder(.5, (3.5, 2., 0.), (3.5, 2., 1.), texture: texture.striped(32)),
+  /// )
+  /// #grid(
+  ///   ..(10.0, 30.0, 100.0).map(step => image(render(
+  ///     eye: (2., 7., 5.),
+  ///     center: (1.5, 2., 0.),
+  ///     step: step,
+  ///     fovy: 32.0,
+  ///     height: 480.0,
+  ///     ..shapes,
+  ///   )))
+  /// )
+  /// ```
+  ///
   /// -> float
   step: 1.0,
   /// The output format of the rendered image. Supports `"svg"` or `"png"` or `("png": ("linewidth": <float>))`.
-  // -> str
+  /// -> str
   format: "svg",
   /// The 3D shapes to be rendered in the scene.
   /// -> shape
