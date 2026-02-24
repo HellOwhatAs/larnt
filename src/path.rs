@@ -34,9 +34,6 @@ use image::{ImageBuffer, Pixel, Rgba};
 use std::f64::consts::PI;
 use std::io::Write;
 
-/// A single path represented as a sequence of 3D points.
-pub type Path = Vec<Vector>;
-
 /// A collection of paths.
 ///
 /// `Paths` is the main output type from rendering. It contains a collection
@@ -55,8 +52,8 @@ pub type Path = Vec<Vector>;
 /// ```
 #[derive(Debug, Clone, Default)]
 pub struct Paths {
-    /// The collection of paths.
-    pub paths: Vec<Path>,
+    buffer: Vec<Vector>,
+    offsets: Vec<usize>,
 }
 
 #[bon]
@@ -84,7 +81,7 @@ impl Paths {
 
         let mut img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_pixel(w, h, background);
 
-        for path_points in &self.paths {
+        for path_points in &self.buffer {
             for i in 0..path_points.len().saturating_sub(1) {
                 let p1 = &path_points[i];
                 let p2 = &path_points[i + 1];
@@ -104,47 +101,89 @@ impl Paths {
     }
 }
 
+struct NewPath<'a> {
+    buffer: &'a mut Vec<Vector>,
+}
+
+impl<'a> NewPath<'a> {
+    pub fn push(&mut self, v: Vector) {
+        self.buffer.push(v);
+    }
+}
+
 impl Paths {
     /// Creates a new empty `Paths` collection.
     pub fn new() -> Self {
-        Paths { paths: Vec::new() }
+        Paths {
+            buffer: Vec::new(),
+            offsets: Vec::new(),
+        }
     }
 
-    /// Creates a `Paths` collection from a vector of paths.
-    pub fn from_vec(paths: Vec<Path>) -> Self {
-        Paths { paths }
-    }
-
-    /// Adds a path to this collection.
-    pub fn push(&mut self, path: Path) {
-        self.paths.push(path);
+    pub fn new_path<'a>(&'a mut self) -> NewPath<'a> {
+        self.offsets.push(self.buffer.len());
+        NewPath {
+            buffer: &mut self.buffer,
+        }
     }
 
     /// Extends this collection with paths from another.
     pub fn extend(&mut self, other: Paths) {
-        self.paths.extend(other.paths);
+        self.buffer.extend(other.buffer);
+        self.offsets
+            .extend(other.offsets.into_iter().map(|o| o + self.buffer.len()));
+    }
+
+    pub fn len(&self) -> usize {
+        self.offsets.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.offsets.is_empty()
     }
 
     /// Returns the bounding box of all paths.
     pub fn bounding_box(&self) -> Box {
-        if self.paths.is_empty() {
+        if self.buffer.is_empty() {
             return Box::default();
         }
-        let mut bx = path_bounding_box(&self.paths[0]);
-        for path in self.paths.iter().skip(1) {
-            bx = bx.extend(path_bounding_box(path));
+        let mut bx = Box::new(self.buffer[0], self.buffer[0]);
+        for v in self.buffer.iter().skip(1) {
+            bx = bx.extend(Box::new(*v, *v));
         }
         bx
     }
 
+    pub fn iter_paths(&self) -> impl Iterator<Item = &[Vector]> {
+        (if self.offsets.is_empty() {
+            None
+        } else {
+            Some(
+                self.offsets
+                    .windows(2)
+                    .map(|window| {
+                        let (start, end) = (window[0], window[1]);
+                        &self.buffer[start..end]
+                    })
+                    .chain(std::iter::once(
+                        &self.buffer[self.offsets.last().copied().unwrap()..],
+                    )),
+            )
+        })
+        .into_iter()
+        .flatten()
+    }
+
     /// Applies a transformation matrix to all paths.
-    pub fn transform(&self, matrix: &Matrix) -> Paths {
-        let paths = self
-            .paths
-            .iter()
-            .map(|path| path_transform(path, matrix))
-            .collect();
-        Paths { paths }
+    pub fn transform(self, matrix: &Matrix) -> Paths {
+        Paths {
+            buffer: self
+                .buffer
+                .into_iter()
+                .map(|v| matrix.mul_position(v))
+                .collect(),
+            offsets: self.offsets,
+        }
     }
 
     /// Subdivides paths into smaller segments.
@@ -153,31 +192,31 @@ impl Paths {
     /// controls the maximum distance between consecutive points.
     pub fn chop(&self, step: f64) -> Paths {
         let paths = self
-            .paths
+            .buffer
             .iter()
             .map(|path| path_chop(path, step))
             .collect();
-        Paths { paths }
+        Paths { buffer: paths }
     }
 
     pub fn chop_adaptive(&self, args: &RenderArgs) -> Paths {
         let paths = self
-            .paths
+            .buffer
             .iter()
             .map(|path| {
                 path_chop_adaptive(path, &args.screen_mat, args.width, args.height, args.step)
             })
             .collect();
-        Paths { paths }
+        Paths { buffer: paths }
     }
 
     /// Filters paths using a custom filter.
     pub fn filter<F: Filter>(&self, f: &F) -> Paths {
         let mut result = Vec::new();
-        for path in &self.paths {
+        for path in &self.buffer {
             result.extend(path_filter(path, f));
         }
-        Paths { paths: result }
+        Paths { buffer: result }
     }
 
     /// Simplifies paths by removing redundant points.
@@ -186,11 +225,11 @@ impl Paths {
     /// points while preserving the overall shape.
     pub fn simplify(&self, threshold: f64) -> Paths {
         let paths = self
-            .paths
+            .buffer
             .iter()
             .map(|path| path_simplify(path, threshold))
             .collect();
-        Paths { paths }
+        Paths { buffer: paths }
     }
 
     /// Converts the paths to an SVG string.
@@ -209,7 +248,7 @@ impl Paths {
             "<g transform=\"translate(0,{}) scale(1,-1)\">",
             height
         ));
-        for path in &self.paths {
+        for path in &self.buffer {
             lines.push(path_to_svg(path));
         }
         lines.push("</g></svg>".to_string());
@@ -262,7 +301,7 @@ impl Paths {
     /// Each path is written as a line of semicolon-separated x,y coordinates.
     pub fn write_to_txt(&self, path: &str) -> std::io::Result<()> {
         let mut file = std::fs::File::create(path)?;
-        for path_points in &self.paths {
+        for path_points in &self.buffer {
             let line: Vec<String> = path_points
                 .iter()
                 .map(|v| format!("{},{}", v.x, v.y))
@@ -348,7 +387,7 @@ fn draw_line(
     }
 }
 
-fn path_bounding_box(path: &Path) -> Box {
+fn path_bounding_box(path: &[Vector]) -> Box {
     if path.is_empty() {
         return Box::default();
     }
@@ -357,10 +396,6 @@ fn path_bounding_box(path: &Path) -> Box {
         bx = bx.extend(Box::new(*v, *v));
     }
     bx
-}
-
-fn path_transform(path: &Path, matrix: &Matrix) -> Path {
-    path.iter().map(|v| matrix.mul_position(*v)).collect()
 }
 
 fn path_chop(path: &Path, step: f64) -> Path {
@@ -553,9 +588,9 @@ fn path_filter<F: Filter>(path: &Path, f: &F) -> Vec<Path> {
     result
 }
 
-fn path_simplify(path: &Path, threshold: f64) -> Path {
+fn path_simplify(path: &[Vector], threshold: f64) -> Path {
     if path.len() < 3 {
-        return path.clone();
+        return path.to_vec();
     }
     let a = path[0];
     let b = path[path.len() - 1];
@@ -571,11 +606,11 @@ fn path_simplify(path: &Path, threshold: f64) -> Path {
     }
 
     if distance > threshold {
-        let r1 = path_simplify(&path[..=index].to_vec(), threshold);
-        let r2 = path_simplify(&path[index..].to_vec(), threshold);
-        let mut result = r1[..r1.len() - 1].to_vec();
-        result.extend(r2);
-        result
+        let mut r1 = path_simplify(&path[..=index], threshold);
+        let r2 = path_simplify(&path[index..], threshold);
+        r1.pop();
+        r1.extend(r2);
+        r1
     } else {
         vec![a, b]
     }
