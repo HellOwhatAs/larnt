@@ -101,11 +101,8 @@ impl Tree {
                 continue;
             }
 
-            let is_dir_negative = match node.axis {
-                Axis::X => dir_x < 0.0,
-                Axis::Y => dir_y < 0.0,
-                Axis::Z => dir_z < 0.0,
-                Axis::None => {
+            let is_dir_negative = match (node.axis, node.count > 0) {
+                (Axis::None, _) | (_, true) => {
                     for i in 0..node.count {
                         let shape = &self.shapes[node.left_first + i];
                         let hit = shape.intersect(r);
@@ -115,6 +112,9 @@ impl Tree {
                     }
                     continue;
                 }
+                (Axis::X, _) => dir_x < 0.0,
+                (Axis::Y, _) => dir_y < 0.0,
+                (Axis::Z, _) => dir_z < 0.0,
             };
 
             let (near, far) = if is_dir_negative {
@@ -151,6 +151,7 @@ impl Tree {
         if count <= 2 {
             nodes[node_idx].left_first = start;
             nodes[node_idx].count = count;
+            nodes[node_idx].axis = Axis::None;
             return;
         }
 
