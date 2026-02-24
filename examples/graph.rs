@@ -1,9 +1,9 @@
-use image::{Delay, DynamicImage, Frame, ImageBuffer, Rgb, codecs::gif::GifEncoder};
-use larnt::{OutlineSphere, Scene, Vector, new_transformed_outline_cylinder, radians};
+use image::{Delay, Frame, ImageBuffer, Rgba, codecs::gif::GifEncoder};
+use larnt::{Scene, Sphere, Vector, new_transformed_cylinder, radians};
 use std::{fs::File, sync::Arc, time::Duration};
 
 fn save_gif_from_iter(
-    frames_iter: impl Iterator<Item = ImageBuffer<Rgb<u8>, Vec<u8>>>,
+    frames_iter: impl Iterator<Item = ImageBuffer<Rgba<u8>, Vec<u8>>>,
     output_path: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let file = File::create(output_path)?;
@@ -11,10 +11,8 @@ fn save_gif_from_iter(
 
     encoder.set_repeat(image::codecs::gif::Repeat::Infinite)?;
 
-    let gif_frames = frames_iter.map(|rgb_img| {
-        let rgba_img = DynamicImage::ImageRgb8(rgb_img).into_rgba8();
+    let gif_frames = frames_iter.map(|rgba_img| {
         let delay = Delay::from_saturating_duration(Duration::from_millis(50));
-
         Frame::from_parts(rgba_img, 0, 0, delay)
     });
 
@@ -22,13 +20,11 @@ fn save_gif_from_iter(
     Ok(())
 }
 
-fn render(frame: i32) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
+fn render(frame: i32) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
     let cx = radians(frame as f64).cos();
     let cy = radians(frame as f64).sin();
     let mut scene = Scene::new();
     let eye = Vector::new(cx, cy, 0.0).mul_scalar(8.0);
-    let center = Vector::new(0.0, 0.0, 0.0);
-    let up = Vector::new(0.0, 0.0, 1.0);
 
     let nodes = vec![
         Vector::new(1.047, -0.000, -1.312),
@@ -87,21 +83,25 @@ fn render(frame: i32) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
 
     // Add nodes as spheres
     for v in &nodes {
-        scene.add(OutlineSphere::new(eye, up, *v, 0.333));
+        scene.add(Sphere::builder(*v, 0.333).build());
     }
 
     // Add edges as cylinders
     for (i, j) in &edges {
         let v0 = nodes[*i];
         let v1 = nodes[*j];
-        let cylinder = new_transformed_outline_cylinder(eye, up, v0, v1, 0.1);
+        let cylinder = new_transformed_cylinder(v0, v1, 0.1).call();
         scene.add_arc(Arc::new(cylinder));
     }
 
-    let width = 750.0;
-    let height = 750.0;
-    let paths = scene.render(eye, center, up, width, height, 60.0, 0.1, 100.0, 0.01);
-    paths.to_image(width, height, 2.5)
+    let (width, height) = (750.0, 750.0);
+    let paths = scene
+        .render(eye)
+        .width(width)
+        .height(height)
+        .fovy(60.0)
+        .call();
+    paths.to_image(width, height).linewidth(2.5).call()
 }
 
 fn main() {

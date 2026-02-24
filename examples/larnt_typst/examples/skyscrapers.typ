@@ -1,6 +1,6 @@
 #set page(margin: 0pt, height: auto)
 #import "@preview/suiji:0.5.1"
-#import "@preview/larnt:0.1.0": *
+#import "../lib.typ": *
 
 #let rng = suiji.gen-rng-f(42)
 
@@ -20,8 +20,7 @@
         cube(
           (fx - p, fy - p, 0.),
           (fx + p, fy + p, fz),
-          texture: "Stripes",
-          stripes: 7,
+          texture: texture.striped(7),
         ),
       )
     }
@@ -30,6 +29,7 @@
     render(
       eye: (1.75, 1.25, 6.0),
       fovy: 100.0,
+      step: 10.0,
       ..cubes,
     ),
     width: 100%,

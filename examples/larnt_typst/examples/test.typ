@@ -1,7 +1,7 @@
-// Takes about 20s to render.
+// Takes about 12s to render.
 #set page(margin: 0pt, height: auto)
 #import "@preview/suiji:0.5.1"
-#import "@preview/larnt:0.1.0": *
+#import "../lib.typ": *
 
 #let rng = suiji.gen-rng-f(42)
 
@@ -16,8 +16,7 @@
         sphere(
           (float(x), float(y), 0.),
           0.45,
-          texture: "RandomCircles",
-          seed: seed,
+          texture: texture.random_circles(seed)
         ),
       )
     }

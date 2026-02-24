@@ -1,5 +1,5 @@
 #set page(margin: 0pt, height: auto)
-#import "@preview/larnt:0.1.0": *
+#import "../lib.typ": *
 
 #{
   let obj = read("./suzanne.obj")
@@ -23,7 +23,7 @@
       center: (1.0, -0.5, 0.0),
       up: (0.0, 1.0, 0.0),
       fovy: 35.0,
-      step: 0.01,
+      step: 5.0,
       ..fs,
     ),
     width: 100%,

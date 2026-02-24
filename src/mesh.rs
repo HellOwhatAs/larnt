@@ -5,7 +5,7 @@ use crate::matrix::Matrix;
 use crate::path::Paths;
 use crate::plane::Plane;
 use crate::ray::Ray;
-use crate::shape::Shape;
+use crate::shape::{RenderArgs, Shape};
 use crate::tree::Tree;
 use crate::triangle::Triangle;
 use crate::vector::Vector;
@@ -81,6 +81,34 @@ impl Mesh {
         self
     }
 
+    pub fn parametric_surface<F>(
+        get_point: F,
+        u_range: std::ops::Range<usize>,
+        v_range: std::ops::Range<usize>,
+    ) -> Mesh
+    where
+        F: Fn(usize, usize) -> Vector,
+    {
+        let mut triangles = Vec::with_capacity(u_range.len() * v_range.len() * 2);
+        for u in u_range {
+            for v in v_range.clone() {
+                let p00 = get_point(u, v);
+                let p10 = get_point(u + 1, v);
+                let p01 = get_point(u, v + 1);
+                let p11 = get_point(u + 1, v + 1);
+
+                for [p1, p2, p3] in [[p00, p10, p01], [p10, p11, p01]] {
+                    let cross = (p2.sub(p1)).cross(p3.sub(p1));
+                    let area_squared = cross.x * cross.x + cross.y * cross.y + cross.z * cross.z;
+                    if area_squared > crate::common::EPS {
+                        triangles.push(Triangle::new(p1, p2, p3));
+                    }
+                }
+            }
+        }
+        Mesh::new(triangles)
+    }
+
     pub fn voxelize(&self, size: f64) -> Vec<Cube> {
         let z1 = self.bx.min.z;
         let z2 = self.bx.max.z;
@@ -104,7 +132,7 @@ impl Mesh {
         set.into_iter()
             .map(|(x, y, z)| {
                 let v = Vector::new(x as f64 / 1000.0, y as f64 / 1000.0, z as f64 / 1000.0);
-                Cube::new(v.sub_scalar(size / 2.0), v.add_scalar(size / 2.0))
+                Cube::builder(v.sub_scalar(size / 2.0), v.add_scalar(size / 2.0)).build()
             })
             .collect()
     }
@@ -136,7 +164,7 @@ impl Shape for Mesh {
             .map_or(Hit::no_hit(), |tree| tree.intersect(r))
     }
 
-    fn paths(&self) -> Paths {
+    fn paths(&self, _args: &RenderArgs) -> Paths {
         let mut normal_merger = VertexMerger::new(1e-6);
         let mut counter = HashMap::new();
         self.index_triangles.iter().for_each(|it| {

@@ -3,7 +3,7 @@ use crate::common::EPS;
 use crate::hit::Hit;
 use crate::path::Paths;
 use crate::ray::Ray;
-use crate::shape::Shape;
+use crate::shape::{RenderArgs, Shape};
 use crate::vector::Vector;
 
 #[derive(Debug, Clone)]
@@ -82,7 +82,7 @@ impl Shape for Triangle {
         Self::intersect_vertices(self.v1, self.v2, self.v3, r)
     }
 
-    fn paths(&self) -> Paths {
+    fn paths(&self, _args: &RenderArgs) -> Paths {
         Paths::from_vec(vec![
             vec![self.v1, self.v2],
             vec![self.v2, self.v3],

@@ -13,6 +13,7 @@ pub mod hit;
 pub mod matrix;
 pub mod mesh;
 pub mod obj;
+pub mod parametric;
 pub mod path;
 pub mod plane;
 pub mod ray;
@@ -28,24 +29,23 @@ pub mod vector;
 // Re-exports for convenient access
 pub use axis::Axis;
 pub use bounding_box::Box;
-pub use cone::{Cone, OutlineCone, new_transformed_cone, new_transformed_outline_cone};
+pub use cone::{Cone, ConeTexture, new_transformed_cone};
 pub use csg::{BooleanShape, Op, new_difference, new_intersection};
 pub use cube::{Cube, CubeTexture};
-pub use cylinder::{
-    Cylinder, OutlineCylinder, new_transformed_cylinder, new_transformed_outline_cylinder,
-};
+pub use cylinder::{Cylinder, CylinderTexture, new_transformed_cylinder};
 pub use filter::{ClipFilter, Filter};
 pub use function::{Direction, Function, FunctionTexture};
 pub use hit::Hit;
 pub use matrix::Matrix;
 pub use mesh::Mesh;
 pub use obj::load_obj;
+pub use parametric::ParametricSurface;
 pub use path::{Path, Paths};
 pub use plane::Plane;
 pub use ray::Ray;
 pub use scene::Scene;
-pub use shape::{EmptyShape, Shape, TransformedShape};
-pub use sphere::{OutlineSphere, Sphere, SphereTexture, lat_lng_to_xyz};
+pub use shape::{EmptyShape, RenderArgs, Shape, TransformedShape};
+pub use sphere::{Sphere, SphereTexture, lat_lng_to_xyz};
 pub use stl::{load_binary_stl, load_stl, save_binary_stl};
 pub use tree::Tree;
 pub use triangle::Triangle;

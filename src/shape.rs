@@ -8,8 +8,8 @@
 //!
 //! To create a custom shape, implement the [`Shape`] trait:
 //!
-//! ```ignore
-//! use larnt::{Shape, Paths, Vector, Box, Hit, Ray};
+//! ```no_run
+//! use larnt::{Shape, RenderArgs, Paths, Vector, Box, Hit, Ray};
 //!
 //! struct MySphere {
 //!     center: Vector,
@@ -33,7 +33,7 @@
 //!         Hit::no_hit()
 //!     }
 //!
-//!     fn paths(&self) -> Paths {
+//!     fn paths(&self, args: &RenderArgs) -> Paths {
 //!         // Return paths that represent this shape's surface
 //!         Paths::new()
 //!     }
@@ -97,7 +97,17 @@ pub trait Shape {
     /// These paths are the visual representation of the shape. For a cube,
     /// this might be the 12 edges. For a sphere, it could be latitude and
     /// longitude lines. Custom implementations can return any pattern.
-    fn paths(&self) -> Paths;
+    fn paths(&self, args: &RenderArgs) -> Paths;
+}
+
+#[derive(Debug, Clone)]
+pub struct RenderArgs {
+    pub screen_mat: Matrix,
+    pub eye: Vector,
+    pub up: Vector,
+    pub width: f64,
+    pub height: f64,
+    pub step: f64,
 }
 
 /// Automatically implement `Shape` for references to shapes.
@@ -114,8 +124,8 @@ impl<T: Shape + ?Sized> Shape for &T {
         (*self).intersect(r)
     }
 
-    fn paths(&self) -> Paths {
-        (*self).paths()
+    fn paths(&self, args: &RenderArgs) -> Paths {
+        (*self).paths(args)
     }
 }
 
@@ -139,7 +149,7 @@ impl Shape for EmptyShape {
         Hit::no_hit()
     }
 
-    fn paths(&self) -> Paths {
+    fn paths(&self, _args: &RenderArgs) -> Paths {
         Paths::new()
     }
 }
@@ -156,10 +166,10 @@ impl Shape for EmptyShape {
 /// use larnt::{Cube, Matrix, TransformedShape, Vector, radians};
 /// use std::sync::Arc;
 ///
-/// let cube = Arc::new(Cube::new(
+/// let cube = Arc::new(Cube::builder(
 ///     Vector::new(-1.0, -1.0, -1.0),
 ///     Vector::new(1.0, 1.0, 1.0),
-/// ));
+/// ).build());
 ///
 /// // Rotate cube 45 degrees around Z axis
 /// let transform = Matrix::rotate(Vector::new(0.0, 0.0, 1.0), radians(45.0));
@@ -208,7 +218,14 @@ impl Shape for TransformedShape {
         self.shape.intersect(self.inverse.mul_ray(r))
     }
 
-    fn paths(&self) -> Paths {
-        self.shape.paths().transform(&self.matrix)
+    fn paths(&self, args: &RenderArgs) -> Paths {
+        self.shape
+            .paths(&RenderArgs {
+                screen_mat: args.screen_mat.mul(&self.matrix),
+                eye: self.inverse.mul_position(args.eye),
+                up: self.inverse.mul_direction(args.up),
+                ..args.clone()
+            })
+            .transform(&self.matrix)
     }
 }

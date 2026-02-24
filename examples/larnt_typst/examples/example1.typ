@@ -1,6 +1,6 @@
 #set page(margin: 0pt, height: auto)
 #import "@preview/suiji:0.5.1"
-#import "@preview/larnt:0.1.0": *
+#import "../lib.typ": *
 
 #let rng = suiji.gen-rng-f(42)
 
@@ -13,10 +13,9 @@
       cubes.push(cube(
         (x - 0.5, y - 0.5, z - 0.5),
         (x + 0.5, y + 0.5, z + 0.5),
-        texture: "Stripes",
-        stripes: 7,
+        texture: texture.striped(7)
       ))
     }
   }
-  image(render(step: 0.05, ..cubes), width: 100%)
+  image(render(..cubes), width: 100%)
 }

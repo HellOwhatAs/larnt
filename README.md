@@ -6,21 +6,22 @@
 
 `larnt` is a vector-based 3D renderer written in Rust. It is used to produce 2D vector graphics (think SVGs) depicting 3D scenes.
 
-*The output of an OpenGL pipeline is a rastered image. The output of `larnt` is a set of 2D vector paths.*
+_The output of an OpenGL pipeline is a rastered image. The output of `larnt` is a set of 2D vector paths._
 
-> This project is a Rust rewrite of the original [Go implementation](https://github.com/fogleman/ln) by [Michael Fogleman](https://github.com/fogleman).
+> This project is a Rust rewrite of the original [ln](https://github.com/fogleman/ln) by [Michael Fogleman](https://github.com/fogleman).
 
 ## Examples
+
 <table>
     <tr>
         <td>
             <a href="examples/basics.rs">
-                <img alt="basics" src="https://github.com/user-attachments/assets/4857bf81-1cae-4b21-960e-7cbcc805a9a5" />
+                <img alt="basics" src="https://github.com/user-attachments/assets/eba5a931-1465-4c65-add2-31a17db63b18" />
             </a>
         </td>
         <td>
             <a href="examples/beads.rs">
-                <img alt="beads" src="https://github.com/user-attachments/assets/2015e98f-54f2-48f4-b88a-0cbae66f5ac1" />
+                <img alt="beads" src="https://github.com/user-attachments/assets/bd96fa4c-4ef3-49e6-a572-2680e417fa05" />
             </a>
         </td>
         <td>
@@ -49,7 +50,7 @@
     <tr>
         <td>
             <a href="examples/skyscrapers.rs">
-                <img alt="skyscrapers" src="https://github.com/user-attachments/assets/3b0509fb-0aa2-4237-8c51-aa957f35be06" />
+                <img alt="skyscrapers" src="https://github.com/user-attachments/assets/e1d8e39d-b670-4350-9d57-bcfafa73ed92" />
             </a>
         </td>
         <td>
@@ -59,12 +60,30 @@
         </td>
         <td>
             <a href="examples/test.rs">
-                <img alt="test" src="https://github.com/user-attachments/assets/9abc50da-b1fe-4c23-bc46-588bd26e93d8" 
+                <img alt="test" src="https://github.com/user-attachments/assets/9abc50da-b1fe-4c23-bc46-588bd26e93d8" />
+            </a>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <a href="examples/torus.rs">
+                <img alt="torus" src="https://github.com/user-attachments/assets/fb63c340-8288-4962-ad20-def83f4a9311" />
+            </a>
+        </td>
+        <td>
+            <a href="examples/mobius.rs">
+                <img alt="mobius" src="https://github.com/user-attachments/assets/99ccff8f-6d5f-4178-ac2b-2201fee329f7" />
+            </a>
+        </td>
+        <td>
+            <a href="examples/klein.rs">
+                <img alt="klein" src="https://github.com/user-attachments/assets/68214ff1-b2de-4532-ab05-62a04c355a93" />
+            </a>
         </td>
     </tr>
 </table>
 
-*Click on the example image to jump to the code.*
+_Click on the example image to jump to the code._
 
 ## Installation
 
@@ -75,21 +94,28 @@ Add to your `Cargo.toml`:
 larnt = "0.1.0"
 ```
 
+Or for the latest development version
+
+```toml
+[dependencies]
+larnt = { git = "https://github.com/HellOwhatAs/larnt.git" }
+```
+
 ## Features
 
 - Primitives
-	- Sphere
-	- Cube
-	- Triangle
-	- Cylinder
-	- Cone
-	- 3D Functions
+  - Sphere
+  - Cube
+  - Triangle
+  - Cylinder
+  - Cone
+  - 3D Surface
 - Triangle Meshes
-	- OBJ & STL
+  - OBJ & STL
 - Vector-based "Texturing"
 - CSG (Constructive Solid Geometry) Operations
-	- Intersection
-	- Difference
+  - Intersection
+  - Difference
 - Output to PNG or SVG
 
 ## How it Works
@@ -97,14 +123,14 @@ larnt = "0.1.0"
 To understand how `larnt` works, it's useful to start with the `Shape` trait:
 
 ```rust
-use larnt::{Box, Hit, Paths, Ray, Vector};
+use larnt::{Box, Hit, Paths, Ray, Vector, RenderArgs};
 
 pub trait Shape {
     fn compile(&mut self) {}
     fn bounding_box(&self) -> Box;
     fn contains(&self, v: Vector, f: f64) -> bool;
     fn intersect(&self, r: Ray) -> Hit;
-    fn paths(&self) -> Paths;
+    fn paths(&self, args: &RenderArgs) -> Paths;
 }
 ```
 
@@ -140,33 +166,39 @@ use larnt::{Cube, Scene, Vector};
 fn main() {
     // create a scene and add a single cube
     let mut scene = Scene::new();
-    scene.add(Cube::new(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)));
+    scene.add(Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build());
 
-    // define camera parameters
-    let eye = Vector::new(4.0, 3.0, 2.0);    // camera position
-    let center = Vector::new(0.0, 0.0, 0.0); // camera looks at
-    let up = Vector::new(0.0, 0.0, 1.0);     // up direction
-
-    // define rendering parameters
-    let width = 1024.0;  // rendered width
+    let eye = Vector::new(4.0, 3.0, 2.0); // camera position
+    let width = 1024.0; // rendered width
     let height = 1024.0; // rendered height
-    let fovy = 50.0;     // vertical field of view, degrees
-    let znear = 0.1;     // near z plane
-    let zfar = 10.0;     // far z plane
-    let step = 0.01;     // how finely to chop the paths for visibility testing
 
     // compute 2D paths that depict the 3D scene
-    let paths = scene.render(eye, center, up, width, height, fovy, znear, zfar, step);
+    let paths = scene
+        .render(eye)
+        .center(Vector::new(0.0, 0.0, 0.0)) // camera looks at
+        .up(Vector::new(0.0, 0.0, 1.0)) // up direction
+        .width(width) // rendered width
+        .height(height) // rendered height
+        .fovy(50.0) // vertical field of view, degrees
+        .near(0.1) // near plane
+        .far(1000.0) // far plane
+        // how finely to chop the paths for visibility testing
+        // unit is the same as the scene's units
+        .step(1.0)
+        .call();
 
     // render the paths in an image
     paths.write_to_png("out.png", width, height);
 
     // save the paths as an svg
-    paths.write_to_svg("out.svg", width, height).expect("Failed to write SVG");
+    paths
+        .write_to_svg("out.svg", width, height)
+        .expect("Failed to write SVG");
 }
 ```
 
 ### The Output
+
 <img width="250px" alt="example0" src="https://github.com/user-attachments/assets/3ab195bf-0e3d-4304-b68d-e7dac0b501d9" />
 
 ## Custom Texturing
@@ -176,7 +208,7 @@ shown in the skyscrapers example above. We can implement the `Shape` trait
 for a custom type.
 
 ```rust
-use larnt::{Cube, Shape, Paths, Vector, Box, Hit, Ray};
+use larnt::{Cube, Shape, RenderArgs, Paths, Vector, Box, Hit, Ray};
 
 struct StripedCube {
     cube: Cube,
@@ -196,11 +228,11 @@ impl Shape for StripedCube {
         self.cube.intersect(r)
     }
 
-    fn paths(&self) -> Paths {
+    fn paths(&self, _: &RenderArgs) -> Paths {
         let mut paths = Vec::new();
         let (x1, y1, z1) = (self.cube.min.x, self.cube.min.y, self.cube.min.z);
         let (x2, y2, z2) = (self.cube.max.x, self.cube.max.y, self.cube.max.z);
-        
+
         for i in 0..=self.stripes {
             let p = i as f64 / self.stripes as f64;
             let x = x1 + (x2 - x1) * p;
@@ -222,21 +254,32 @@ Now `StripedCube` instances can be added to the scene.
 You can easily construct complex solids using Intersection, Difference.
 
 ```rust
-use larnt::{new_difference, new_intersection, radians, Cube, Cylinder, Matrix, Sphere, TransformedShape, Vector};
+use larnt::{
+    Cube, CubeTexture, Cylinder, Matrix, Sphere, SphereTexture, TransformedShape, Vector,
+    new_difference, new_intersection, radians,
+};
 use std::sync::Arc;
 
 let shape = new_difference(vec![
     new_intersection(vec![
-        Arc::new(Sphere::new(Vector::default(), 1.0)),
-        Arc::new(Cube::new(Vector::new(-0.8, -0.8, -0.8), Vector::new(0.8, 0.8, 0.8))),
+        Arc::new(
+            Sphere::builder(Vector::default(), 1.0)
+                .texture(SphereTexture::lat_lng().call())
+                .build(),
+        ),
+        Arc::new(
+            Cube::builder(Vector::new(-0.8, -0.8, -0.8), Vector::new(0.8, 0.8, 0.8))
+                .texture(CubeTexture::striped().stripes(10).call())
+                .build(),
+        ),
     ]),
-    Arc::new(Cylinder::new(0.4, -2.0, 2.0)),
+    Arc::new(Cylinder::builder(0.4, -2.0, 2.0).build()),
     Arc::new(TransformedShape::new(
-        Arc::new(Cylinder::new(0.4, -2.0, 2.0)),
+        Arc::new(Cylinder::builder(0.4, -2.0, 2.0).build()),
         Matrix::rotate(Vector::new(1.0, 0.0, 0.0), radians(90.0)),
     )),
     Arc::new(TransformedShape::new(
-        Arc::new(Cylinder::new(0.4, -2.0, 2.0)),
+        Arc::new(Cylinder::builder(0.4, -2.0, 2.0).build()),
         Matrix::rotate(Vector::new(0.0, 1.0, 0.0), radians(90.0)),
     )),
 ]);

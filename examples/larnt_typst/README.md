@@ -12,7 +12,7 @@ _3D line art engine using [rust rewrite](https://github.com/HellOwhatAs/larnt) o
         <td>
             <a href="examples/basics.typ">
                 <img width="250px" alt="basics"
-                    src="https://github.com/user-attachments/assets/3f792cc9-f8c5-432b-8042-e8952daec0e8" />
+                    src="https://github.com/user-attachments/assets/25294f77-350c-4286-96e2-3e71ba008788" />
             </a>
         </td>
         <td>
@@ -30,7 +30,7 @@ _3D line art engine using [rust rewrite](https://github.com/HellOwhatAs/larnt) o
     </tr>
     <tr>
         <td>basics</td>
-        <td>beads (about 1min)</td>
+        <td>beads (about 15s)</td>
         <td>csg</td>
     </tr>
     <tr>
@@ -55,7 +55,7 @@ _3D line art engine using [rust rewrite](https://github.com/HellOwhatAs/larnt) o
     </tr>
     <tr>
         <td>example1</td>
-        <td>func (about 2s)</td>
+        <td>func (about 1.5s)</td>
         <td>func2 (about 1s)</td>
     </tr>
     <tr>
@@ -80,7 +80,7 @@ _3D line art engine using [rust rewrite](https://github.com/HellOwhatAs/larnt) o
     <tr>
         <td>func3 (about 1s)</td>
         <td>graph</td>
-        <td>skyscrapers (about 3s)</td>
+        <td>skyscrapers</td>
     </tr>
     <tr>
         <td>
@@ -96,16 +96,16 @@ _3D line art engine using [rust rewrite](https://github.com/HellOwhatAs/larnt) o
             </a>
         </td>
         <td>
-            <a href="examples/test0.typ">
-                <img width="250px" alt="test0"
-                    src="https://github.com/user-attachments/assets/70d52efd-b126-4dd2-a77e-2d9ec9358d91" />
+            <a href="examples/torus.typ">
+                <img width="250px" alt="torus"
+                    src="https://github.com/user-attachments/assets/e25bf5aa-1c26-45e3-81ff-0ede804195f5" />
             </a>
         </td>
     </tr>
     <tr>
         <td>suzanne</td>
-        <td>test (about 20s)</td>
-        <td>test0</td>
+        <td>test (about 12s)</td>
+        <td>torus</td>
     </tr>
 </table>
 
@@ -119,7 +119,7 @@ _3D line art engine using [rust rewrite](https://github.com/HellOwhatAs/larnt) o
 	- Triangle
 	- Cylinder
 	- Cone
-	- 3D Functions
+	- 3D Surface
 - Triangle Meshes
 - Vector-based "Texturing"
 - CSG (Constructive Solid Geometry) Operations

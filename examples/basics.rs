@@ -1,6 +1,6 @@
 use larnt::{
-    Cube, CubeTexture, OutlineSphere, Scene, Sphere, SphereTexture, Vector, new_transformed_cone,
-    new_transformed_cylinder, new_transformed_outline_cone, new_transformed_outline_cylinder,
+    ConeTexture, Cube, CubeTexture, CylinderTexture, Scene, Sphere, SphereTexture, Vector,
+    new_transformed_cone, new_transformed_cylinder,
 };
 
 fn main() {
@@ -18,54 +18,74 @@ fn main() {
     let fovy = 50.0; // vertical field of view, degrees
     let znear = 0.1; // near z plane
     let zfar = 10.0; // far z plane
-    let step = 0.01; // how finely to chop the paths for visibility testing
+    let step = 1.0; // how finely to chop the paths for visibility testing
 
-    scene.add(Cube::new(
-        Vector::new(0.0, 0.0, 0.0),
-        Vector::new(1.0, 1.0, 1.0),
-    ));
+    scene.add(Cube::builder(Vector::new(0.0, 0.0, 0.0), Vector::new(1.0, 1.0, 1.0)).build());
     scene.add(
-        Cube::new(Vector::new(1.5, 0.0, 0.0), Vector::new(2.5, 1.0, 1.0))
-            .with_texture(CubeTexture::Striped(8)),
-    );
-    scene.add(Sphere::new(Vector::new(0.5, 2.0, 0.5), 0.5));
-    scene.add(
-        Sphere::new(Vector::new(2.0, 2.0, 0.5), 0.5).with_texture(SphereTexture::RandomCircles(42)),
+        Cube::builder(Vector::new(1.5, 0.0, 0.0), Vector::new(2.5, 1.0, 1.0))
+            .texture(CubeTexture::striped().call())
+            .build(),
     );
     scene.add(
-        Sphere::new(Vector::new(0.5, 3.5, 0.5), 0.5)
-            .with_texture(SphereTexture::RandomEquators(42)),
+        Sphere::builder(Vector::new(0.5, 2.0, 0.5), 0.5)
+            .texture(SphereTexture::lat_lng().call())
+            .build(),
     );
-    scene.add(OutlineSphere::new(eye, up, Vector::new(2.0, 3.5, 0.5), 0.5));
-    scene.add(new_transformed_cone(
-        up,
-        Vector::new(-1.0, 0.5, 0.0),
-        Vector::new(-1.0, 0.5, 1.0),
-        0.5,
-    ));
-    scene.add(new_transformed_outline_cone(
-        eye,
-        up,
-        Vector::new(-1.0, 2.0, 0.0),
-        Vector::new(-1.0, 2.0, 1.0),
-        0.5,
-    ));
-    scene.add(new_transformed_cylinder(
-        up,
-        Vector::new(3.5, 0.5, 0.0),
-        Vector::new(3.5, 0.5, 1.0),
-        0.5,
-    ));
-    scene.add(new_transformed_outline_cylinder(
-        eye,
-        up,
-        Vector::new(3.5, 2.0, 0.0),
-        Vector::new(3.5, 2.0, 1.0),
-        0.5,
-    ));
+    scene.add(
+        Sphere::builder(Vector::new(2.0, 2.0, 0.5), 0.5)
+            .texture(SphereTexture::random_circles(42).call())
+            .build(),
+    );
+    scene.add(
+        Sphere::builder(Vector::new(0.5, 3.5, 0.5), 0.5)
+            .texture(SphereTexture::random_equators(42).call())
+            .build(),
+    );
+    scene.add(
+        Sphere::builder(Vector::new(3.5, 3.5, 0.5), 0.5)
+            .texture(SphereTexture::random_fuzz(42).call())
+            .build(),
+    );
+    scene.add(Sphere::builder(Vector::new(2.0, 3.5, 0.5), 0.5).build());
+    scene.add(
+        new_transformed_cone(
+            Vector::new(-1.0, 0.5, 0.0),
+            Vector::new(-1.0, 0.5, 1.0),
+            0.5,
+        )
+        .texture(ConeTexture::Striped(12))
+        .call(),
+    );
+    scene.add(
+        new_transformed_cone(
+            Vector::new(-1.0, 2.0, 0.0),
+            Vector::new(-1.0, 2.0, 1.0),
+            0.5,
+        )
+        .call(),
+    );
+    scene.add(
+        new_transformed_cylinder(Vector::new(3.5, 0.5, 0.0), Vector::new(3.5, 0.5, 1.0), 0.5)
+            .texture(CylinderTexture::Striped(36))
+            .call(),
+    );
+    scene.add(
+        new_transformed_cylinder(Vector::new(3.5, 2.0, 0.0), Vector::new(3.5, 2.0, 1.0), 0.5)
+            .call(),
+    );
 
     // compute 2D paths that depict the 3D scene
-    let paths = scene.render(eye, center, up, width, height, fovy, znear, zfar, step);
+    let paths = scene
+        .render(eye)
+        .center(center)
+        .up(up)
+        .width(width)
+        .height(height)
+        .fovy(fovy)
+        .near(znear)
+        .far(zfar)
+        .step(step)
+        .call();
 
     // save the result as a png
     paths.write_to_png("out.png", width, height);

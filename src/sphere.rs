@@ -1,7 +1,7 @@
 //! Sphere primitive.
 //!
 //! This module provides the [`Sphere`] shape with multiple texture options,
-//! and [`OutlineSphere`] which renders as a silhouette circle from the camera's
+//! the default outline texture renders as a silhouette circle from the camera's
 //! perspective.
 //!
 //! # Example
@@ -9,90 +9,120 @@
 //! ```
 //! use larnt::{Scene, Sphere, SphereTexture, Vector};
 //!
-//! // Create a unit sphere at the origin with the default lat/lng texture
-//! let sphere = Sphere::new(Vector::new(0.0, 0.0, 0.0), 1.0);
+//! // Create a unit sphere at the origin with the default outline texture
+//! let sphere = Sphere::builder(Vector::new(0.0, 0.0, 0.0), 1.0).build();
 //!
 //! // Or with a custom texture
-//! let sphere_dots = Sphere::new(Vector::new(2.0, 0.0, 0.0), 1.0)
-//!     .with_texture(SphereTexture::RandomDots(42));
+//! let sphere_fuzz = Sphere::builder(Vector::new(2.0, 0.0, 0.0), 1.0)
+//!     .texture(SphereTexture::random_fuzz(42).call())
+//!     .build();
 //!
 //! let mut scene = Scene::new();
 //! scene.add(sphere);
-//! scene.add(sphere_dots);
+//! scene.add(sphere_fuzz);
 //! ```
 
-use crate::bounding_box::Box;
 use crate::hit::Hit;
 use crate::matrix::Matrix;
 use crate::path::Paths;
+use crate::path::adaptive_arc;
 use crate::ray::Ray;
 use crate::shape::Shape;
 use crate::util::radians;
 use crate::vector::Vector;
+use crate::{bounding_box::Box, shape::RenderArgs};
+use bon::{Builder, bon};
 use rand::{Rng, SeedableRng, rngs::SmallRng};
+use std::f64::consts::PI;
 
 /// Texture style for Sphere shapes
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum SphereTexture {
-    /// Latitude/longitude grid texture (default)
+    /// A sphere that renders as a silhouette circle from the camera's perspective.
     #[default]
-    LatLng,
-    /// Random rotated equators (great circles)
-    RandomEquators(u64),
-    /// Random point dots on the surface
-    RandomDots(u64),
-    /// Random concentric circles pattern
-    RandomCircles(u64),
+    Outline,
+    /// Latitude/longitude grid texture (default n: 10, o: 10)
+    LatLng { n: i32, o: i32 },
+    /// Random rotated equators (great circles) (default n: 100)
+    RandomEquators { seed: u64, n: usize },
+    /// Random fuzz on the surface (default num: 1000, scale: 1.1)
+    RandomFuzz { seed: u64, num: usize, scale: f64 },
+    /// Random concentric circles pattern (default num: 140)
+    RandomCircles { seed: u64, num: usize },
+}
+
+#[bon]
+impl SphereTexture {
+    /// Create a latitude/longitude grid texture with the specified number of lines and offset.
+    #[builder]
+    pub fn lat_lng(#[builder(default = 10)] n: i32, #[builder(default = 10)] o: i32) -> Self {
+        SphereTexture::LatLng { n, o }
+    }
+
+    /// Create a random equators texture with the specified number of great circles.
+    #[builder]
+    pub fn random_equators(
+        #[builder(start_fn)] seed: u64,
+        #[builder(default = 100)] n: usize,
+    ) -> Self {
+        SphereTexture::RandomEquators { seed, n }
+    }
+
+    /// Create a random fuzz texture with the specified number of points and scale.
+    #[builder]
+    pub fn random_fuzz(
+        #[builder(start_fn)] seed: u64,
+        #[builder(default = 1000)] num: usize,
+        #[builder(default = 1.1)] scale: f64,
+    ) -> Self {
+        SphereTexture::RandomFuzz { seed, num, scale }
+    }
+
+    /// Create a random concentric circles texture with the specified number of circles.
+    #[builder]
+    pub fn random_circles(
+        #[builder(start_fn)] seed: u64,
+        #[builder(default = 140)] num: usize,
+    ) -> Self {
+        SphereTexture::RandomCircles { seed, num }
+    }
 }
 
 /// A sphere defined by center and radius.
 ///
-/// The default paths generated are latitude and longitude lines, creating
-/// a globe-like appearance. You can use [`with_texture`](Sphere::with_texture)
-/// to select different texture styles.
+/// The default paths generated are a silhouette circle from the camera's perspective.
 ///
 /// # Example
 ///
 /// ```
 /// use larnt::{Sphere, SphereTexture, Vector};
 ///
-/// // Sphere at origin with radius 2 (default lat/lng texture)
-/// let sphere = Sphere::new(Vector::new(0.0, 0.0, 0.0), 2.0);
+/// // Sphere at origin with radius 2 (default outline texture)
+/// let sphere = Sphere::builder(Vector::new(0.0, 0.0, 0.0), 2.0).build();
 ///
-/// // Sphere with dots texture
-/// let sphere_dots = Sphere::new(Vector::new(0.0, 0.0, 0.0), 2.0)
-///     .with_texture(SphereTexture::RandomDots(42));
+/// // Sphere with fuzz texture
+/// let sphere_fuzz = Sphere::builder(Vector::new(0.0, 0.0, 0.0), 2.0)
+///     .texture(SphereTexture::random_fuzz(42).call())
+///     .build();
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
 pub struct Sphere {
     /// The center point of the sphere.
+    #[builder(start_fn)]
     pub center: Vector,
     /// The radius of the sphere.
+    #[builder(start_fn)]
     pub radius: f64,
     /// Cached bounding box.
-    pub bx: Box,
-    /// The texture style for the sphere.
-    pub texture: SphereTexture,
-}
-
-impl Sphere {
-    /// Creates a new sphere with the given center and radius.
-    pub fn new(center: Vector, radius: f64) -> Self {
+    #[builder(skip = {
         let min = Vector::new(center.x - radius, center.y - radius, center.z - radius);
         let max = Vector::new(center.x + radius, center.y + radius, center.z + radius);
-        Sphere {
-            center,
-            radius,
-            bx: Box::new(min, max),
-            texture: SphereTexture::default(),
-        }
-    }
-
-    /// Sets the texture style for the sphere.
-    pub fn with_texture(mut self, texture: SphereTexture) -> Self {
-        self.texture = texture;
-        self
-    }
+        Box::new(min, max)
+    })]
+    pub bx: Box,
+    /// The texture style for the sphere.
+    #[builder(default)]
+    pub texture: SphereTexture,
 }
 
 impl Shape for Sphere {
@@ -125,101 +155,153 @@ impl Shape for Sphere {
         Hit::no_hit()
     }
 
-    fn paths(&self) -> Paths {
+    fn paths(&self, args: &RenderArgs) -> Paths {
         match self.texture {
-            SphereTexture::LatLng => self.paths_lat_lng(),
-            SphereTexture::RandomEquators(seed) => self.paths_random_equators(seed),
-            SphereTexture::RandomDots(seed) => self.paths_random_dots(seed),
-            SphereTexture::RandomCircles(seed) => self.paths_random_circles(seed),
+            SphereTexture::Outline => self.paths_outline(args),
+            SphereTexture::LatLng { n, o } => self.paths_lat_lng(&args.screen_mat, args.step, n, o),
+            SphereTexture::RandomEquators { seed, n } => {
+                self.paths_random_equators(&args.screen_mat, args.step, n, seed)
+            }
+            SphereTexture::RandomFuzz { seed, num, scale } => {
+                self.paths_random_fuzz(num, scale, seed)
+            }
+            SphereTexture::RandomCircles { seed, num } => {
+                self.paths_random_circles(&args.screen_mat, args.step, num, seed)
+            }
         }
     }
 }
 
 impl Sphere {
-    /// Latitude/longitude grid texture (default)
-    fn paths_lat_lng(&self) -> Paths {
+    /// Outline texture: renders as a silhouette circle from the camera's perspective.
+    fn paths_outline(&self, args: &RenderArgs) -> Paths {
+        let center = self.center;
+        let radius = self.radius;
+
+        let hyp = center.sub(args.eye).length();
+        let opp = radius;
+        if hyp < opp {
+            return Paths::new();
+        }
+        let theta = (opp / hyp).asin();
+        let adj = opp / theta.tan();
+        let d = theta.cos() * adj;
+        let r = theta.sin() * adj;
+
+        let w = center.sub(args.eye).normalize();
+
+        // Handle case when w is parallel to up vector by finding a perpendicular vector
+        let cross = w.cross(args.up);
+        let u = if cross.length_squared() < 1e-18 {
+            // w is parallel to up, use the minimum axis approach to find a perpendicular
+            w.cross(w.min_axis()).normalize()
+        } else {
+            cross.normalize()
+        };
+        let v = w.cross(u).normalize();
+        let c = args.eye.add(w.mul_scalar(d));
+
+        let path = adaptive_arc(
+            0.0,
+            PI * 2.,
+            r,
+            &(c, u, v),
+            &args.screen_mat,
+            args.step.powi(2),
+        );
+        Paths::from_vec(vec![path])
+    }
+
+    /// Latitude/longitude grid texture
+    fn paths_lat_lng(&self, screen_mat: &Matrix, step: f64, n: i32, o: i32) -> Paths {
         let mut paths = Vec::new();
-        let n = 10;
-        let o = 10;
+        let step_sq = step.powi(2);
 
         // Latitude lines
-        let mut lat = -90 + o;
-        while lat <= 90 - o {
-            let mut path = Vec::new();
-            for lng in 0..=360 {
-                let v = lat_lng_to_xyz(lat as f64, lng as f64, self.radius).add(self.center);
-                path.push(v);
+        {
+            let mut lat = -90 + o;
+            while lat <= 90 - o {
+                let (c, r) = {
+                    let latr = radians(lat as f64);
+                    let mut c = self.center;
+                    c.z += self.radius * latr.sin();
+                    let r = self.radius * latr.cos();
+                    (c, r)
+                };
+                let (u, v) = (Vector::new(1., 0., 0.), Vector::new(0., 1., 0.));
+
+                let path = adaptive_arc(0.0, PI * 2.0, r, &(c, u, v), screen_mat, step_sq);
+                paths.push(path);
+                lat += n;
             }
-            paths.push(path);
-            lat += n;
         }
 
         // Longitude lines
-        let mut lng = 0;
-        while lng < 360 {
-            let mut path = Vec::new();
-            for lat in -(90 - o)..=(90 - o) {
-                let v = lat_lng_to_xyz(lat as f64, lng as f64, self.radius).add(self.center);
-                path.push(v);
+        {
+            let mut lng = 0;
+            let u = Vector::new(0.0, 0.0, 1.0);
+            while lng < 360 {
+                let (c, r) = (self.center, self.radius);
+                let v = {
+                    let lngr = radians(lng as f64);
+                    Vector::new(lngr.cos(), lngr.sin(), 0.0)
+                };
+                let [alpha, beta] = [o, 180 - o].map(|x| radians(x as f64));
+
+                let path = adaptive_arc(alpha, beta, r, &(c, u, v), screen_mat, step_sq);
+                paths.push(path);
+                lng += n;
             }
-            paths.push(path);
-            lng += n;
         }
 
         Paths::from_vec(paths)
     }
 
     /// Random rotated equators (great circles)
-    fn paths_random_equators(&self, seed: u64) -> Paths {
+    fn paths_random_equators(&self, screen_mat: &Matrix, step: f64, n: usize, seed: u64) -> Paths {
         let mut rng = SmallRng::seed_from_u64(seed);
-        // Create a single equator path
-        let mut equator = Vec::new();
-        for lng in 0..=360 {
-            let v = lat_lng_to_xyz(0.0, lng as f64, self.radius);
-            equator.push(v);
-        }
+        let step_sq = step.powi(2);
+        let (c, r) = (self.center, self.radius);
 
-        let mut paths = Vec::new();
-        for _ in 0..100 {
-            let mut m = Matrix::identity();
-            for _ in 0..3 {
-                let v = Vector::random_unit_vector(&mut rng);
-                m = m.rotated(v, rng.random::<f64>() * 2.0 * std::f64::consts::PI);
-            }
-            m = m.translated(self.center);
+        let mut paths = Vec::with_capacity(n);
+        for _ in 0..n {
+            let (u, v) = {
+                let [u, w] = [(); 2].map(|_| Vector::random_unit_vector(&mut rng));
+                (u, w.cross(u).normalize())
+            };
 
-            // Transform the equator path
-            let transformed: Vec<Vector> = equator.iter().map(|p| m.mul_position(*p)).collect();
-            paths.push(transformed);
+            let path = adaptive_arc(0.0, PI * 2.0, r, &(c, u, v), screen_mat, step_sq);
+            paths.push(path);
         }
 
         Paths::from_vec(paths)
     }
 
     /// Random point dots on the surface
-    fn paths_random_dots(&self, seed: u64) -> Paths {
+    fn paths_random_fuzz(&self, num: usize, scale: f64, seed: u64) -> Paths {
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut paths = Vec::new();
 
-        for _ in 0..20000 {
-            let v = Vector::random_unit_vector(&mut rng)
-                .mul_scalar(self.radius)
-                .add(self.center);
-            // Each "dot" is a zero-length path (two identical points)
-            paths.push(vec![v, v]);
+        for _ in 0..num {
+            let v = Vector::random_unit_vector(&mut rng);
+            paths.push(vec![
+                v.mul_scalar(self.radius).add(self.center),
+                v.mul_scalar(self.radius * scale).add(self.center),
+            ]);
         }
 
         Paths::from_vec(paths)
     }
 
     /// Random concentric circles pattern
-    fn paths_random_circles(&self, seed: u64) -> Paths {
+    fn paths_random_circles(&self, screen_mat: &Matrix, step: f64, num: usize, seed: u64) -> Paths {
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut paths = Vec::new();
         let mut seen: Vec<Vector> = Vec::new();
         let mut radii: Vec<f64> = Vec::new();
+        let step_sq = step.powi(2);
 
-        for _ in 0..140 {
+        for _ in 0..num {
             let mut v: Vector;
             let mut m: f64;
 
@@ -251,16 +333,14 @@ impl Sphere {
             let n = rng.random_range(1..=4);
             let mut current_m = m;
             for _ in 0..n {
-                let mut path = Vec::new();
-                for j in (0..=360).step_by(5) {
-                    let a = radians(j as f64);
-                    let mut x = v;
-                    x = x.add(p.mul_scalar(a.cos() * current_m));
-                    x = x.add(q.mul_scalar(a.sin() * current_m));
-                    x = x.normalize();
-                    x = x.mul_scalar(self.radius).add(self.center);
-                    path.push(x);
-                }
+                let (r, c) = {
+                    let norm = (v.length_squared() + current_m.powi(2)).sqrt();
+                    let r = current_m * self.radius / norm;
+                    let c = v.mul_scalar(self.radius / norm).add(self.center);
+                    (r, c)
+                };
+
+                let path = adaptive_arc(0.0, PI * 2.0, r, &(c, p, q), screen_mat, step_sq);
                 paths.push(path);
                 current_m *= 0.75;
             }
@@ -288,98 +368,4 @@ pub fn lat_lng_to_xyz(lat: f64, lng: f64, radius: f64) -> Vector {
     let y = radius * lat.cos() * lng.sin();
     let z = radius * lat.sin();
     Vector::new(x, y, z)
-}
-
-/// A sphere that renders as a silhouette circle from the camera's perspective.
-///
-/// Unlike [`Sphere`] which draws latitude/longitude lines, `OutlineSphere`
-/// draws only the visible outline of the sphere as seen from the camera.
-/// This is useful for cleaner, more stylized renderings.
-///
-/// # Example
-///
-/// ```
-/// use larnt::{OutlineSphere, Scene, Vector};
-///
-/// let eye = Vector::new(4.0, 3.0, 2.0);
-/// let up = Vector::new(0.0, 0.0, 1.0);
-///
-/// let sphere = OutlineSphere::new(eye, up, Vector::new(0.0, 0.0, 0.0), 1.0);
-/// ```
-#[derive(Debug, Clone)]
-pub struct OutlineSphere {
-    /// The underlying sphere geometry.
-    pub sphere: Sphere,
-    /// The camera position (used to compute the silhouette).
-    pub eye: Vector,
-    /// The up direction (used to orient the silhouette).
-    pub up: Vector,
-}
-
-impl OutlineSphere {
-    /// Creates a new outline sphere.
-    ///
-    /// # Arguments
-    ///
-    /// * `eye` - The camera position
-    /// * `up` - The up direction vector
-    /// * `center` - The center of the sphere
-    /// * `radius` - The radius of the sphere
-    pub fn new(eye: Vector, up: Vector, center: Vector, radius: f64) -> Self {
-        OutlineSphere {
-            sphere: Sphere::new(center, radius),
-            eye,
-            up,
-        }
-    }
-}
-
-impl Shape for OutlineSphere {
-    fn bounding_box(&self) -> Box {
-        self.sphere.bounding_box()
-    }
-
-    fn contains(&self, v: Vector, f: f64) -> bool {
-        self.sphere.contains(v, f)
-    }
-
-    fn intersect(&self, r: Ray) -> Hit {
-        self.sphere.intersect(r)
-    }
-
-    fn paths(&self) -> Paths {
-        let center = self.sphere.center;
-        let radius = self.sphere.radius;
-
-        let hyp = center.sub(self.eye).length();
-        let opp = radius;
-        let theta = (opp / hyp).asin();
-        let adj = opp / theta.tan();
-        let d = theta.cos() * adj;
-        let r = theta.sin() * adj;
-
-        let w = center.sub(self.eye).normalize();
-
-        // Handle case when w is parallel to up vector by finding a perpendicular vector
-        let cross = w.cross(self.up);
-        let u = if cross.length_squared() < 1e-18 {
-            // w is parallel to up, use the minimum axis approach to find a perpendicular
-            w.cross(w.min_axis()).normalize()
-        } else {
-            cross.normalize()
-        };
-        let v = w.cross(u).normalize();
-        let c = self.eye.add(w.mul_scalar(d));
-
-        let mut path = Vec::new();
-        for i in 0..=360 {
-            let a = radians(i as f64);
-            let mut p = c;
-            p = p.add(u.mul_scalar(a.cos() * r));
-            p = p.add(v.mul_scalar(a.sin() * r));
-            path.push(p);
-        }
-
-        Paths::from_vec(vec![path])
-    }
 }

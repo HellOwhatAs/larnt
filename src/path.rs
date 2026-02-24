@@ -10,18 +10,13 @@
 //!
 //! # Example
 //!
-//! ```no_run
-//! use larnt::{Scene, Cube, Vector};
+//! ```
+//! use larnt::{Cube, Scene, Vector};
 //!
 //! let mut scene = Scene::new();
-//! scene.add(Cube::new(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)));
+//! scene.add(Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build());
 //!
-//! let paths = scene.render(
-//!     Vector::new(4.0, 3.0, 2.0),
-//!     Vector::new(0.0, 0.0, 0.0),
-//!     Vector::new(0.0, 0.0, 1.0),
-//!     1024.0, 1024.0, 50.0, 0.1, 10.0, 0.01,
-//! );
+//! let paths = scene.render(Vector::new(4.0, 3.0, 2.0)).call();
 //!
 //! // Output to different formats
 //! paths.write_to_png("output.png", 1024.0, 1024.0);
@@ -31,9 +26,12 @@
 use crate::bounding_box::Box;
 use crate::filter::Filter;
 use crate::matrix::Matrix;
+use crate::shape::RenderArgs;
 use crate::vector::Vector;
+use bon::bon;
 #[cfg(feature = "image")]
-use image::{ImageBuffer, Pixel, Rgb};
+use image::{ImageBuffer, Pixel, Rgba};
+use std::f64::consts::PI;
 use std::io::Write;
 
 /// A single path represented as a sequence of 3D points.
@@ -59,6 +57,51 @@ pub type Path = Vec<Vector>;
 pub struct Paths {
     /// The collection of paths.
     pub paths: Vec<Path>,
+}
+
+#[bon]
+impl Paths {
+    /// Converts the paths to an ImageBuffer.
+    ///
+    /// # Arguments
+    ///
+    /// * `width` - The image width
+    /// * `height` - The image height
+    /// * `linewidth` - The thickness of the lines in pixels
+    #[cfg(feature = "image")]
+    #[builder]
+    pub fn to_image(
+        &self,
+        #[builder(start_fn)] width: f64,
+        #[builder(start_fn)] height: f64,
+        #[builder(default = 1.0)] linewidth: f64,
+        #[builder(default = Rgba([255, 255, 255, 255]))] background: Rgba<u8>,
+        #[builder(default = Rgba([0, 0, 0, 255]))] foreground: Rgba<u8>,
+    ) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+        let scale = 1.0;
+        let w = (width * scale) as u32;
+        let h = (height * scale) as u32;
+
+        let mut img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_pixel(w, h, background);
+
+        for path_points in &self.paths {
+            for i in 0..path_points.len().saturating_sub(1) {
+                let p1 = &path_points[i];
+                let p2 = &path_points[i + 1];
+                draw_line(
+                    &mut img,
+                    p1.x * scale,
+                    h as f64 - p1.y * scale,
+                    p2.x * scale,
+                    h as f64 - p2.y * scale,
+                    linewidth,
+                    foreground,
+                );
+            }
+        }
+
+        img
+    }
 }
 
 impl Paths {
@@ -117,6 +160,17 @@ impl Paths {
         Paths { paths }
     }
 
+    pub fn chop_adaptive(&self, args: &RenderArgs) -> Paths {
+        let paths = self
+            .paths
+            .iter()
+            .map(|path| {
+                path_chop_adaptive(path, &args.screen_mat, args.width, args.height, args.step)
+            })
+            .collect();
+        Paths { paths }
+    }
+
     /// Filters paths using a custom filter.
     pub fn filter<F: Filter>(&self, f: &F) -> Paths {
         let mut result = Vec::new();
@@ -166,18 +220,13 @@ impl Paths {
     ///
     /// # Example
     ///
-    /// ```no_run
+    /// ```
     /// use larnt::{Scene, Cube, Vector};
     ///
     /// let mut scene = Scene::new();
-    /// scene.add(Cube::new(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)));
+    /// scene.add(Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build());
     ///
-    /// let paths = scene.render(
-    ///     Vector::new(4.0, 3.0, 2.0),
-    ///     Vector::new(0.0, 0.0, 0.0),
-    ///     Vector::new(0.0, 0.0, 1.0),
-    ///     1024.0, 1024.0, 50.0, 0.1, 10.0, 0.01,
-    /// );
+    /// let paths = scene.render(Vector::new(4.0, 3.0, 2.0)).call();
     ///
     /// paths.write_to_svg("output.svg", 1024.0, 1024.0).unwrap();
     /// ```
@@ -186,70 +235,25 @@ impl Paths {
         std::fs::write(path, svg)
     }
 
-    /// Converts the paths to an ImageBuffer.
-    ///
-    /// # Arguments
-    ///
-    /// * `width` - The image width
-    /// * `height` - The image height
-    /// * `linewidth` - The thickness of the lines in pixels
-    #[cfg(feature = "image")]
-    pub fn to_image(
-        &self,
-        width: f64,
-        height: f64,
-        linewidth: f64,
-    ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
-        let scale = 1.0;
-        let w = (width * scale) as u32;
-        let h = (height * scale) as u32;
-
-        let mut img: ImageBuffer<Rgb<u8>, Vec<u8>> =
-            ImageBuffer::from_pixel(w, h, Rgb([255, 255, 255]));
-
-        for path_points in &self.paths {
-            for i in 0..path_points.len().saturating_sub(1) {
-                let p1 = &path_points[i];
-                let p2 = &path_points[i + 1];
-                draw_line(
-                    &mut img,
-                    p1.x * scale,
-                    h as f64 - p1.y * scale,
-                    p2.x * scale,
-                    h as f64 - p2.y * scale,
-                    linewidth,
-                    Rgb([0, 0, 0]),
-                );
-            }
-        }
-
-        img
-    }
-
     /// Writes the paths to a PNG image file.
     ///
     /// Renders the paths as black lines on a white background.
     ///
     /// # Example
     ///
-    /// ```no_run
+    /// ```
     /// use larnt::{Scene, Sphere, Vector};
     ///
     /// let mut scene = Scene::new();
-    /// scene.add(Sphere::new(Vector::new(0.0, 0.0, 0.0), 1.0));
+    /// scene.add(Sphere::builder(Vector::new(0.0, 0.0, 0.0), 1.0).build());
     ///
-    /// let paths = scene.render(
-    ///     Vector::new(4.0, 3.0, 2.0),
-    ///     Vector::new(0.0, 0.0, 0.0),
-    ///     Vector::new(0.0, 0.0, 1.0),
-    ///     512.0, 512.0, 50.0, 0.1, 10.0, 0.01,
-    /// );
+    /// let paths = scene.render(Vector::new(4.0, 3.0, 2.0)).call();
     ///
     /// paths.write_to_png("output.png", 512.0, 512.0);
     /// ```
     #[cfg(feature = "png")]
     pub fn write_to_png(&self, path: &str, width: f64, height: f64) {
-        let img = self.to_image(width, height, 2.5);
+        let img = self.to_image(width, height).linewidth(2.5).call();
         img.save(path).expect("Failed to save PNG");
     }
 
@@ -271,13 +275,13 @@ impl Paths {
 
 #[cfg(feature = "image")]
 fn draw_line(
-    img: &mut ImageBuffer<Rgb<u8>, Vec<u8>>,
+    img: &mut ImageBuffer<Rgba<u8>, Vec<u8>>,
     x0: f64,
     y0: f64,
     x1: f64,
     y1: f64,
     width: f64,
-    color: Rgb<u8>,
+    color: Rgba<u8>,
 ) {
     let w = img.width() as i32;
     let h = img.height() as i32;
@@ -330,15 +334,15 @@ fn draw_line(
                 let bg_pixel = img.get_pixel(pixel_x, pixel_y);
                 let bg_channels = bg_pixel.channels();
                 let fg_channels = color.channels();
-                let mut new_channels = [0u8; 3];
+                let mut new_channels = [0u8; 4];
 
-                for i in 0..3 {
+                for i in 0..4 {
                     let bg_val = bg_channels[i] as f64;
                     let fg_val = fg_channels[i] as f64;
                     new_channels[i] = (bg_val * (1.0 - alpha) + fg_val * alpha) as u8;
                 }
 
-                img.put_pixel(pixel_x, pixel_y, *Rgb::from_slice(&new_channels));
+                img.put_pixel(pixel_x, pixel_y, *Rgba::from_slice(&new_channels));
             }
         }
     }
@@ -377,6 +381,154 @@ fn path_chop(path: &Path, step: f64) -> Path {
         result.push(b);
     }
     result
+}
+
+fn path_chop_adaptive(
+    path: &Path,
+    screen_mat: &Matrix,
+    width: f64,
+    height: f64,
+    step: f64,
+) -> Path {
+    let mut result = vec![path[0]];
+    let step_sq = step.powi(2);
+    path.iter()
+        .map(|&v| (v, screen_mat.mul_position_w(v)))
+        .collect::<Vec<_>>()
+        .windows(2)
+        .for_each(|window| {
+            recursive_subdivide(
+                (window[0], window[1]),
+                &|(a, _), (b, _)| {
+                    let mid = a.add(b).mul_scalar(0.5);
+                    (mid, screen_mat.mul_position_w(mid))
+                },
+                &|(a, sa), (b, sb)| {
+                    (sa.x < 0.0 && sb.x < 0.0
+                        || sa.y < 0.0 && sb.y < 0.0
+                        || sa.x > width && sb.x > width
+                        || sa.y > height && sb.y > height)
+                        || sa.distance_squared(sb) < step_sq
+                        || a.distance_squared(b) < crate::common::EPS
+                },
+                &mut |(x, _)| result.push(x),
+            )
+        });
+    result
+}
+
+/// Recursively subdivides an arc defined by angles `alpha` and `beta`
+/// into a sequence of angles that approximate the arc on screen within a certain step size.
+///
+/// The arc is defined by a center point `c` and two orthogonal vectors `u` and `v` that
+/// define the plane of the arc. The radius `r` determines how far from the center the
+/// arc points are. The `screen_mat` is used to project the 3D points onto the screen
+/// for distance calculations. The `step_sq` parameter controls how closely the subdivided points
+/// approximate the arc on screen, with smaller values resulting in more points for a smoother arc.
+pub fn recursive_arc_subdivide(
+    alpha: f64,
+    beta: f64,
+    r: f64,
+    cuv: &(Vector, Vector, Vector),
+    screen_mat: &Matrix,
+    step_sq: f64,
+) -> Vec<f64> {
+    let screen_view = |x: f64| {
+        screen_mat.mul_position_w(
+            (cuv.0)
+                .add((cuv.1).mul_scalar(x.cos() * r))
+                .add((cuv.2).mul_scalar(x.sin() * r)),
+        )
+    };
+    let mut path = vec![alpha];
+    crate::path::recursive_subdivide(
+        ((alpha, screen_view(alpha)), (beta, screen_view(beta))),
+        &|(alpha, _), (beta, _)| {
+            let mid = (beta + alpha) / 2.0;
+            (mid, screen_view(mid))
+        },
+        &|(alpha, sa), (beta, sb)| {
+            let theta = (beta - alpha) / 2.0;
+            theta < PI / 180.0
+                || sa.distance_squared(sb) * theta / theta.sin() < step_sq && theta < PI / 3.0
+        },
+        &mut |(x, _)| path.push(x),
+    );
+    path
+}
+
+pub fn radius_expansion(path: &[f64], r: f64) -> Vec<f64> {
+    let mut radius: Vec<f64> = std::iter::once(0.0)
+        .chain(path.windows(2).map(|x| {
+            let (alpha, beta) = (x[0], x[1]);
+            let cos_theta = ((beta - alpha) / 2.0).cos();
+            r / cos_theta
+        }))
+        .collect();
+    let (back, front) = (radius.last().copied().unwrap(), radius[1]);
+    radius[0] = back;
+    radius.push(front);
+    radius
+}
+
+/// Generates a sequence of points along an arc defined by angles `alpha` and `beta`,
+/// with adaptive subdivision to ensure smoothness on screen and radius expansion
+/// to pass visibility testing.
+pub fn adaptive_arc(
+    alpha: f64,
+    beta: f64,
+    r: f64,
+    cuv: &(Vector, Vector, Vector),
+    screen_mat: &Matrix,
+    step_sq: f64,
+) -> Vec<Vector> {
+    let path = recursive_arc_subdivide(alpha, beta, r, cuv, screen_mat, step_sq);
+    let expanded_radius = radius_expansion(&path, r);
+    let (c, u, v) = cuv;
+    path.iter()
+        .enumerate()
+        .map(|(i, beta)| {
+            let max_r = expanded_radius[i].max(expanded_radius[i + 1]);
+            c.add(u.mul_scalar(beta.cos() * max_r))
+                .add(v.mul_scalar(beta.sin() * max_r))
+        })
+        .collect()
+}
+
+/// Similar to `adaptive_arc`, but uses the original radius values
+/// instead of expanded values. This can be used for inner arcs.
+pub fn adaptive_arc_inner(
+    alpha: f64,
+    beta: f64,
+    r: f64,
+    cuv: &(Vector, Vector, Vector),
+    screen_mat: &Matrix,
+    step_sq: f64,
+) -> Vec<Vector> {
+    let path = recursive_arc_subdivide(alpha, beta, r, cuv, screen_mat, step_sq);
+    let (c, u, v) = cuv;
+    path.iter()
+        .map(|beta| {
+            c.add(u.mul_scalar(beta.cos() * r))
+                .add(v.mul_scalar(beta.sin() * r))
+        })
+        .collect()
+}
+
+pub fn recursive_subdivide<T: Copy>(
+    ab: (T, T),
+    divider: &impl Fn(T, T) -> T,
+    terminator: &impl Fn(T, T) -> bool,
+    collector: &mut impl FnMut(T),
+) {
+    let (a, b) = ab;
+    if terminator(a, b) {
+        collector(b);
+    } else {
+        let mid = divider(a, b);
+        recursive_subdivide((a, mid), divider, terminator, collector);
+        recursive_subdivide((mid, b), divider, terminator, collector);
+    }
 }
 
 fn path_filter<F: Filter>(path: &Path, f: &F) -> Vec<Path> {

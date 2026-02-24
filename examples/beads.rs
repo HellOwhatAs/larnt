@@ -1,4 +1,4 @@
-use larnt::{OutlineSphere, Scene, Vector};
+use larnt::{Scene, Sphere, SphereTexture, Vector};
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 fn normalize(values: &[f64], a: f64, b: f64) -> Vec<f64> {
@@ -32,10 +32,7 @@ fn low_pass_noise(rng: &mut SmallRng, n: usize, alpha: f64, iterations: usize) -
 }
 
 fn main() {
-    let mut rng = SmallRng::seed_from_u64(42);
-    let eye = Vector::new(8.0, 8.0, 8.0);
-    let center = Vector::new(0.0, 0.0, 0.0);
-    let up = Vector::new(0.0, 0.0, 1.0);
+    let mut rng = SmallRng::seed_from_u64(0);
 
     let mut scene = Scene::new();
 
@@ -48,7 +45,9 @@ fn main() {
 
         let mut position = Vector::new(0.0, 0.0, 0.0);
         for i in 0..n {
-            let sphere = OutlineSphere::new(eye, up, position, 0.1);
+            let sphere = Sphere::builder(position, 0.1)
+                .texture(SphereTexture::random_fuzz(42).num(i * 5).call())
+                .build();
             scene.add(sphere);
             let s = (ss[i] + 1.0) / 2.0 * 0.1 + 0.01;
             let v = Vector::new(xs[i], ys[i], zs[i]).normalize().mul_scalar(s);
@@ -56,13 +55,16 @@ fn main() {
         }
     }
 
-    let width = 1024.;
-    let height = 1024.;
-    let fovy = 50.0;
-
-    let paths = scene.render(eye, center, up, width, height, fovy, 0.1, 100.0, 0.01);
+    let (width, height) = (1024.0, 1024.0);
+    let paths = scene
+        .render(Vector::new(8.0, 8.0, 8.0))
+        .width(width)
+        .height(height)
+        .call();
     paths
-        .to_image(width, height, 0.8)
+        .to_image(width, height)
+        .linewidth(0.8)
+        .call()
         .save("out.png")
         .expect("Failed to save PNG");
     paths

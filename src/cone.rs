@@ -2,21 +2,106 @@ use crate::bounding_box::Box;
 use crate::hit::Hit;
 use crate::matrix::Matrix;
 use crate::path::Paths;
+use crate::path::adaptive_arc;
 use crate::ray::Ray;
-use crate::shape::{Shape, TransformedShape};
+use crate::shape::{RenderArgs, Shape, TransformedShape};
 use crate::util::radians;
 use crate::vector::Vector;
+use bon::{Builder, bon, builder};
+use std::f64::consts::PI;
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, Default)]
+pub enum ConeTexture {
+    #[default]
+    Outline,
+    Striped(u64),
+}
+
+#[bon]
+impl ConeTexture {
+    #[builder]
+    pub fn striped(#[builder(default = 8)] num: u64) -> Self {
+        ConeTexture::Striped(num)
+    }
+}
+
+/// A 3D cone shape defined by a circular base and an apex point.
+/// The cone is oriented along the z-axis, with the base centered at
+/// the origin (0,0,0) and the apex at (0,0,height).
+#[derive(Debug, Clone, Builder)]
 pub struct Cone {
+    #[builder(start_fn)]
     pub radius: f64,
+    #[builder(start_fn)]
     pub height: f64,
+    #[builder(default)]
+    pub texture: ConeTexture,
 }
 
 impl Cone {
-    pub fn new(radius: f64, height: f64) -> Self {
-        Cone { radius, height }
+    fn paths_striped(&self, num: u64) -> Paths {
+        let mut result = Vec::new();
+        for a in (0..360).step_by((360 / num) as usize) {
+            let x = self.radius * radians(a as f64).cos();
+            let y = self.radius * radians(a as f64).sin();
+            result.push(vec![
+                Vector::new(x, y, 0.0),
+                Vector::new(0.0, 0.0, self.height),
+            ]);
+        }
+        Paths::from_vec(result)
+    }
+
+    fn paths_outline(&self, args: &RenderArgs) -> Paths {
+        // For a cone with apex at (0,0,h) and base circle radius r at z=0,
+        // the silhouette generators are found by solving:
+        // E.x * cos(θ) + E.y * sin(θ) = r * (1 - E.z / h)
+        // where E is the eye position.
+        //
+        // This is of the form: a*cos(θ) + b*sin(θ) = c
+        // Solution: θ = atan2(b, a) ± acos(c / sqrt(a^2 + b^2))
+        let r = self.radius;
+        let h = self.height;
+
+        let a = args.eye.x;
+        let b = args.eye.y;
+        let c = r * (1.0 - args.eye.z / h);
+
+        let sqrt_ab = (a * a + b * b).sqrt();
+
+        let cuv = (
+            Vector::new(0.0, 0.0, 0.0),
+            Vector::new(1.0, 0.0, 0.0),
+            Vector::new(0.0, 1.0, 0.0),
+        );
+
+        // Compute silhouette generator angles
+        let ratio = c / sqrt_ab;
+        if ratio.abs() > 1.0 {
+            // Eye is inside the extended cone surface - no proper silhouette
+            // Fall back to just the base circle
+            let path = adaptive_arc(0.0, PI * 2.0, r, &cuv, &args.screen_mat, args.step.powi(2));
+            return Paths::from_vec(vec![path]);
+        }
+
+        let eye_azimuth = b.atan2(a);
+        let angular_offset = ratio.acos();
+        let theta1 = eye_azimuth + angular_offset;
+        let theta2 = eye_azimuth - angular_offset;
+
+        // Base circle path
+        let p0 = adaptive_arc(0.0, PI * 2.0, r, &cuv, &args.screen_mat, args.step.powi(2));
+
+        // Silhouette points on the base circle (with slight outward offset for visibility)
+        let a0 = Vector::new(r * theta1.cos(), r * theta1.sin(), 0.0);
+        let b0 = Vector::new(r * theta2.cos(), r * theta2.sin(), 0.0);
+
+        Paths::from_vec(vec![
+            p0,
+            vec![a0, Vector::new(0.0, 0.0, h)],
+            vec![b0, Vector::new(0.0, 0.0, h)],
+        ])
     }
 }
 
@@ -71,138 +156,22 @@ impl Shape for Cone {
         Hit::no_hit()
     }
 
-    fn paths(&self) -> Paths {
-        let mut result = Vec::new();
-        let mut a = 0;
-        while a < 360 {
-            let x = self.radius * radians(a as f64).cos();
-            let y = self.radius * radians(a as f64).sin();
-            result.push(vec![
-                Vector::new(x, y, 0.0),
-                Vector::new(0.0, 0.0, self.height),
-            ]);
-            a += 30;
-        }
-        Paths::from_vec(result)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct OutlineCone {
-    pub cone: Cone,
-    pub eye: Vector,
-    pub up: Vector,
-}
-
-impl OutlineCone {
-    pub fn new(eye: Vector, up: Vector, radius: f64, height: f64) -> Self {
-        OutlineCone {
-            cone: Cone::new(radius, height),
-            eye,
-            up,
+    fn paths(&self, args: &RenderArgs) -> Paths {
+        match self.texture {
+            ConeTexture::Outline => self.paths_outline(args),
+            ConeTexture::Striped(num) => self.paths_striped(num),
         }
     }
 }
 
-impl Shape for OutlineCone {
-    fn bounding_box(&self) -> Box {
-        self.cone.bounding_box()
-    }
-
-    fn contains(&self, v: Vector, f: f64) -> bool {
-        self.cone.contains(v, f)
-    }
-
-    fn intersect(&self, r: Ray) -> Hit {
-        self.cone.intersect(r)
-    }
-
-    fn paths(&self) -> Paths {
-        // For a cone with apex at (0,0,h) and base circle radius r at z=0,
-        // the silhouette generators are found by solving:
-        // E.x * cos(θ) + E.y * sin(θ) = r * (1 - E.z / h)
-        // where E is the eye position.
-        //
-        // This is of the form: a*cos(θ) + b*sin(θ) = c
-        // Solution: θ = atan2(b, a) ± acos(c / sqrt(a^2 + b^2))
-        let r = self.cone.radius;
-        let h = self.cone.height;
-
-        let a = self.eye.x;
-        let b = self.eye.y;
-        let c = r * (1.0 - self.eye.z / h);
-
-        let sqrt_ab = (a * a + b * b).sqrt();
-
-        // For visibility of arcs, scale by 1/cos(π/360)
-        let vscale = 1.0 / (std::f64::consts::PI / 360.0).cos();
-
-        // Compute silhouette generator angles
-        let ratio = c / sqrt_ab;
-        if ratio.abs() > 1.0 {
-            // Eye is inside the extended cone surface - no proper silhouette
-            // Fall back to just the base circle
-            let mut p0 = Vec::new();
-            let vscale = if self.eye.z >= 0.0 && self.eye.z <= h {
-                1.0
-            } else {
-                vscale
-            };
-            for angle in 0..=360 {
-                let x = r * vscale * radians(angle as f64).cos();
-                let y = r * vscale * radians(angle as f64).sin();
-                p0.push(Vector::new(x, y, 0.0));
-            }
-            return Paths::from_vec(vec![p0]);
-        }
-
-        let eye_azimuth = b.atan2(a);
-        let angular_offset = ratio.acos();
-        let theta1 = eye_azimuth + angular_offset;
-        let theta2 = eye_azimuth - angular_offset;
-
-        // Base circle path
-        let mut p0 = Vec::new();
-        for angle in 0..=360 {
-            let angle_r = radians(angle as f64);
-            let x = r * vscale * angle_r.cos();
-            let y = r * vscale * angle_r.sin();
-            p0.push(Vector::new(x, y, 0.0));
-        }
-
-        // Silhouette points on the base circle (with slight outward offset for visibility)
-        let a0 = Vector::new(r * theta1.cos(), r * theta1.sin(), 0.0);
-        let b0 = Vector::new(r * theta2.cos(), r * theta2.sin(), 0.0);
-
-        Paths::from_vec(vec![
-            p0,
-            vec![a0, Vector::new(0.0, 0.0, h)],
-            vec![b0, Vector::new(0.0, 0.0, h)],
-        ])
-    }
-}
-
-pub fn new_transformed_cone(up: Vector, v0: Vector, v1: Vector, radius: f64) -> TransformedShape {
-    let d = v1.sub(v0);
-    let z = d.length();
-    let a = d.normalize().dot(up).acos();
-    let m = if a != 0.0 {
-        let u = d.cross(up).normalize();
-        Matrix::rotate(u, a).translated(v0)
-    } else {
-        Matrix::translate(v0)
-    };
-    let c = Cone::new(radius, z);
-    TransformedShape::new(Arc::new(c), m)
-}
-
-pub fn new_transformed_outline_cone(
-    eye: Vector,
-    up: Vector,
-    v0: Vector,
-    v1: Vector,
-    radius: f64,
+#[builder]
+pub fn new_transformed_cone(
+    #[builder(start_fn)] v0: Vector,
+    #[builder(start_fn)] v1: Vector,
+    #[builder(start_fn)] radius: f64,
+    #[builder(default)] texture: ConeTexture,
 ) -> TransformedShape {
+    let up = Vector::new(0.0, 0.0, 1.0);
     let d = v1.sub(v0);
     let z = d.length();
     let a = d.normalize().dot(up).acos();
@@ -212,6 +181,6 @@ pub fn new_transformed_outline_cone(
     } else {
         Matrix::translate(v0)
     };
-    let c = OutlineCone::new(m.inverse().mul_position(eye), up, radius, z);
+    let c = Cone::builder(radius, z).texture(texture).build();
     TransformedShape::new(Arc::new(c), m)
 }

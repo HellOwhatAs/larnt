@@ -9,10 +9,7 @@
 //! use larnt::{Cube, Scene, Vector};
 //!
 //! // Create a 2x2x2 cube centered at the origin
-//! let cube = Cube::new(
-//!     Vector::new(-1.0, -1.0, -1.0),
-//!     Vector::new(1.0, 1.0, 1.0),
-//! );
+//! let cube = Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build();
 //!
 //! let mut scene = Scene::new();
 //! scene.add(cube);
@@ -22,16 +19,27 @@ use crate::bounding_box::Box;
 use crate::hit::Hit;
 use crate::path::Paths;
 use crate::ray::Ray;
-use crate::shape::Shape;
+use crate::shape::{RenderArgs, Shape};
 use crate::vector::Vector;
+use bon::{Builder, bon};
 
 /// Texture style for the cube.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum CubeTexture {
     /// Plain cube with edges only.
+    #[default]
     Vanilla,
     /// Cube with striped pattern on faces.
     Striped(u64),
+}
+
+#[bon]
+impl CubeTexture {
+    /// Create a striped texture with the specified number of stripes (default is 8).
+    #[builder]
+    pub fn striped(#[builder(default = 8)] stripes: u64) -> Self {
+        CubeTexture::Striped(stripes)
+    }
 }
 
 /// An axis-aligned cube (rectangular cuboid).
@@ -45,39 +53,22 @@ pub enum CubeTexture {
 /// use larnt::{Cube, Vector};
 ///
 /// // Unit cube from (0,0,0) to (1,1,1)
-/// let cube = Cube::new(Vector::new(0.0, 0.0, 0.0), Vector::new(1.0, 1.0, 1.0));
+/// let cube = Cube::builder(Vector::new(0.0, 0.0, 0.0), Vector::new(1.0, 1.0, 1.0)).build();
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Builder)]
 pub struct Cube {
     /// The minimum corner (smallest x, y, z values).
+    #[builder(start_fn)]
     pub min: Vector,
     /// The maximum corner (largest x, y, z values).
+    #[builder(start_fn)]
     pub max: Vector,
     /// Cached bounding box.
+    #[builder(skip = Box::new(min, max))]
     pub bx: Box,
     /// Texture style.
+    #[builder(default)]
     pub texture: CubeTexture,
-}
-
-impl Cube {
-    /// Creates a new cube from two opposite corners.
-    ///
-    /// The corners define the axis-aligned bounding box of the cube.
-    /// The `min` corner should have smaller x, y, z values than `max`.
-    pub fn new(min: Vector, max: Vector) -> Self {
-        Cube {
-            min,
-            max,
-            bx: Box::new(min, max),
-            texture: CubeTexture::Vanilla,
-        }
-    }
-
-    /// Sets the texture style of the cube.
-    pub fn with_texture(mut self, texture: CubeTexture) -> Self {
-        self.texture = texture;
-        self
-    }
 }
 
 impl Shape for Cube {
@@ -114,35 +105,15 @@ impl Shape for Cube {
         Hit::no_hit()
     }
 
-    fn paths(&self) -> Paths {
+    fn paths(&self, _args: &RenderArgs) -> Paths {
         match self.texture {
-            CubeTexture::Vanilla => self.paths_vanilla(),
+            CubeTexture::Vanilla => self.paths_striped(1),
             CubeTexture::Striped(stripes) => self.paths_striped(stripes),
         }
     }
 }
 
 impl Cube {
-    fn paths_vanilla(&self) -> Paths {
-        let (x1, y1, z1) = (self.min.x, self.min.y, self.min.z);
-        let (x2, y2, z2) = (self.max.x, self.max.y, self.max.z);
-
-        Paths::from_vec(vec![
-            vec![Vector::new(x1, y1, z1), Vector::new(x1, y1, z2)],
-            vec![Vector::new(x1, y1, z1), Vector::new(x1, y2, z1)],
-            vec![Vector::new(x1, y1, z1), Vector::new(x2, y1, z1)],
-            vec![Vector::new(x1, y1, z2), Vector::new(x1, y2, z2)],
-            vec![Vector::new(x1, y1, z2), Vector::new(x2, y1, z2)],
-            vec![Vector::new(x1, y2, z1), Vector::new(x1, y2, z2)],
-            vec![Vector::new(x1, y2, z1), Vector::new(x2, y2, z1)],
-            vec![Vector::new(x1, y2, z2), Vector::new(x2, y2, z2)],
-            vec![Vector::new(x2, y1, z1), Vector::new(x2, y1, z2)],
-            vec![Vector::new(x2, y1, z1), Vector::new(x2, y2, z1)],
-            vec![Vector::new(x2, y1, z2), Vector::new(x2, y2, z2)],
-            vec![Vector::new(x2, y2, z1), Vector::new(x2, y2, z2)],
-        ])
-    }
-
     fn paths_striped(&self, stripes: u64) -> Paths {
         let (x1, y1, z1) = (self.min.x, self.min.y, self.min.z);
         let (x2, y2, z2) = (self.max.x, self.max.y, self.max.z);

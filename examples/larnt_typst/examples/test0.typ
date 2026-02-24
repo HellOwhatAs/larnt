@@ -1,5 +1,5 @@
 #set page(margin: 0pt, height: auto)
-#import "@preview/larnt:0.1.0": *
+#import "../lib.typ": *
 
 #{
   let n = 8
@@ -7,10 +7,11 @@
   for x in range(-n, n + 1) {
     for y in range(-n, n + 2) {
       shapes.push(
-        outline(sphere(
+        sphere(
           (float(x), float(y), 0.),
           0.45,
-        )),
+          texture: texture.outline(),
+        ),
       )
     }
   }
