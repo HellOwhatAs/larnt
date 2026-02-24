@@ -76,8 +76,8 @@ _The output of an OpenGL pipeline is a rastered image. The output of `larnt` is 
             </a>
         </td>
         <td>
-            <a href="examples/klein.rs">
-                <img alt="klein" src="https://github.com/user-attachments/assets/68214ff1-b2de-4532-ab05-62a04c355a93" />
+            <a href="examples/klein_bottle.rs">
+                <img alt="klein_bottle" src="https://github.com/user-attachments/assets/68214ff1-b2de-4532-ab05-62a04c355a93" />
             </a>
         </td>
     </tr>
