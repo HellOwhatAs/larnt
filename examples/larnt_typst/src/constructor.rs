@@ -207,6 +207,11 @@ pub enum LnShape {
         v3: [f64; 3],
     },
     Mesh(Vec<LnShape>),
+    ParametricSurface {
+        samples: Vec<(f64, f64, f64)>,
+        u_steps: usize,
+        v_steps: usize,
+    },
 
     Difference(Vec<LnShape>),
     Intersection(Vec<LnShape>),
@@ -318,6 +323,18 @@ impl LnShape {
                 }
                 Arc::new(larnt::Mesh::new(triangles))
             }
+            LnShape::ParametricSurface {
+                samples,
+                u_steps,
+                v_steps,
+            } => Arc::new(larnt::ParametricSurface::from_grid(
+                |i: usize, j: usize| {
+                    let (x, y, z) = samples[i * (v_steps + 1) + j];
+                    larnt::Vector::new(x, y, z)
+                },
+                u_steps,
+                v_steps,
+            )),
             LnShape::Difference(ln_shapes) => {
                 let shapes = ln_shapes
                     .into_iter()

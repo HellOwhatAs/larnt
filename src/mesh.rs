@@ -81,6 +81,34 @@ impl Mesh {
         self
     }
 
+    pub fn parametric_surface<F>(
+        get_point: F,
+        u_range: std::ops::Range<usize>,
+        v_range: std::ops::Range<usize>,
+    ) -> Mesh
+    where
+        F: Fn(usize, usize) -> Vector,
+    {
+        let mut triangles = Vec::with_capacity(u_range.len() * v_range.len() * 2);
+        for u in u_range {
+            for v in v_range.clone() {
+                let p00 = get_point(u, v);
+                let p10 = get_point(u + 1, v);
+                let p01 = get_point(u, v + 1);
+                let p11 = get_point(u + 1, v + 1);
+
+                for [p1, p2, p3] in [[p00, p10, p01], [p10, p11, p01]] {
+                    let cross = (p2.sub(p1)).cross(p3.sub(p1));
+                    let area_squared = cross.x * cross.x + cross.y * cross.y + cross.z * cross.z;
+                    if area_squared > crate::common::EPS {
+                        triangles.push(Triangle::new(p1, p2, p3));
+                    }
+                }
+            }
+        }
+        Mesh::new(triangles)
+    }
+
     pub fn voxelize(&self, size: f64) -> Vec<Cube> {
         let z1 = self.bx.min.z;
         let z2 = self.bx.max.z;

@@ -366,6 +366,46 @@
   )
 }
 
+/// The parametric surface defined by a function of (u, v) => (x, y, z).
+/// It generates a sampled mesh across the parameter grid, applying a custom grid texture for rendering.
+///
+/// ```example
+/// #import "@preview/lilaq:0.5.0": linspace
+/// #image(render(
+///   eye: (3., 3., 3.),
+///   surface(
+///     linspace(0, calc.pi * 2, num: 64),
+///     linspace(0.0, calc.pi * 2, num: 32),
+///     (u, v) => {
+///       let x = (1.5 + 0.5 * calc.cos(v)) * calc.cos(u);
+///       let y = (1.5 + 0.5 * calc.cos(v)) * calc.sin(u);
+///       let z = 0.5 * calc.sin(v);
+///       (x, y, z)
+///     }
+///   ),
+/// ))
+/// ```
+///
+/// -> shape
+#let surface(
+  /// The u parameter samples. Given as an array of floats.
+  /// -> array
+  u,
+  /// The v parameter samples. Given as an array of floats.
+  /// -> array
+  v,
+  /// The function that defines the surface, given as a function that takes two floats (u and v) and returns an array of three floats representing the x, y, and z coordinates of the surface point corresponding to those parameters.
+  func,
+) = {
+  (
+    ParametricSurface: (
+      samples: u.map(u => v.map(v => func(u, v))).join(),
+      u_steps: u.len() - 1,
+      v_steps: v.len() - 1,
+    ),
+  )
+}
+
 /// The difference operation for shapes.
 /// Can be used to create complex shapes by subtracting multiple shapes from a base shape.
 ///
