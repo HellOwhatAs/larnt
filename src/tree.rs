@@ -3,237 +3,268 @@ use crate::bounding_box::Box;
 use crate::hit::Hit;
 use crate::ray::Ray;
 use crate::shape::Shape;
-use crate::util::median;
+use crate::vector::Vector;
 use std::sync::Arc;
 
-pub struct Tree {
+#[derive(Clone)]
+struct BvhNode {
     pub bx: Box,
-    pub root: Node,
+    pub left_first: usize,
+    pub count: usize,
+    pub axis: Axis,
+}
+
+impl BvhNode {
+    fn empty() -> Self {
+        Self {
+            bx: Box::default(),
+            left_first: 0,
+            count: 0,
+            axis: Axis::None,
+        }
+    }
+}
+
+struct PrimInfo {
+    shape: Arc<dyn Shape + Send + Sync>,
+    bx: Box,
+    centroid: (f64, f64, f64),
+}
+
+pub struct Tree {
+    nodes: Vec<BvhNode>,
+    shapes: Vec<Arc<dyn Shape + Send + Sync>>,
 }
 
 impl Tree {
     pub fn new(shapes: Vec<Arc<dyn Shape + Send + Sync>>) -> Self {
-        let bx = box_for_arc_shapes(&shapes);
-        let mut root = Node::new(shapes);
-        root.split(0);
-        Tree { bx, root }
+        if shapes.is_empty() {
+            return Tree {
+                nodes: Vec::new(),
+                shapes,
+            };
+        }
+
+        let len = shapes.len();
+        let mut nodes = Vec::with_capacity(len * 2);
+        nodes.push(BvhNode::empty());
+
+        let mut prims: Vec<PrimInfo> = shapes
+            .into_iter()
+            .map(|shape| {
+                let bx = shape.bounding_box();
+                let centroid = Self::centroid(&bx);
+                PrimInfo {
+                    shape,
+                    bx,
+                    centroid,
+                }
+            })
+            .collect();
+
+        let mut sah_right_boxes = vec![Box::default(); len];
+
+        Self::build(&mut nodes, &mut prims, &mut sah_right_boxes, 0, 0, len);
+
+        let sorted_shapes = prims.into_iter().map(|p| p.shape).collect();
+
+        Tree {
+            nodes,
+            shapes: sorted_shapes,
+        }
     }
 
     pub fn intersect(&self, r: Ray) -> Hit {
-        let (tmin, tmax) = self.bx.intersect(r);
-        if tmax < tmin || tmax <= 0.0 {
+        if self.nodes.is_empty() {
             return Hit::no_hit();
         }
-        self.root.intersect(r, tmin, tmax)
-    }
-}
 
-fn box_for_arc_shapes(shapes: &[Arc<dyn Shape + Send + Sync>]) -> Box {
-    if shapes.is_empty() {
-        return Box::default();
-    }
-    let mut bx = shapes[0].bounding_box();
-    for shape in shapes.iter().skip(1) {
-        bx = bx.extend(shape.bounding_box());
-    }
-    bx
-}
+        let mut closest_hit = Hit::no_hit();
+        let mut stack = [0usize; 64];
+        let mut stack_ptr = 1;
+        stack[0] = 0;
 
-pub struct Node {
-    pub axis: Axis,
-    pub point: f64,
-    pub shapes: Vec<Arc<dyn Shape + Send + Sync>>,
-    pub left: Option<std::boxed::Box<Node>>,
-    pub right: Option<std::boxed::Box<Node>>,
-}
+        let Vector {
+            x: dir_x,
+            y: dir_y,
+            z: dir_z,
+        } = r.direction;
 
-impl Node {
-    pub fn new(shapes: Vec<Arc<dyn Shape + Send + Sync>>) -> Self {
-        Node {
-            axis: Axis::None,
-            point: 0.0,
-            shapes,
-            left: None,
-            right: None,
-        }
-    }
+        while stack_ptr > 0 {
+            stack_ptr -= 1;
+            let node_idx = stack[stack_ptr];
+            let node = &self.nodes[node_idx];
 
-    pub fn intersect(&self, r: Ray, tmin: f64, tmax: f64) -> Hit {
-        let (tsplit, left_first) = match self.axis {
-            Axis::None => return self.intersect_shapes(r),
-            Axis::X => {
-                let tsplit = (self.point - r.origin.x) / r.direction.x;
-                let left_first =
-                    r.origin.x < self.point || (r.origin.x == self.point && r.direction.x <= 0.0);
-                (tsplit, left_first)
+            let (tmin, tmax) = node.bx.intersect(r);
+
+            if tmax < tmin || tmax <= 0.0 || tmin >= closest_hit.t {
+                continue;
             }
-            Axis::Y => {
-                let tsplit = (self.point - r.origin.y) / r.direction.y;
-                let left_first =
-                    r.origin.y < self.point || (r.origin.y == self.point && r.direction.y <= 0.0);
-                (tsplit, left_first)
-            }
-            Axis::Z => {
-                let tsplit = (self.point - r.origin.z) / r.direction.z;
-                let left_first =
-                    r.origin.z < self.point || (r.origin.z == self.point && r.direction.z <= 0.0);
-                (tsplit, left_first)
-            }
-        };
 
-        // SAFETY: left and right children always exist when axis != Axis::None
-        // This invariant is maintained by the split() method
-        let (first, second) = if left_first {
-            (
-                self.left
-                    .as_ref()
-                    .expect("left child must exist when axis is set"),
-                self.right
-                    .as_ref()
-                    .expect("right child must exist when axis is set"),
-            )
-        } else {
-            (
-                self.right
-                    .as_ref()
-                    .expect("right child must exist when axis is set"),
-                self.left
-                    .as_ref()
-                    .expect("left child must exist when axis is set"),
-            )
-        };
+            let is_dir_negative = match node.axis {
+                Axis::X => dir_x < 0.0,
+                Axis::Y => dir_y < 0.0,
+                Axis::Z => dir_z < 0.0,
+                Axis::None => {
+                    for i in 0..node.count {
+                        let shape = &self.shapes[node.left_first + i];
+                        let hit = shape.intersect(r);
+                        if hit.t < closest_hit.t {
+                            closest_hit = hit;
+                        }
+                    }
+                    continue;
+                }
+            };
 
-        if tsplit > tmax || tsplit <= 0.0 {
-            first.intersect(r, tmin, tmax)
-        } else if tsplit < tmin {
-            second.intersect(r, tmin, tmax)
-        } else {
-            let h1 = first.intersect(r, tmin, tsplit);
-            if h1.t <= tsplit {
-                h1
+            let (near, far) = if is_dir_negative {
+                (node.left_first + 1, node.left_first)
             } else {
-                let h2 = second.intersect(r, tsplit, tmax.min(h1.t));
-                if h1.t <= h2.t { h1 } else { h2 }
-            }
+                (node.left_first, node.left_first + 1)
+            };
+
+            stack[stack_ptr] = far;
+            stack_ptr += 1;
+            stack[stack_ptr] = near;
+            stack_ptr += 1;
         }
+
+        closest_hit
     }
 
-    fn intersect_shapes(&self, r: Ray) -> Hit {
-        let mut hit = Hit::no_hit();
-        for shape in &self.shapes {
-            let h = shape.intersect(r);
-            if h.t < hit.t {
-                hit = h;
-            }
-        }
-        hit
-    }
-
-    fn partition_score(&self, axis: Axis, point: f64) -> usize {
-        let mut left = 0;
-        let mut right = 0;
-        for shape in &self.shapes {
-            let bx = shape.bounding_box();
-            let (l, r) = bx.partition(axis, point);
-            if l {
-                left += 1;
-            }
-            if r {
-                right += 1;
-            }
-        }
-        left.max(right)
-    }
-
-    fn partition(
-        &self,
-        axis: Axis,
-        point: f64,
-    ) -> (
-        Vec<Arc<dyn Shape + Send + Sync>>,
-        Vec<Arc<dyn Shape + Send + Sync>>,
+    fn build(
+        nodes: &mut Vec<BvhNode>,
+        prims: &mut [PrimInfo],
+        sah_right_boxes: &mut [Box],
+        node_idx: usize,
+        start: usize,
+        end: usize,
     ) {
-        let mut left = Vec::new();
-        let mut right = Vec::new();
-        for shape in &self.shapes {
-            let bx = shape.bounding_box();
-            let (l, r) = bx.partition(axis, point);
-            if l {
-                left.push(Arc::clone(shape));
-            }
-            if r {
-                right.push(Arc::clone(shape));
-            }
+        let count = end - start;
+
+        let mut parent_bx = prims[start].bx;
+        for i in start + 1..end {
+            parent_bx = parent_bx.extend(prims[i].bx);
         }
-        (left, right)
+        nodes[node_idx].bx = parent_bx;
+
+        if count <= 2 {
+            nodes[node_idx].left_first = start;
+            nodes[node_idx].count = count;
+            return;
+        }
+
+        let mut min_c = prims[start].centroid;
+        let mut max_c = min_c;
+        for i in start + 1..end {
+            let c = prims[i].centroid;
+            min_c.0 = min_c.0.min(c.0);
+            min_c.1 = min_c.1.min(c.1);
+            min_c.2 = min_c.2.min(c.2);
+            max_c.0 = max_c.0.max(c.0);
+            max_c.1 = max_c.1.max(c.1);
+            max_c.2 = max_c.2.max(c.2);
+        }
+
+        let extent_x = max_c.0 - min_c.0;
+        let extent_y = max_c.1 - min_c.1;
+        let extent_z = max_c.2 - min_c.2;
+
+        let axis = if extent_x > extent_y && extent_x > extent_z {
+            Axis::X
+        } else if extent_y > extent_z {
+            Axis::Y
+        } else {
+            Axis::Z
+        };
+        nodes[node_idx].axis = axis;
+
+        prims[start..end].sort_unstable_by(|a, b| {
+            let [va, vb] = match axis {
+                Axis::X => [a, b].map(|x| x.centroid.0),
+                Axis::Y => [a, b].map(|x| x.centroid.1),
+                Axis::Z => [a, b].map(|x| x.centroid.2),
+                _ => unreachable!("The axis should never be None here"),
+            };
+            va.partial_cmp(&vb).unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        let mut current_right_bx = prims[end - 1].bx;
+        sah_right_boxes[count - 1] = current_right_bx;
+        for i in (1..count - 1).rev() {
+            current_right_bx = current_right_bx.extend(prims[start + i].bx);
+            sah_right_boxes[i] = current_right_bx;
+        }
+
+        let parent_area = Self::surface_area(&parent_bx);
+        let mut current_left_bx = prims[start].bx;
+
+        let mut best_cost = f64::MAX;
+        let mut best_split_idx = start + count / 2;
+
+        for i in 1..count {
+            let left_count = i;
+            let right_count = count - i;
+
+            let left_area = Self::surface_area(&current_left_bx);
+            let right_area = Self::surface_area(&sah_right_boxes[i]);
+
+            let cost = left_area * (left_count as f64) + right_area * (right_count as f64);
+
+            if cost < best_cost {
+                best_cost = cost;
+                best_split_idx = start + i;
+            }
+
+            current_left_bx = current_left_bx.extend(prims[start + i].bx);
+        }
+
+        let traversal_cost = parent_area * 0.125;
+        let leaf_cost = (count as f64) * parent_area;
+
+        if best_cost + traversal_cost >= leaf_cost && count <= 8 {
+            nodes[node_idx].left_first = start;
+            nodes[node_idx].count = count;
+            return;
+        }
+
+        let left_child_idx = nodes.len();
+        nodes.push(BvhNode::empty());
+        nodes.push(BvhNode::empty());
+
+        nodes[node_idx].left_first = left_child_idx;
+        nodes[node_idx].count = 0;
+
+        Self::build(
+            nodes,
+            prims,
+            sah_right_boxes,
+            left_child_idx,
+            start,
+            best_split_idx,
+        );
+        Self::build(
+            nodes,
+            prims,
+            sah_right_boxes,
+            left_child_idx + 1,
+            best_split_idx,
+            end,
+        );
     }
 
-    pub fn split(&mut self, depth: usize) {
-        if self.shapes.len() < 8 {
-            return;
-        }
+    fn centroid(bx: &Box) -> (f64, f64, f64) {
+        (
+            (bx.min.x + bx.max.x) * 0.5,
+            (bx.min.y + bx.max.y) * 0.5,
+            (bx.min.z + bx.max.z) * 0.5,
+        )
+    }
 
-        let mut xs = Vec::with_capacity(self.shapes.len() * 2);
-        let mut ys = Vec::with_capacity(self.shapes.len() * 2);
-        let mut zs = Vec::with_capacity(self.shapes.len() * 2);
-
-        for shape in &self.shapes {
-            let bx = shape.bounding_box();
-            xs.push(bx.min.x);
-            xs.push(bx.max.x);
-            ys.push(bx.min.y);
-            ys.push(bx.max.y);
-            zs.push(bx.min.z);
-            zs.push(bx.max.z);
-        }
-
-        xs.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        ys.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        zs.sort_by(|a, b| a.partial_cmp(b).unwrap());
-
-        let mx = median(&xs);
-        let my = median(&ys);
-        let mz = median(&zs);
-
-        let mut best = (self.shapes.len() as f64 * 0.85) as usize;
-        let mut best_axis = Axis::None;
-        let mut best_point = 0.0;
-
-        let sx = self.partition_score(Axis::X, mx);
-        if sx < best {
-            best = sx;
-            best_axis = Axis::X;
-            best_point = mx;
-        }
-
-        let sy = self.partition_score(Axis::Y, my);
-        if sy < best {
-            best = sy;
-            best_axis = Axis::Y;
-            best_point = my;
-        }
-
-        let sz = self.partition_score(Axis::Z, mz);
-        if sz < best {
-            best_axis = Axis::Z;
-            best_point = mz;
-        }
-
-        if best_axis == Axis::None {
-            return;
-        }
-
-        let (l, r) = self.partition(best_axis, best_point);
-        self.axis = best_axis;
-        self.point = best_point;
-
-        let mut left = Node::new(l);
-        let mut right = Node::new(r);
-        left.split(depth + 1);
-        right.split(depth + 1);
-
-        self.left = Some(std::boxed::Box::new(left));
-        self.right = Some(std::boxed::Box::new(right));
-        self.shapes.clear();
+    fn surface_area(bx: &Box) -> f64 {
+        let dx = (bx.max.x - bx.min.x).max(0.0);
+        let dy = (bx.max.y - bx.min.y).max(0.0);
+        let dz = (bx.max.z - bx.min.z).max(0.0);
+        2.0 * (dx * dy + dy * dz + dz * dx)
     }
 }
