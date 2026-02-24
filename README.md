@@ -8,7 +8,7 @@
 
 _The output of an OpenGL pipeline is a rastered image. The output of `larnt` is a set of 2D vector paths._
 
-> This project is a Rust rewrite of the original [Go implementation](https://github.com/fogleman/ln) by [Michael Fogleman](https://github.com/fogleman).
+> This project is a Rust rewrite of the original [ln](https://github.com/fogleman/ln) by [Michael Fogleman](https://github.com/fogleman).
 
 ## Examples
 
@@ -16,12 +16,12 @@ _The output of an OpenGL pipeline is a rastered image. The output of `larnt` is 
     <tr>
         <td>
             <a href="examples/basics.rs">
-                <img alt="basics" src="https://github.com/user-attachments/assets/4857bf81-1cae-4b21-960e-7cbcc805a9a5" />
+                <img alt="basics" src="https://github.com/user-attachments/assets/eba5a931-1465-4c65-add2-31a17db63b18" />
             </a>
         </td>
         <td>
             <a href="examples/beads.rs">
-                <img alt="beads" src="https://github.com/user-attachments/assets/2015e98f-54f2-48f4-b88a-0cbae66f5ac1" />
+                <img alt="beads" src="https://github.com/user-attachments/assets/bd96fa4c-4ef3-49e6-a572-2680e417fa05" />
             </a>
         </td>
         <td>
@@ -50,7 +50,7 @@ _The output of an OpenGL pipeline is a rastered image. The output of `larnt` is 
     <tr>
         <td>
             <a href="examples/skyscrapers.rs">
-                <img alt="skyscrapers" src="https://github.com/user-attachments/assets/3b0509fb-0aa2-4237-8c51-aa957f35be06" />
+                <img alt="skyscrapers" src="https://github.com/user-attachments/assets/e1d8e39d-b670-4350-9d57-bcfafa73ed92" />
             </a>
         </td>
         <td>
@@ -64,6 +64,23 @@ _The output of an OpenGL pipeline is a rastered image. The output of `larnt` is 
             </a>
         </td>
     </tr>
+    <tr>
+        <td>
+            <a href="examples/torus.rs">
+                <img alt="torus" src="https://github.com/user-attachments/assets/fb63c340-8288-4962-ad20-def83f4a9311" />
+            </a>
+        </td>
+        <td>
+            <a href="examples/mobius.rs">
+                <img alt="mobius" src="https://github.com/user-attachments/assets/99ccff8f-6d5f-4178-ac2b-2201fee329f7" />
+            </a>
+        </td>
+        <td>
+            <a href="examples/klein.rs">
+                <img alt="klein" src="https://github.com/user-attachments/assets/68214ff1-b2de-4532-ab05-62a04c355a93" />
+            </a>
+        </td>
+    </tr>
 </table>
 
 _Click on the example image to jump to the code._
@@ -71,10 +88,15 @@ _Click on the example image to jump to the code._
 ## Installation
 
 Add to your `Cargo.toml`:
-
 ```toml
 [dependencies]
 larnt = "0.1.0"
+```
+
+Or for the latest development version
+```toml
+[dependencies]
+larnt = { git = "https://github.com/HellOwhatAs/larnt.git" }
 ```
 
 ## Features
