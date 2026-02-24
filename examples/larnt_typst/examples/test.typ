@@ -1,4 +1,4 @@
-// Takes about 20s to render.
+// Takes about 12s to render.
 #set page(margin: 0pt, height: auto)
 #import "@preview/suiji:0.5.1"
 #import "../lib.typ": *

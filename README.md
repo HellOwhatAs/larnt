@@ -88,12 +88,14 @@ _Click on the example image to jump to the code._
 ## Installation
 
 Add to your `Cargo.toml`:
+
 ```toml
 [dependencies]
 larnt = "0.1.0"
 ```
 
 Or for the latest development version
+
 ```toml
 [dependencies]
 larnt = { git = "https://github.com/HellOwhatAs/larnt.git" }
@@ -107,7 +109,7 @@ larnt = { git = "https://github.com/HellOwhatAs/larnt.git" }
   - Triangle
   - Cylinder
   - Cone
-  - 3D Functions
+  - 3D Surface
 - Triangle Meshes
   - OBJ & STL
 - Vector-based "Texturing"
