@@ -1,6 +1,6 @@
 // Takes about 1s to render.
 #set page(height: auto, margin: 0pt)
-#import "@preview/larnt:0.1.0": *
+#import "../lib.typ": *
 
 #{
   let f(x, y) = 0.7 * calc.sin(calc.sqrt(20 * (x * x + y * y)))

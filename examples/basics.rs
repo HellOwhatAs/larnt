@@ -41,6 +41,11 @@ fn main() {
             .texture(SphereTexture::random_equators(42).call())
             .build(),
     );
+    scene.add(
+        Sphere::builder(Vector::new(3.5, 3.5, 0.5), 0.5)
+            .texture(SphereTexture::random_fuzz(42).call())
+            .build(),
+    );
     scene.add(Sphere::builder(Vector::new(2.0, 3.5, 0.5), 0.5).build());
     scene.add(
         new_transformed_cone(

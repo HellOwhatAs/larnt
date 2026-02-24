@@ -23,9 +23,9 @@ fn main() {
     }
 
     let eye = Vector::new(13.75, 6.25, 18.0);
-    let center = Vector::new(-8.0, -10.0, 0.0);
-    let width = 2560.0;
-    let height = 2560.0;
+    let center = Vector::new(-8.0, -10.0, 4.0);
+    let width = 1024.0;
+    let height = 1024.0;
 
     let paths = scene
         .render(eye)
@@ -37,7 +37,7 @@ fn main() {
         .call();
     paths
         .to_image(width, height)
-        .linewidth(1.5)
+        .linewidth(1.0)
         .call()
         .save("out.png")
         .expect("Failed to save PNG");

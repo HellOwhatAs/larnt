@@ -4,7 +4,7 @@
 
 #image(render(
   eye: (3., 3., 3.),
-  step: 10.0,
+  step: 5.0,
   surface(
     linspace(0, calc.pi * 2, num: 64),
     linspace(0.0, calc.pi * 2, num: 32),

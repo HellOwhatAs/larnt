@@ -1,6 +1,6 @@
 // Takes about 1s to render.
 #set page(height: auto, margin: 0pt)
-#import "@preview/larnt:0.1.0": *
+#import "../lib.typ": *
 
 #{
   let (min, max) = ((-1., -1., -1.), (1., 1., 1.))

@@ -1,7 +1,7 @@
 // Takes about 15s to render.
 #set page(margin: 0pt, height: auto)
 #import "@preview/suiji:0.5.1"
-#import "@preview/larnt:0.1.0": *
+#import "../lib.typ": *
 
 #{
   let normalize(values, a, b) = {
