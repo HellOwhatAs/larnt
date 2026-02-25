@@ -16,7 +16,7 @@
 //! scene.add(cylinder);
 //! ```
 
-use crate::bounding_box::Box;
+use crate::bounding_box::BBox;
 use crate::hit::Hit;
 use crate::matrix::Matrix;
 use crate::path::{Paths, adaptive_arc, adaptive_arc_inner};
@@ -26,7 +26,6 @@ use crate::util::radians;
 use crate::vector::Vector;
 use bon::{Builder, bon, builder};
 use std::f64::consts::PI;
-use std::sync::Arc;
 
 /// Texture options for cylinders.
 #[derive(Debug, Clone, Copy, Default)]
@@ -162,9 +161,9 @@ impl Cylinder {
 }
 
 impl Shape for Cylinder {
-    fn bounding_box(&self) -> Box {
+    fn bounding_box(&self) -> BBox {
         let r = self.radius;
-        Box::new(Vector::new(-r, -r, self.z0), Vector::new(r, r, self.z1))
+        BBox::new(Vector::new(-r, -r, self.z0), Vector::new(r, r, self.z1))
     }
 
     fn contains(&self, v: Vector, f: f64) -> bool {
@@ -228,12 +227,12 @@ impl Shape for Cylinder {
 /// * `radius` - Radius of the cylinder
 /// * `texture` - Texture style for the cylinder
 #[builder]
-pub fn new_transformed_cylinder(
+pub fn new_transformed_cylinder<T: From<Cylinder>>(
     #[builder(start_fn)] v0: Vector,
     #[builder(start_fn)] v1: Vector,
     #[builder(start_fn)] radius: f64,
     #[builder(default)] texture: CylinderTexture,
-) -> TransformedShape {
+) -> TransformedShape<T> {
     let up = Vector::new(0.0, 0.0, 1.0);
     let d = v1.sub(v0);
     let z = d.length();
@@ -245,5 +244,5 @@ pub fn new_transformed_cylinder(
         Matrix::translate(v0)
     };
     let c = Cylinder::builder(radius, 0.0, z).texture(texture).build();
-    TransformedShape::new(Arc::new(c), m)
+    TransformedShape::new(c.into(), m)
 }

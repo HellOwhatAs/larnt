@@ -1,4 +1,4 @@
-use larnt::{Cube, Scene, Vector};
+use larnt::{Cube, Vector, render};
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 fn make_cube(x: f64, y: f64, z: f64) -> Cube {
@@ -9,20 +9,20 @@ fn make_cube(x: f64, y: f64, z: f64) -> Cube {
 
 fn main() {
     let mut rng = SmallRng::seed_from_u64(42);
-    let mut scene = Scene::new();
+    let mut shapes = Vec::new();
 
     for x in -2..=2 {
         for y in -2..=2 {
             let z = rng.random::<f64>();
-            scene.add(make_cube(x as f64, y as f64, z));
+            shapes.push(make_cube(x as f64, y as f64, z));
         }
     }
 
     let width = 1024.0;
     let height = 1024.0;
 
-    let paths = scene
-        .render(Vector::new(6.0, 5.0, 3.0))
+    let paths = render(shapes)
+        .eye(Vector::new(6.0, 5.0, 3.0))
         .width(width)
         .height(height)
         .call();

@@ -25,14 +25,13 @@
 //! scene.add_arc(shape);
 //! ```
 
-use crate::bounding_box::Box;
+use crate::bounding_box::BBox;
 use crate::filter::Filter;
 use crate::hit::Hit;
 use crate::path::Paths;
 use crate::ray::Ray;
 use crate::shape::{EmptyShape, RenderArgs, Shape};
 use crate::vector::Vector;
-use std::sync::Arc;
 
 /// Boolean operation type for CSG.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,18 +43,18 @@ pub enum Op {
 }
 
 /// A shape created by combining two shapes with a boolean operation.
-pub struct BooleanShape {
+pub struct BooleanShape<T> {
     /// The operation to perform.
     pub op: Op,
     /// The first operand shape.
-    pub a: Arc<dyn Shape + Send + Sync>,
+    pub a: Box<T>,
     /// The second operand shape.
-    pub b: Arc<dyn Shape + Send + Sync>,
+    pub b: Box<T>,
 }
 
-impl BooleanShape {
+impl<T: Shape> BooleanShape<T> {
     /// Creates a new boolean shape.
-    pub fn new(op: Op, a: Arc<dyn Shape + Send + Sync>, b: Arc<dyn Shape + Send + Sync>) -> Self {
+    pub fn new(op: Op, a: Box<T>, b: Box<T>) -> Self {
         BooleanShape { op, a, b }
     }
 }
@@ -63,18 +62,14 @@ impl BooleanShape {
 /// Creates a boolean shape from multiple shapes.
 ///
 /// The shapes are combined pairwise using the given operation.
-pub fn new_boolean_shape(
-    op: Op,
-    shapes: Vec<Arc<dyn Shape + Send + Sync>>,
-) -> Arc<dyn Shape + Send + Sync> {
-    if shapes.is_empty() {
-        return Arc::new(EmptyShape);
-    }
-    let mut shape: Arc<dyn Shape + Send + Sync> = shapes[0].clone();
-    for s in shapes.into_iter().skip(1) {
-        shape = Arc::new(BooleanShape::new(op, shape, s));
-    }
-    shape
+pub fn new_boolean_shape<T>(op: Op, shapes: Vec<T>) -> T
+where
+    T: Shape + From<BooleanShape<T>> + From<EmptyShape>,
+{
+    shapes
+        .into_iter()
+        .reduce(|acc, s| BooleanShape::new(op, Box::new(acc), Box::new(s)).into())
+        .unwrap_or_else(|| EmptyShape.into())
 }
 
 /// Creates an intersection of multiple shapes.
@@ -94,7 +89,10 @@ pub fn new_boolean_shape(
 ///
 /// let intersection = new_intersection(vec![sphere, cube]);
 /// ```
-pub fn new_intersection(shapes: Vec<Arc<dyn Shape + Send + Sync>>) -> Arc<dyn Shape + Send + Sync> {
+pub fn new_intersection<T>(shapes: Vec<T>) -> T
+where
+    T: Shape + From<BooleanShape<T>> + From<EmptyShape>,
+{
     new_boolean_shape(Op::Intersection, shapes)
 }
 
@@ -116,21 +114,15 @@ pub fn new_intersection(shapes: Vec<Arc<dyn Shape + Send + Sync>>) -> Arc<dyn Sh
 ///  // Cube with a spherical hole
 ///  let difference = new_difference(vec![cube, sphere]);
 /// ```
-pub fn new_difference(shapes: Vec<Arc<dyn Shape + Send + Sync>>) -> Arc<dyn Shape + Send + Sync> {
+pub fn new_difference<T>(shapes: Vec<T>) -> T
+where
+    T: Shape + From<BooleanShape<T>> + From<EmptyShape>,
+{
     new_boolean_shape(Op::Difference, shapes)
 }
 
-impl Shape for BooleanShape {
-    fn compile(&mut self) {
-        if let Some(s) = Arc::get_mut(&mut self.a) {
-            s.compile();
-        }
-        if let Some(s) = Arc::get_mut(&mut self.b) {
-            s.compile();
-        }
-    }
-
-    fn bounding_box(&self) -> Box {
+impl<T: Shape> Shape for BooleanShape<T> {
+    fn bounding_box(&self) -> BBox {
         let a = self.a.bounding_box();
         let b = self.b.bounding_box();
         a.extend(b)
@@ -166,7 +158,7 @@ impl Shape for BooleanShape {
     }
 }
 
-impl Filter for BooleanShape {
+impl<T: Shape> Filter for BooleanShape<T> {
     fn filter(&self, v: Vector) -> Option<Vector> {
         if self.contains(v, 0.0) { Some(v) } else { None }
     }

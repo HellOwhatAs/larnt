@@ -370,7 +370,7 @@ impl Matrix {
     }
 
     /// Transforms a bounding box by this matrix.
-    pub fn mul_box(&self, bx: crate::bounding_box::Box) -> crate::bounding_box::Box {
+    pub fn mul_box(&self, bx: crate::bounding_box::BBox) -> crate::bounding_box::BBox {
         let r = Vector::new(self.x00, self.x10, self.x20);
         let u = Vector::new(self.x01, self.x11, self.x21);
         let b = Vector::new(self.x02, self.x12, self.x22);
@@ -386,7 +386,7 @@ impl Matrix {
         let (za, zb) = (za.min(zb), za.max(zb));
         let min = xa.add(ya).add(za).add(t);
         let max = xb.add(yb).add(zb).add(t);
-        crate::bounding_box::Box { min, max }
+        crate::bounding_box::BBox { min, max }
     }
 
     /// Returns the transpose of this matrix.

@@ -1,7 +1,7 @@
 use std::{fs::File, time::Duration};
 
 use image::{Delay, Frame, ImageBuffer, Rgba, codecs::gif::GifEncoder};
-use larnt::{Box as BBox, Matrix, Plane, Vector, load_obj};
+use larnt::{BBox, Matrix, Plane, Vector, load_obj};
 
 fn save_gif_from_iter(
     frames_iter: impl Iterator<Item = ImageBuffer<Rgba<u8>, Vec<u8>>>,

@@ -1,28 +1,31 @@
-use larnt::{Box as BBox, Function, FunctionTexture, Scene, Sphere, SphereTexture, Vector};
+use larnt::{BBox, Function, FunctionTexture, Primitive, Sphere, SphereTexture, Vector, render};
 
 fn main() {
-    let mut scene = Scene::new();
+    let mut shapes: Vec<Primitive> = Vec::new();
     let bbox = BBox::new(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0));
 
-    scene.add(
+    shapes.push(Primitive::Dynamic(Box::new(
         Function::builder(|x, y| x * y, bbox)
             .step(0.01)
             .texture(FunctionTexture::Spiral)
             .build(),
-    );
-    scene.add(Function::builder(|_, _| 0.0, bbox).step(0.01).build());
-    scene.add(
+    )));
+    shapes.push(Primitive::Dynamic(Box::new(
+        Function::builder(|_, _| 0.0, bbox).step(0.01).build(),
+    )));
+    shapes.push(
         Sphere::builder(Vector::new(0.0, -0.6, 0.0), 0.25)
             .texture(SphereTexture::random_circles(42).call())
-            .build(),
+            .build()
+            .into(),
     );
 
     let eye = Vector::new(3.0, 0.5, 3.0);
     let width = 1024.0;
     let height = 1024.0;
 
-    let paths = scene
-        .render(eye)
+    let paths = render(shapes)
+        .eye(eye)
         .width(width)
         .height(height)
         .fovy(40.0)

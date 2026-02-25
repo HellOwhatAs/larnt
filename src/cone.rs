@@ -1,4 +1,4 @@
-use crate::bounding_box::Box;
+use crate::bounding_box::BBox;
 use crate::hit::Hit;
 use crate::matrix::Matrix;
 use crate::path::Paths;
@@ -9,7 +9,6 @@ use crate::util::radians;
 use crate::vector::Vector;
 use bon::{Builder, bon, builder};
 use std::f64::consts::PI;
-use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub enum ConeTexture {
@@ -122,9 +121,9 @@ impl Cone {
 }
 
 impl Shape for Cone {
-    fn bounding_box(&self) -> Box {
+    fn bounding_box(&self) -> BBox {
         let r = self.radius;
-        Box::new(Vector::new(-r, -r, 0.0), Vector::new(r, r, self.height))
+        BBox::new(Vector::new(-r, -r, 0.0), Vector::new(r, r, self.height))
     }
 
     fn contains(&self, _v: Vector, _f: f64) -> bool {
@@ -181,12 +180,12 @@ impl Shape for Cone {
 }
 
 #[builder]
-pub fn new_transformed_cone(
+pub fn new_transformed_cone<T: From<Cone>>(
     #[builder(start_fn)] v0: Vector,
     #[builder(start_fn)] v1: Vector,
     #[builder(start_fn)] radius: f64,
     #[builder(default)] texture: ConeTexture,
-) -> TransformedShape {
+) -> TransformedShape<T> {
     let up = Vector::new(0.0, 0.0, 1.0);
     let d = v1.sub(v0);
     let z = d.length();
@@ -198,5 +197,5 @@ pub fn new_transformed_cone(
         Matrix::translate(v0)
     };
     let c = Cone::builder(radius, z).texture(texture).build();
-    TransformedShape::new(Arc::new(c), m)
+    TransformedShape::new(c.into(), m)
 }

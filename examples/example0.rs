@@ -1,15 +1,15 @@
-use larnt::{Cube, Scene, Vector};
+use larnt::{Cube, Vector, render};
 
 fn main() {
     // create a scene and add a single cube
-    let mut scene = Scene::new();
-    scene.add(Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build());
+    let mut shapes = Vec::new();
+    shapes.push(Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build());
 
     let (width, height) = (1024.0, 1024.0);
 
     // compute 2D paths that depict the 3D scene
-    let paths = scene
-        .render(Vector::new(4.0, 3.0, 2.0))
+    let paths = render(shapes)
+        .eye(Vector::new(4.0, 3.0, 2.0))
         .width(width)
         .height(height)
         .call();

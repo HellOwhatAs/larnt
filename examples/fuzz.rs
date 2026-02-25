@@ -1,10 +1,10 @@
-use larnt::{Scene, Sphere, SphereTexture, Vector};
+use larnt::{Sphere, SphereTexture, Vector, render};
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 fn main() {
     let mut rng = SmallRng::seed_from_u64(42);
 
-    let mut scene = Scene::new();
+    let mut shapes = Vec::new();
     let n = 10;
 
     for x in -n..=n {
@@ -14,14 +14,14 @@ fn main() {
             let sphere = Sphere::builder(v, 0.45)
                 .texture(SphereTexture::random_fuzz(42).call())
                 .build();
-            scene.add(sphere);
+            shapes.push(sphere);
         }
     }
 
     let eye = Vector::new(8.0, 8.0, 8.0);
     let (width, height) = (1920.0, 1200.0);
 
-    let paths = scene.render(eye).width(width).height(height).call();
+    let paths = render(shapes).eye(eye).width(width).height(height).call();
     paths.write_to_png("out.png", width, height);
     paths
         .write_to_svg("out.svg", width, height)

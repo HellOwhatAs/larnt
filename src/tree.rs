@@ -1,14 +1,13 @@
 use crate::axis::Axis;
-use crate::bounding_box::Box;
+use crate::bounding_box::BBox;
 use crate::hit::Hit;
 use crate::ray::Ray;
 use crate::shape::Shape;
 use crate::vector::Vector;
-use std::sync::Arc;
 
 #[derive(Clone)]
 struct BvhNode {
-    pub bx: Box,
+    pub bx: BBox,
     pub left_first: usize,
     pub count: usize,
     pub axis: Axis,
@@ -17,7 +16,7 @@ struct BvhNode {
 impl BvhNode {
     fn empty() -> Self {
         Self {
-            bx: Box::default(),
+            bx: BBox::default(),
             left_first: 0,
             count: 0,
             axis: Axis::None,
@@ -25,19 +24,19 @@ impl BvhNode {
     }
 }
 
-struct PrimInfo {
-    shape: Arc<dyn Shape + Send + Sync>,
-    bx: Box,
+struct PrimInfo<T> {
+    shape: T,
+    bx: BBox,
     centroid: (f64, f64, f64),
 }
 
-pub struct Tree {
+pub struct Tree<T> {
     nodes: Vec<BvhNode>,
-    shapes: Vec<Arc<dyn Shape + Send + Sync>>,
+    shapes: Vec<T>,
 }
 
-impl Tree {
-    pub fn new(shapes: Vec<Arc<dyn Shape + Send + Sync>>) -> Self {
+impl<T: Shape> Tree<T> {
+    pub fn new(shapes: Vec<T>) -> Self {
         if shapes.is_empty() {
             return Tree {
                 nodes: Vec::new(),
@@ -49,7 +48,7 @@ impl Tree {
         let mut nodes = Vec::with_capacity(len * 2);
         nodes.push(BvhNode::empty());
 
-        let mut prims: Vec<PrimInfo> = shapes
+        let mut prims: Vec<PrimInfo<T>> = shapes
             .into_iter()
             .map(|shape| {
                 let bx = shape.bounding_box();
@@ -62,7 +61,7 @@ impl Tree {
             })
             .collect();
 
-        let mut sah_right_boxes = vec![Box::default(); len];
+        let mut sah_right_boxes = vec![BBox::default(); len];
 
         Self::build(&mut nodes, &mut prims, &mut sah_right_boxes, 0, 0, len);
 
@@ -134,8 +133,8 @@ impl Tree {
 
     fn build(
         nodes: &mut Vec<BvhNode>,
-        prims: &mut [PrimInfo],
-        sah_right_boxes: &mut [Box],
+        prims: &mut [PrimInfo<T>],
+        sah_right_boxes: &mut [BBox],
         node_idx: usize,
         start: usize,
         end: usize,
@@ -254,7 +253,7 @@ impl Tree {
         );
     }
 
-    fn centroid(bx: &Box) -> (f64, f64, f64) {
+    fn centroid(bx: &BBox) -> (f64, f64, f64) {
         (
             (bx.min.x + bx.max.x) * 0.5,
             (bx.min.y + bx.max.y) * 0.5,
@@ -262,7 +261,7 @@ impl Tree {
         )
     }
 
-    fn surface_area(bx: &Box) -> f64 {
+    fn surface_area(bx: &BBox) -> f64 {
         let dx = (bx.max.x - bx.min.x).max(0.0);
         let dy = (bx.max.y - bx.min.y).max(0.0);
         let dz = (bx.max.z - bx.min.z).max(0.0);

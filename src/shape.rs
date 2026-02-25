@@ -40,7 +40,7 @@
 //! }
 //! ```
 
-use crate::bounding_box::Box;
+use crate::bounding_box::BBox;
 use crate::hit::Hit;
 use crate::matrix::Matrix;
 use crate::path::Paths;
@@ -64,17 +64,11 @@ use crate::vector::Vector;
 ///
 /// - [`compile`](Shape::compile): Perform any preprocessing (default: no-op)
 pub trait Shape {
-    /// Performs any preprocessing needed before rendering.
-    ///
-    /// This is called once before rendering begins. Override this for shapes
-    /// that need to build acceleration structures or precompute data.
-    fn compile(&mut self) {}
-
     /// Returns the axis-aligned bounding box of this shape.
     ///
     /// The bounding box is used for spatial partitioning and early-out
     /// intersection tests.
-    fn bounding_box(&self) -> Box;
+    fn bounding_box(&self) -> BBox;
 
     /// Tests if a point is inside this solid.
     ///
@@ -112,7 +106,7 @@ pub struct RenderArgs {
 
 /// Automatically implement `Shape` for references to shapes.
 impl<T: Shape + ?Sized> Shape for &T {
-    fn bounding_box(&self) -> Box {
+    fn bounding_box(&self) -> BBox {
         (*self).bounding_box()
     }
 
@@ -137,8 +131,8 @@ impl<T: Shape + ?Sized> Shape for &T {
 pub struct EmptyShape;
 
 impl Shape for EmptyShape {
-    fn bounding_box(&self) -> Box {
-        Box::new(Vector::default(), Vector::default())
+    fn bounding_box(&self) -> BBox {
+        BBox::new(Vector::default(), Vector::default())
     }
 
     fn contains(&self, _v: Vector, _f: f64) -> bool {
@@ -175,21 +169,21 @@ impl Shape for EmptyShape {
 /// let transform = Matrix::rotate(Vector::new(0.0, 0.0, 1.0), radians(45.0));
 /// let rotated = TransformedShape::new(cube, transform);
 /// ```
-pub struct TransformedShape {
+pub struct TransformedShape<T> {
     /// The underlying shape being transformed.
-    pub shape: std::sync::Arc<dyn Shape + Send + Sync>,
+    pub shape: T,
     /// The transformation matrix to apply.
     pub matrix: Matrix,
     /// The inverse of the transformation matrix (cached for efficiency).
     pub inverse: Matrix,
 }
 
-impl TransformedShape {
+impl<T> TransformedShape<T> {
     /// Creates a new transformed shape.
     ///
     /// The inverse matrix is computed automatically and cached for use
     /// in intersection and containment tests.
-    pub fn new(shape: std::sync::Arc<dyn Shape + Send + Sync>, matrix: Matrix) -> Self {
+    pub fn new(shape: T, matrix: Matrix) -> Self {
         let inverse = matrix.inverse();
         TransformedShape {
             shape,
@@ -199,14 +193,8 @@ impl TransformedShape {
     }
 }
 
-impl Shape for TransformedShape {
-    fn compile(&mut self) {
-        if let Some(s) = std::sync::Arc::get_mut(&mut self.shape) {
-            s.compile();
-        }
-    }
-
-    fn bounding_box(&self) -> Box {
+impl<T: Shape> Shape for TransformedShape<T> {
+    fn bounding_box(&self) -> BBox {
         self.matrix.mul_box(self.shape.bounding_box())
     }
 

@@ -1,9 +1,9 @@
-use larnt::{Cube, Scene, Vector};
+use larnt::{Cube, Vector, render};
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 fn main() {
     let mut rng = SmallRng::seed_from_u64(42);
-    let mut scene = Scene::new();
+    let mut shapes = Vec::new();
     let n = 860;
 
     for x in -n..=n {
@@ -18,7 +18,7 @@ fn main() {
                 Vector::new(fx + p, fy + p, fz),
             )
             .build();
-            scene.add(shape);
+            shapes.push(shape);
         }
     }
 
@@ -27,8 +27,8 @@ fn main() {
     let width = 1024.0;
     let height = 1024.0;
 
-    let paths = scene
-        .render(eye)
+    let paths = render(shapes)
+        .eye(eye)
         .center(center)
         .width(width)
         .height(height)

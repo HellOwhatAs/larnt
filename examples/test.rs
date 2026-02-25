@@ -1,14 +1,14 @@
-use larnt::{Scene, Sphere, SphereTexture, Vector};
+use larnt::{Sphere, SphereTexture, Vector, render};
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 fn main() {
-    let mut scene = Scene::new();
+    let mut shapes = Vec::new();
     let mut rng = SmallRng::seed_from_u64(42);
     let n = 8;
 
     for x in -n..=n {
         for y in -n..=n {
-            scene.add(
+            shapes.push(
                 Sphere::builder(Vector::new(x as f64, y as f64, 0.0), 0.45)
                     .texture(SphereTexture::random_circles(rng.random()).call())
                     .build(),
@@ -21,8 +21,8 @@ fn main() {
     let width = 1024.0;
     let height = 1024.0;
 
-    let paths = scene
-        .render(eye)
+    let paths = render(shapes)
+        .eye(eye)
         .center(center)
         .width(width)
         .height(height)

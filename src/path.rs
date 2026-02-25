@@ -23,7 +23,7 @@
 //! paths.write_to_svg("output.svg", 1024.0, 1024.0).unwrap();
 //! ```
 
-use crate::bounding_box::Box;
+use crate::bounding_box::BBox;
 use crate::filter::Filter;
 use crate::matrix::Matrix;
 use crate::shape::RenderArgs;
@@ -188,13 +188,13 @@ impl Paths {
     }
 
     /// Returns the bounding box of all paths.
-    pub fn bounding_box(&self) -> Box {
+    pub fn bounding_box(&self) -> BBox {
         if self.buffer.is_empty() {
-            return Box::default();
+            return BBox::default();
         }
-        let mut bx = Box::new(self.buffer[0], self.buffer[0]);
+        let mut bx = BBox::new(self.buffer[0], self.buffer[0]);
         for v in self.buffer.iter().skip(1) {
-            bx = bx.extend(Box::new(*v, *v));
+            bx = bx.extend(BBox::new(*v, *v));
         }
         bx
     }

@@ -1,19 +1,16 @@
-use larnt::{Box as BBox, Function, Scene, Vector};
+use larnt::{BBox, Function, Vector, render};
 
 fn main() {
-    let mut scene = Scene::new();
     let bbox = BBox::new(
         Vector::new(-25.0, -25.0, -20.0),
         Vector::new(25.0, 25.0, 10.0),
     );
 
-    scene.add(
-        Function::builder(
-            |x, y| (x).sin() * (y).cos() - (x.powi(2) + y.powi(2)) * 0.01,
-            bbox,
-        )
-        .build(),
-    );
+    let func = Function::builder(
+        |x, y| (x).sin() * (y).cos() - (x.powi(2) + y.powi(2)) * 0.01,
+        bbox,
+    )
+    .build();
 
     let a = std::f64::consts::PI / 4.0;
     let eye = Vector::new(a.cos() * 28.0, a.sin() * 28.0, 10.0);
@@ -21,8 +18,8 @@ fn main() {
     let width = 1024.0;
     let height = 1024.0;
 
-    let paths = scene
-        .render(eye)
+    let paths = render(vec![func])
+        .eye(eye)
         .center(center)
         .width(width)
         .height(height)

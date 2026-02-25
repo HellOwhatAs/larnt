@@ -1,4 +1,4 @@
-use crate::bounding_box::Box;
+use crate::bounding_box::BBox;
 use crate::common::EPS;
 use crate::hit::Hit;
 use crate::path::Paths;
@@ -11,17 +11,11 @@ pub struct Triangle {
     pub v1: Vector,
     pub v2: Vector,
     pub v3: Vector,
-    pub bx: Box,
 }
 
 impl Triangle {
     pub fn new(v1: Vector, v2: Vector, v3: Vector) -> Self {
-        Self {
-            v1,
-            v2,
-            v3,
-            bx: Box::new(v1.min(v2).min(v3), v1.max(v2).max(v3)),
-        }
+        Self { v1, v2, v3 }
     }
 
     pub fn intersect_vertices(v1: Vector, v2: Vector, v3: Vector, r: Ray) -> Hit {
@@ -70,8 +64,11 @@ impl Triangle {
 }
 
 impl Shape for Triangle {
-    fn bounding_box(&self) -> Box {
-        self.bx
+    fn bounding_box(&self) -> BBox {
+        BBox::new(
+            self.v1.min(self.v2).min(self.v3),
+            self.v1.max(self.v2).max(self.v3),
+        )
     }
 
     fn contains(&self, _v: Vector, _f: f64) -> bool {

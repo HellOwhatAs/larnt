@@ -1,11 +1,11 @@
 use larnt::{
-    ConeTexture, Cube, CubeTexture, CylinderTexture, Scene, Sphere, SphereTexture, Vector,
-    new_transformed_cone, new_transformed_cylinder,
+    ConeTexture, Cube, CubeTexture, CylinderTexture, Primitive, Sphere, SphereTexture, Vector,
+    new_transformed_cone, new_transformed_cylinder, render,
 };
 
 fn main() {
     // create a scene and add a single cube
-    let mut scene = Scene::new();
+    let mut shapes: Vec<Primitive> = Vec::new();
 
     // define camera parameters
     let eye = Vector::new(2.0, 7.0, 5.0); // camera position
@@ -20,63 +20,80 @@ fn main() {
     let zfar = 10.0; // far z plane
     let step = 1.0; // how finely to chop the paths for visibility testing
 
-    scene.add(Cube::builder(Vector::new(0.0, 0.0, 0.0), Vector::new(1.0, 1.0, 1.0)).build());
-    scene.add(
+    shapes.push(
+        Cube::builder(Vector::new(0.0, 0.0, 0.0), Vector::new(1.0, 1.0, 1.0))
+            .build()
+            .into(),
+    );
+    shapes.push(
         Cube::builder(Vector::new(1.5, 0.0, 0.0), Vector::new(2.5, 1.0, 1.0))
             .texture(CubeTexture::striped().call())
-            .build(),
+            .build()
+            .into(),
     );
-    scene.add(
+    shapes.push(
         Sphere::builder(Vector::new(0.5, 2.0, 0.5), 0.5)
             .texture(SphereTexture::lat_lng().call())
-            .build(),
+            .build()
+            .into(),
     );
-    scene.add(
+    shapes.push(
         Sphere::builder(Vector::new(2.0, 2.0, 0.5), 0.5)
             .texture(SphereTexture::random_circles(42).call())
-            .build(),
+            .build()
+            .into(),
     );
-    scene.add(
+    shapes.push(
         Sphere::builder(Vector::new(0.5, 3.5, 0.5), 0.5)
             .texture(SphereTexture::random_equators(42).call())
-            .build(),
+            .build()
+            .into(),
     );
-    scene.add(
+    shapes.push(
         Sphere::builder(Vector::new(3.5, 3.5, 0.5), 0.5)
             .texture(SphereTexture::random_fuzz(42).call())
-            .build(),
+            .build()
+            .into(),
     );
-    scene.add(Sphere::builder(Vector::new(2.0, 3.5, 0.5), 0.5).build());
-    scene.add(
+    shapes.push(
+        Sphere::builder(Vector::new(2.0, 3.5, 0.5), 0.5)
+            .build()
+            .into(),
+    );
+    shapes.push(
         new_transformed_cone(
             Vector::new(-1.0, 0.5, 0.0),
             Vector::new(-1.0, 0.5, 1.0),
             0.5,
         )
         .texture(ConeTexture::Striped(12))
-        .call(),
+        .call()
+        .into(),
     );
-    scene.add(
+    shapes.push(
         new_transformed_cone(
             Vector::new(-1.0, 2.0, 0.0),
             Vector::new(-1.0, 2.0, 1.0),
             0.5,
         )
-        .call(),
+        .call()
+        .into(),
     );
-    scene.add(
+    shapes.push(
         new_transformed_cylinder(Vector::new(3.5, 0.5, 0.0), Vector::new(3.5, 0.5, 1.0), 0.5)
             .texture(CylinderTexture::Striped(36))
-            .call(),
+            .call()
+            .into(),
     );
-    scene.add(
+    shapes.push(
         new_transformed_cylinder(Vector::new(3.5, 2.0, 0.0), Vector::new(3.5, 2.0, 1.0), 0.5)
-            .call(),
+            .call()
+            .into(),
     );
 
     // compute 2D paths that depict the 3D scene
-    let paths = scene
-        .render(eye)
+    let paths = render(shapes)
+        .eye(eye)
         .center(center)
         .up(up)
         .width(width)

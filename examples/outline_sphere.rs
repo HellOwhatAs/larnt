@@ -1,14 +1,12 @@
-use larnt::{Scene, Sphere, Vector};
+use larnt::{Sphere, Vector, render};
 
 fn main() {
     let eye = Vector::new(1.0, 1.0, 1.0);
-    let mut scene = Scene::new();
-    scene.add(Sphere::builder(eye.mul_scalar(-1.0), 1.0).build());
     let width = 1024.0;
     let height = 1024.0;
 
-    let paths = scene
-        .render(eye)
+    let paths = render(vec![Sphere::builder(eye.mul_scalar(-1.0), 1.0).build()])
+        .eye(eye)
         .width(width)
         .height(height)
         .step(1e-3)

@@ -15,7 +15,7 @@
 //! scene.add(cube);
 //! ```
 
-use crate::bounding_box::Box;
+use crate::bounding_box::BBox;
 use crate::hit::Hit;
 use crate::path::Paths;
 use crate::ray::Ray;
@@ -63,17 +63,14 @@ pub struct Cube {
     /// The maximum corner (largest x, y, z values).
     #[builder(start_fn)]
     pub max: Vector,
-    /// Cached bounding box.
-    #[builder(skip = Box::new(min, max))]
-    pub bx: Box,
     /// Texture style.
     #[builder(default)]
     pub texture: CubeTexture,
 }
 
 impl Shape for Cube {
-    fn bounding_box(&self) -> Box {
-        self.bx
+    fn bounding_box(&self) -> BBox {
+        BBox::new(self.min, self.max)
     }
 
     fn contains(&self, v: Vector, f: f64) -> bool {

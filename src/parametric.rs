@@ -1,4 +1,4 @@
-use crate::bounding_box::Box;
+use crate::bounding_box::BBox;
 use crate::hit::Hit;
 use crate::mesh::Mesh;
 use crate::path::Paths;
@@ -72,11 +72,7 @@ impl ParametricSurface {
 }
 
 impl Shape for ParametricSurface {
-    fn compile(&mut self) {
-        self.mesh.compile();
-    }
-
-    fn bounding_box(&self) -> Box {
+    fn bounding_box(&self) -> BBox {
         self.mesh.bounding_box()
     }
 

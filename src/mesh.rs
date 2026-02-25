@@ -1,4 +1,4 @@
-use crate::bounding_box::Box;
+use crate::bounding_box::BBox;
 use crate::hit::Hit;
 use crate::matrix::Matrix;
 use crate::path::Paths;
@@ -8,14 +8,13 @@ use crate::tree::Tree;
 use crate::triangle::Triangle;
 use crate::vector::Vector;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 /// Triangle mesh shape.
 pub struct Mesh {
-    bx: Box,
+    bx: BBox,
     vertices: Vec<Vector>,
     index_triangles: Vec<IndexTriangle>,
-    tree: Option<Tree>,
+    tree: Tree<Triangle>,
 }
 
 impl Mesh {
@@ -30,10 +29,10 @@ impl Mesh {
             })
             .collect();
         Mesh {
-            bx: Box::for_shapes(triangles.into_iter()),
+            bx: BBox::for_shapes(&triangles),
             index_triangles: itriangles,
             vertices: merger.vertices,
-            tree: None,
+            tree: Tree::new(triangles),
         }
     }
 
@@ -49,7 +48,7 @@ impl Mesh {
 
     pub fn unit_cube(self) -> Self {
         self.fit_inside(
-            Box::new(Vector::default(), Vector::new(1.0, 1.0, 1.0)),
+            BBox::new(Vector::default(), Vector::new(1.0, 1.0, 1.0)),
             Vector::default(),
         )
         .move_to(Vector::default(), Vector::new(0.5, 0.5, 0.5))
@@ -60,7 +59,7 @@ impl Mesh {
         self.transform(&matrix)
     }
 
-    pub fn fit_inside(self, bx: Box, anchor: Vector) -> Self {
+    pub fn fit_inside(self, bx: BBox, anchor: Vector) -> Self {
         let scale = bx.size().div(self.bx.size()).min_component();
         let extra = bx.size().sub(self.bx.size().mul_scalar(scale));
         let mut matrix = Matrix::identity();
@@ -74,8 +73,9 @@ impl Mesh {
         for v in self.vertices.iter_mut() {
             *v = matrix.mul_position(*v);
         }
-        self.bx = Box::for_shapes(self.triangles());
-        self.tree = None;
+        let triangles: Vec<Triangle> = self.triangles().collect();
+        self.bx = BBox::for_shapes(&triangles);
+        self.tree = Tree::new(triangles);
         self
     }
 
@@ -109,17 +109,7 @@ impl Mesh {
 }
 
 impl Shape for Mesh {
-    fn compile(&mut self) {
-        if self.tree.is_none() {
-            self.tree = Some(Tree::new(
-                self.triangles()
-                    .map(|t| Arc::new(t) as Arc<dyn Shape + Send + Sync>)
-                    .collect(),
-            ));
-        }
-    }
-
-    fn bounding_box(&self) -> Box {
+    fn bounding_box(&self) -> BBox {
         self.bx
     }
 
@@ -128,9 +118,7 @@ impl Shape for Mesh {
     }
 
     fn intersect(&self, r: Ray) -> Hit {
-        self.tree
-            .as_ref()
-            .map_or(Hit::no_hit(), |tree| tree.intersect(r))
+        self.tree.intersect(r)
     }
 
     fn paths(&self, _args: &RenderArgs) -> Paths {

@@ -30,7 +30,7 @@ use crate::ray::Ray;
 use crate::shape::Shape;
 use crate::util::radians;
 use crate::vector::Vector;
-use crate::{bounding_box::Box, shape::RenderArgs};
+use crate::{bounding_box::BBox, shape::RenderArgs};
 use bon::{Builder, bon};
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 use std::f64::consts::PI;
@@ -113,21 +113,24 @@ pub struct Sphere {
     /// The radius of the sphere.
     #[builder(start_fn)]
     pub radius: f64,
-    /// Cached bounding box.
-    #[builder(skip = {
-        let min = Vector::new(center.x - radius, center.y - radius, center.z - radius);
-        let max = Vector::new(center.x + radius, center.y + radius, center.z + radius);
-        Box::new(min, max)
-    })]
-    pub bx: Box,
     /// The texture style for the sphere.
     #[builder(default)]
     pub texture: SphereTexture,
 }
 
 impl Shape for Sphere {
-    fn bounding_box(&self) -> Box {
-        self.bx
+    fn bounding_box(&self) -> BBox {
+        let min = Vector::new(
+            self.center.x - self.radius,
+            self.center.y - self.radius,
+            self.center.z - self.radius,
+        );
+        let max = Vector::new(
+            self.center.x + self.radius,
+            self.center.y + self.radius,
+            self.center.z + self.radius,
+        );
+        BBox::new(min, max)
     }
 
     fn contains(&self, v: Vector, f: f64) -> bool {

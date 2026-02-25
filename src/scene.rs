@@ -17,254 +17,104 @@
 //! ```
 
 use crate::filter::ClipFilter;
-use crate::hit::Hit;
 use crate::matrix::Matrix;
 use crate::path::Paths;
 use crate::ray::Ray;
 use crate::shape::{RenderArgs, Shape};
 use crate::tree::Tree;
 use crate::vector::Vector;
-use bon::bon;
-use std::sync::Arc;
+use bon::builder;
 
-/// A container for 3D shapes that handles rendering.
+/// Renders the scene to 2D paths.
 ///
-/// The `Scene` struct collects shapes and provides methods to render them
-/// into 2D vector paths. It uses a bounding volume hierarchy (BVH) tree
-/// for efficient ray-shape intersection tests.
+/// This is the main rendering function. It:
+/// 1. Compiles the BVH tree if needed
+/// 2. Gets all paths from shapes
+/// 3. Chops paths for visibility testing
+/// 4. Filters out hidden portions
+/// 5. Projects to 2D screen space
+///
+/// # Arguments
+///
+/// * `eye` - Camera position
+/// * `center` - Point the camera looks at
+/// * `up` - Up direction vector
+/// * `width` - Output width in pixels
+/// * `height` - Output height in pixels
+/// * `fovy` - Vertical field of view in degrees
+/// * `near` - Near clipping plane distance
+/// * `far` - Far clipping plane distance
+/// * `step` - Path subdivision step size for visibility testing
 ///
 /// # Example
 ///
 /// ```
-/// use larnt::{Scene, Sphere, Vector};
+/// use larnt::{Scene, Cube, Vector};
 ///
 /// let mut scene = Scene::new();
-/// scene.add(Sphere::builder(Vector::new(0.0, 0.0, 0.0), 1.0).build());
+/// scene.add(Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build());
 ///
-/// let paths = scene
-///     .render(Vector::new(4.0, 3.0, 2.0)) // eye position
-///     .center(Vector::new(0.0, 0.0, 0.0)) // looks at
-///     .up(Vector::new(0.0, 0.0, 1.0)) // up direction
-///     .width(1024.0) // rendered width
-///     .height(1024.0) // rendered height
-///     .fovy(50.0) // vertical field of view, degrees
-///     .near(0.1) // near plane
-///     .far(1000.0) // far plane
-///     // how finely to chop the paths for visibility testing
-///     // unit is the same as the scene's units
-///     .step(1.0)
-///     .call();
+/// let paths = scene.render(Vector::new(4.0, 3.0, 2.0)).call();
 /// ```
-pub struct Scene {
-    /// The shapes in this scene.
-    pub shapes: Vec<Arc<dyn Shape + Send + Sync>>,
-    /// The BVH tree for efficient intersection testing.
-    pub tree: Option<Tree>,
-}
+#[builder]
+pub fn render<T: Shape>(
+    #[builder(start_fn)] shapes: Vec<T>,
+    eye: Vector,
+    #[builder(default = Vector::new(0.0, 0.0, 0.0))] center: Vector,
+    #[builder(default = Vector::new(0.0, 0.0, 1.0))] up: Vector,
+    #[builder(default = 1024.0)] width: f64,
+    #[builder(default = 1024.0)] height: f64,
+    #[builder(default = 50.0)] fovy: f64,
+    #[builder(default = 0.1)] near: f64,
+    #[builder(default = 1e3)] far: f64,
+    #[builder(default = 1.0)] step: f64,
+) -> Paths {
+    let aspect = width / height;
+    let matrix = Matrix::look_at(eye, center, up);
+    let matrix = matrix.with_perspective(fovy, aspect, near, far);
 
-#[bon]
-impl Scene {
-    /// Renders the scene to 2D paths.
-    ///
-    /// This is the main rendering function. It:
-    /// 1. Compiles the BVH tree if needed
-    /// 2. Gets all paths from shapes
-    /// 3. Chops paths for visibility testing
-    /// 4. Filters out hidden portions
-    /// 5. Projects to 2D screen space
-    ///
-    /// # Arguments
-    ///
-    /// * `eye` - Camera position
-    /// * `center` - Point the camera looks at
-    /// * `up` - Up direction vector
-    /// * `width` - Output width in pixels
-    /// * `height` - Output height in pixels
-    /// * `fovy` - Vertical field of view in degrees
-    /// * `near` - Near clipping plane distance
-    /// * `far` - Far clipping plane distance
-    /// * `step` - Path subdivision step size for visibility testing
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use larnt::{Scene, Cube, Vector};
-    ///
-    /// let mut scene = Scene::new();
-    /// scene.add(Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build());
-    ///
-    /// let paths = scene.render(Vector::new(4.0, 3.0, 2.0)).call();
-    /// ```
-    #[builder]
-    pub fn render(
-        &mut self,
-        #[builder(start_fn)] eye: Vector,
-        #[builder(default = Vector::new(0.0, 0.0, 0.0))] center: Vector,
-        #[builder(default = Vector::new(0.0, 0.0, 1.0))] up: Vector,
-        #[builder(default = 1024.0)] width: f64,
-        #[builder(default = 1024.0)] height: f64,
-        #[builder(default = 50.0)] fovy: f64,
-        #[builder(default = 0.1)] near: f64,
-        #[builder(default = 1e3)] far: f64,
-        #[builder(default = 1.0)] step: f64,
-    ) -> Paths {
-        let aspect = width / height;
-        let matrix = Matrix::look_at(eye, center, up);
-        let matrix = matrix.with_perspective(fovy, aspect, near, far);
-        self.render_with_matrix(matrix, eye, up, width, height, step)
-    }
-}
+    let viewport_mat = Matrix::translate(Vector::new(1.0, 1.0, 0.0)).scaled(Vector::new(
+        width / 2.0,
+        height / 2.0,
+        1.0,
+    ));
 
-impl Scene {
-    /// Creates a new empty scene.
-    pub fn new() -> Self {
-        Scene {
-            shapes: Vec::new(),
-            tree: None,
-        }
+    let args = RenderArgs {
+        screen_mat: viewport_mat.mul(&matrix),
+        eye,
+        up,
+        width,
+        height,
+        step,
+    };
+
+    let mut paths = Paths::new();
+    for shape in shapes.iter() {
+        paths.extend(shape.paths(&args));
     }
 
-    /// Compiles the scene by building the BVH tree.
-    ///
-    /// This is called automatically by [`Scene::render`], but can be called
-    /// manually if you want to reuse the same scene for multiple renders.
-    ///
-    /// This method also compiles individual shapes (e.g., building internal
-    /// BVH trees for meshes) when possible. Shapes added via [`Scene::add`]
-    /// are already compiled, but shapes added via [`Scene::add_arc`] will
-    /// be compiled here if there are no other references to them.
-    pub fn compile(&mut self) {
-        for shape in &mut self.shapes {
-            if let Some(s) = Arc::get_mut(shape) {
-                s.compile();
+    if step > 0.0 {
+        paths = paths.chop_adaptive(&args);
+    }
+
+    paths = {
+        let tree = Tree::new(shapes);
+        let visible = |eye: Vector, point: Vector| -> bool {
+            let v = eye.sub(point);
+            if v.length() == 0.0 {
+                return true;
             }
-        }
-        if self.tree.is_none() {
-            self.tree = Some(Tree::new(self.shapes.clone()));
-        }
-    }
-
-    /// Adds a shape to the scene.
-    ///
-    /// The shape is wrapped in an `Arc` and stored for rendering.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use larnt::{Scene, Cube, Vector};
-    ///
-    /// let mut scene = Scene::new();
-    /// scene.add(Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build());
-    /// ```
-    pub fn add<S: Shape + Send + Sync + 'static>(&mut self, mut shape: S) {
-        shape.compile();
-        self.shapes.push(Arc::new(shape));
-    }
-
-    /// Adds a pre-wrapped shape to the scene.
-    ///
-    /// Use this when you already have an `Arc<dyn Shape>`, such as when
-    /// working with CSG operations or transformed shapes.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use larnt::{Scene, Sphere, Shape, Vector};
-    /// use std::sync::Arc;
-    ///
-    /// let sphere: Arc<dyn Shape + Send + Sync> = Arc::new(Sphere::builder(Vector::default(), 1.0).build());
-    /// let mut scene = Scene::new();
-    /// scene.add_arc(sphere);
-    /// ```
-    pub fn add_arc(&mut self, shape: Arc<dyn Shape + Send + Sync>) {
-        self.shapes.push(shape);
-    }
-
-    /// Tests for ray-scene intersection.
-    ///
-    /// Returns a [`Hit`] describing the intersection, or [`Hit::no_hit()`]
-    /// if the ray doesn't hit any shape.
-    pub fn intersect(&self, r: Ray) -> Hit {
-        self.tree
-            .as_ref()
-            .map_or(Hit::no_hit(), |tree| tree.intersect(r))
-    }
-
-    /// Tests if a point is visible from the camera position.
-    ///
-    /// Returns `true` if there is no shape blocking the view from
-    /// `eye` to `point`.
-    pub fn visible(&self, eye: Vector, point: Vector) -> bool {
-        let v = eye.sub(point);
-        if v.length() == 0.0 {
-            return true;
-        }
-        let r = Ray::new(point, v.normalize());
-        let hit = self.intersect(r);
-        hit.t >= v.length()
-    }
-
-    /// Returns all paths from all shapes in the scene.
-    pub fn paths(&self, args: &RenderArgs) -> Paths {
-        let mut result = Paths::new();
-        for shape in &self.shapes {
-            result.extend(shape.paths(args));
-        }
-        result
-    }
-
-    /// Renders the scene with a custom transformation matrix.
-    ///
-    /// This gives you full control over the projection matrix, useful for
-    /// orthographic projections or custom camera setups.
-    pub fn render_with_matrix(
-        &mut self,
-        matrix: Matrix,
-        eye: Vector,
-        up: Vector,
-        width: f64,
-        height: f64,
-        step: f64,
-    ) -> Paths {
-        let viewport_mat = Matrix::translate(Vector::new(1.0, 1.0, 0.0)).scaled(Vector::new(
-            width / 2.0,
-            height / 2.0,
-            1.0,
-        ));
-
-        let args = RenderArgs {
-            screen_mat: viewport_mat.mul(&matrix),
-            eye,
-            up,
-            width,
-            height,
-            step,
+            let r = Ray::new(point, v.normalize());
+            let hit = tree.intersect(r);
+            hit.t >= v.length()
         };
+        let filter = ClipFilter::new(matrix, eye, visible);
+        paths.filter(&filter)
+    };
 
-        self.compile();
-        let mut paths = self.paths(&args);
-
-        if step > 0.0 {
-            paths = paths.chop_adaptive(&args);
-        }
-
-        let filter = ClipFilter {
-            matrix,
-            eye,
-            scene: self,
-        };
-        paths = paths.filter(&filter);
-
-        if step > 0.0 {
-            paths = paths.simplify(1e-6);
-        }
-
-        paths.transform(&viewport_mat)
+    if step > 0.0 {
+        paths = paths.simplify(1e-6);
     }
-}
 
-impl Default for Scene {
-    fn default() -> Self {
-        Scene::new()
-    }
+    paths.transform(&viewport_mat)
 }

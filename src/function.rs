@@ -1,4 +1,4 @@
-use crate::bounding_box::Box;
+use crate::bounding_box::BBox;
 use crate::hit::Hit;
 use crate::path::{Paths, recursive_subdivide};
 use crate::ray::Ray;
@@ -46,7 +46,7 @@ where
     #[builder(start_fn)]
     pub func: F,
     #[builder(start_fn)]
-    pub bx: Box,
+    pub bx: BBox,
     #[builder(default = Direction::Below)]
     pub direction: Direction,
     #[builder(default)]
@@ -59,7 +59,7 @@ impl<F> Shape for Function<F>
 where
     F: Fn(f64, f64) -> f64 + Send + Sync,
 {
-    fn bounding_box(&self) -> Box {
+    fn bounding_box(&self) -> BBox {
         self.bx
     }
 

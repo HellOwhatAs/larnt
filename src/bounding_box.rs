@@ -4,18 +4,18 @@ use crate::shape::Shape;
 use crate::vector::Vector;
 
 #[derive(Debug, Clone, Copy, Default)]
-pub struct Box {
+pub struct BBox {
     pub min: Vector,
     pub max: Vector,
 }
 
-impl Box {
+impl BBox {
     pub fn new(min: Vector, max: Vector) -> Self {
-        Box { min, max }
+        BBox { min, max }
     }
 
-    pub fn for_shapes(shapes: impl Iterator<Item = impl Shape>) -> Self {
-        let mut bx = Box::default();
+    pub fn for_shapes(shapes: &[impl Shape]) -> Self {
+        let mut bx = BBox::default();
         for shape in shapes {
             bx = bx.extend(shape.bounding_box());
         }
@@ -24,7 +24,7 @@ impl Box {
 
     pub fn for_vectors(vectors: &[Vector]) -> Self {
         if vectors.is_empty() {
-            return Box::default();
+            return BBox::default();
         }
         let mut min = vectors[0];
         let mut max = vectors[0];
@@ -32,7 +32,7 @@ impl Box {
             min = min.min(*v);
             max = max.max(*v);
         }
-        Box { min, max }
+        BBox { min, max }
     }
 
     pub fn anchor(&self, anchor: Vector) -> Vector {
@@ -56,8 +56,8 @@ impl Box {
             && self.max.z >= v.z
     }
 
-    pub fn extend(&self, other: Box) -> Box {
-        Box {
+    pub fn extend(&self, other: BBox) -> BBox {
+        BBox {
             min: self.min.min(other.min),
             max: self.max.max(other.max),
         }

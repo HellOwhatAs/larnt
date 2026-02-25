@@ -1,6 +1,6 @@
 use image::{Delay, Frame, ImageBuffer, Rgba, codecs::gif::GifEncoder};
-use larnt::{Scene, Sphere, Vector, new_transformed_cylinder, radians};
-use std::{fs::File, sync::Arc, time::Duration};
+use larnt::{Primitive, Sphere, Vector, new_transformed_cylinder, radians, render};
+use std::{fs::File, time::Duration};
 
 fn save_gif_from_iter(
     frames_iter: impl Iterator<Item = ImageBuffer<Rgba<u8>, Vec<u8>>>,
@@ -20,10 +20,10 @@ fn save_gif_from_iter(
     Ok(())
 }
 
-fn render(frame: i32) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+fn render_frame(frame: i32) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
     let cx = radians(frame as f64).cos();
     let cy = radians(frame as f64).sin();
-    let mut scene = Scene::new();
+    let mut shapes = Vec::new();
     let eye = Vector::new(cx, cy, 0.0).mul_scalar(8.0);
 
     let nodes = vec![
@@ -83,20 +83,20 @@ fn render(frame: i32) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
 
     // Add nodes as spheres
     for v in &nodes {
-        scene.add(Sphere::builder(*v, 0.333).build());
+        shapes.push(Sphere::builder(*v, 0.333).build().into());
     }
 
     // Add edges as cylinders
     for (i, j) in &edges {
         let v0 = nodes[*i];
         let v1 = nodes[*j];
-        let cylinder = new_transformed_cylinder(v0, v1, 0.1).call();
-        scene.add_arc(Arc::new(cylinder));
+        let cylinder: Primitive = new_transformed_cylinder(v0, v1, 0.1).call().into();
+        shapes.push(cylinder);
     }
 
     let (width, height) = (750.0, 750.0);
-    let paths = scene
-        .render(eye)
+    let paths = render(shapes)
+        .eye(eye)
         .width(width)
         .height(height)
         .fovy(60.0)
@@ -105,6 +105,6 @@ fn render(frame: i32) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
 }
 
 fn main() {
-    let image_iter = (0..360).step_by(3).map(|i| render(i));
+    let image_iter = (0..360).step_by(3).map(|i| render_frame(i));
     save_gif_from_iter(image_iter, "output.gif").unwrap();
 }

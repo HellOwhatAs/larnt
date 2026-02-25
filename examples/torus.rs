@@ -1,4 +1,4 @@
-use larnt::{ParametricSurface, Scene, Vector};
+use larnt::{ParametricSurface, Vector, render};
 use std::f64::consts::PI;
 
 fn main() {
@@ -9,10 +9,8 @@ fn main() {
         Vector::new(x, y, z)
     };
     let torus_mesh = ParametricSurface::new(torus_func, (0.0, 2.0 * PI), (0.0, 2.0 * PI), 64, 32);
-    let mut scene = Scene::new();
-    scene.add(torus_mesh);
-    scene
-        .render(Vector::new(3., 3., 3.))
+    render(vec![torus_mesh])
+        .eye(Vector::new(3., 3., 3.))
         .call()
         .write_to_png("out.png", 1024.0, 1024.0);
 }
