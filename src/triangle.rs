@@ -46,7 +46,7 @@ impl Triangle {
         let tz = r.origin.z - v1.z;
         let u = (tx * px + ty * py + tz * pz) * inv;
 
-        if u < 0.0 || u > 1.0 {
+        if !(0.0..=1.0).contains(&u) {
             return Hit::no_hit();
         }
 

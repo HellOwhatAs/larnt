@@ -143,8 +143,8 @@ impl Tree {
         let count = end - start;
 
         let mut parent_bx = prims[start].bx;
-        for i in start + 1..end {
-            parent_bx = parent_bx.extend(prims[i].bx);
+        for prim in &prims[start + 1..end] {
+            parent_bx = parent_bx.extend(prim.bx);
         }
         nodes[node_idx].bx = parent_bx;
 
@@ -157,8 +157,8 @@ impl Tree {
 
         let mut min_c = prims[start].centroid;
         let mut max_c = min_c;
-        for i in start + 1..end {
-            let c = prims[i].centroid;
+        for prim in &prims[start + 1..end] {
+            let c = prim.centroid;
             min_c.0 = min_c.0.min(c.0);
             min_c.1 = min_c.1.min(c.1);
             min_c.2 = min_c.2.min(c.2);

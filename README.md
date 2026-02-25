@@ -163,38 +163,36 @@ operations.
 ```rust
 use larnt::{Cube, Scene, Vector};
 
-fn main() {
-    // create a scene and add a single cube
-    let mut scene = Scene::new();
-    scene.add(Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build());
+// create a scene and add a single cube
+let mut scene = Scene::new();
+scene.add(Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build());
 
-    let eye = Vector::new(4.0, 3.0, 2.0); // camera position
-    let width = 1024.0; // rendered width
-    let height = 1024.0; // rendered height
+let eye = Vector::new(4.0, 3.0, 2.0); // camera position
+let width = 1024.0; // rendered width
+let height = 1024.0; // rendered height
 
-    // compute 2D paths that depict the 3D scene
-    let paths = scene
-        .render(eye)
-        .center(Vector::new(0.0, 0.0, 0.0)) // camera looks at
-        .up(Vector::new(0.0, 0.0, 1.0)) // up direction
-        .width(width) // rendered width
-        .height(height) // rendered height
-        .fovy(50.0) // vertical field of view, degrees
-        .near(0.1) // near plane
-        .far(1000.0) // far plane
-        // how finely to chop the paths for visibility testing
-        // unit is the same as the scene's units
-        .step(1.0)
-        .call();
+// compute 2D paths that depict the 3D scene
+let paths = scene
+    .render(eye)
+    .center(Vector::new(0.0, 0.0, 0.0)) // camera looks at
+    .up(Vector::new(0.0, 0.0, 1.0)) // up direction
+    .width(width) // rendered width
+    .height(height) // rendered height
+    .fovy(50.0) // vertical field of view, degrees
+    .near(0.1) // near plane
+    .far(1000.0) // far plane
+    // how finely to chop the paths for visibility testing
+    // unit is the same as the scene's units
+    .step(1.0)
+    .call();
 
-    // render the paths in an image
-    paths.write_to_png("out.png", width, height);
+// render the paths in an image
+paths.write_to_png("out.png", width, height);
 
-    // save the paths as an svg
-    paths
-        .write_to_svg("out.svg", width, height)
-        .expect("Failed to write SVG");
-}
+// save the paths as an svg
+paths
+    .write_to_svg("out.svg", width, height)
+    .expect("Failed to write SVG");
 ```
 
 ### The Output

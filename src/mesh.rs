@@ -39,7 +39,7 @@ impl Mesh {
         }
     }
 
-    pub fn triangles(&self) -> impl Iterator<Item = Triangle> + ExactSizeIterator {
+    pub fn triangles(&self) -> impl ExactSizeIterator<Item = Triangle> {
         self.index_triangles.iter().map(|itr| {
             Triangle::new(
                 self.vertices[itr.v1],
@@ -143,7 +143,6 @@ impl Shape for Mesh {
         if self.tree.is_none() {
             self.tree = Some(Tree::new(
                 self.triangles()
-                    .into_iter()
                     .map(|t| Arc::new(t) as Arc<dyn Shape + Send + Sync>)
                     .collect(),
             ));
@@ -264,10 +263,7 @@ impl VertexMerger {
         let new_idx = self.vertices.len();
         self.vertices.push(v);
 
-        self.grid
-            .entry((ix, iy, iz))
-            .or_insert_with(Vec::new)
-            .push(new_idx);
+        self.grid.entry((ix, iy, iz)).or_default().push(new_idx);
 
         new_idx
     }
