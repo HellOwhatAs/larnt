@@ -41,16 +41,16 @@ pub struct Cone {
 
 impl Cone {
     fn paths_striped(&self, num: u64) -> Paths {
-        let mut result = Vec::new();
+        let mut result = Paths::new();
         for a in (0..360).step_by((360 / num) as usize) {
             let x = self.radius * radians(a as f64).cos();
             let y = self.radius * radians(a as f64).sin();
-            result.push(vec![
-                Vector::new(x, y, 0.0),
-                Vector::new(0.0, 0.0, self.height),
-            ]);
+
+            let mut new_path = result.new_path();
+            new_path.push(Vector::new(x, y, 0.0));
+            new_path.push(Vector::new(0.0, 0.0, self.height));
         }
-        Paths::from_vec(result)
+        result
     }
 
     fn paths_outline(&self, args: &RenderArgs) -> Paths {
@@ -61,6 +61,8 @@ impl Cone {
         //
         // This is of the form: a*cos(θ) + b*sin(θ) = c
         // Solution: θ = atan2(b, a) ± acos(c / sqrt(a^2 + b^2))
+        let mut result = Paths::new();
+
         let r = self.radius;
         let h = self.height;
 
@@ -81,8 +83,16 @@ impl Cone {
         if ratio.abs() > 1.0 {
             // Eye is inside the extended cone surface - no proper silhouette
             // Fall back to just the base circle
-            let path = adaptive_arc(0.0, PI * 2.0, r, &cuv, &args.screen_mat, args.step.powi(2));
-            return Paths::from_vec(vec![path]);
+            adaptive_arc(
+                0.0,
+                PI * 2.0,
+                r,
+                &cuv,
+                &args.screen_mat,
+                args.step.powi(2),
+                &mut result.new_path(),
+            );
+            return result;
         }
 
         let eye_azimuth = b.atan2(a);
@@ -91,17 +101,23 @@ impl Cone {
         let theta2 = eye_azimuth - angular_offset;
 
         // Base circle path
-        let p0 = adaptive_arc(0.0, PI * 2.0, r, &cuv, &args.screen_mat, args.step.powi(2));
+        adaptive_arc(
+            0.0,
+            PI * 2.0,
+            r,
+            &cuv,
+            &args.screen_mat,
+            args.step.powi(2),
+            &mut result.new_path(),
+        );
 
         // Silhouette points on the base circle (with slight outward offset for visibility)
         let a0 = Vector::new(r * theta1.cos(), r * theta1.sin(), 0.0);
         let b0 = Vector::new(r * theta2.cos(), r * theta2.sin(), 0.0);
 
-        Paths::from_vec(vec![
-            p0,
-            vec![a0, Vector::new(0.0, 0.0, h)],
-            vec![b0, Vector::new(0.0, 0.0, h)],
-        ])
+        result.new_path().extend([a0, Vector::new(0.0, 0.0, h)]);
+        result.new_path().extend([b0, Vector::new(0.0, 0.0, h)]);
+        result
     }
 }
 

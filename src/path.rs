@@ -34,9 +34,6 @@ use image::{ImageBuffer, Pixel, Rgba};
 use std::f64::consts::PI;
 use std::io::Write;
 
-/// A single path represented as a sequence of 3D points.
-pub type Path = Vec<Vector>;
-
 /// A collection of paths.
 ///
 /// `Paths` is the main output type from rendering. It contains a collection
@@ -55,8 +52,8 @@ pub type Path = Vec<Vector>;
 /// ```
 #[derive(Debug, Clone, Default)]
 pub struct Paths {
-    /// The collection of paths.
-    pub paths: Vec<Path>,
+    buffer: Vec<Vector>,
+    offsets: Vec<usize>,
 }
 
 #[bon]
@@ -84,7 +81,7 @@ impl Paths {
 
         let mut img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_pixel(w, h, background);
 
-        for path_points in &self.paths {
+        for path_points in self.iter_paths() {
             for i in 0..path_points.len().saturating_sub(1) {
                 let p1 = &path_points[i];
                 let p2 = &path_points[i + 1];
@@ -104,47 +101,134 @@ impl Paths {
     }
 }
 
+pub struct NewPath<'a> {
+    buffer: &'a mut Vec<Vector>,
+    offsets: &'a mut Vec<usize>,
+}
+
+impl<'a> NewPath<'a> {
+    pub fn new(buffer: &'a mut Vec<Vector>, offsets: &'a mut Vec<usize>) -> Self {
+        NewPath { buffer, offsets }
+    }
+
+    pub fn push(&mut self, v: Vector) {
+        self.buffer.push(v);
+    }
+
+    pub fn pop(&mut self) -> Option<Vector> {
+        if self.buffer.len() > self.offsets.last().copied().unwrap_or(0) {
+            self.buffer.pop()
+        } else {
+            None
+        }
+    }
+
+    pub fn extend_from_slice(&mut self, slice: &[Vector]) {
+        self.buffer.extend_from_slice(slice);
+    }
+
+    pub fn as_slice(&self) -> &[Vector] {
+        let start = self.offsets.last().copied().unwrap_or(0);
+        &self.buffer[start..]
+    }
+
+    pub fn as_mut_slice(&mut self) -> &mut [Vector] {
+        let start = self.offsets.last().copied().unwrap_or(0);
+        &mut self.buffer[start..]
+    }
+
+    pub fn len(&self) -> usize {
+        self.buffer.len() - self.offsets.last().copied().unwrap_or(0)
+    }
+}
+
+impl Extend<Vector> for NewPath<'_> {
+    fn extend<T: IntoIterator<Item = Vector>>(&mut self, iter: T) {
+        self.buffer.extend(iter);
+    }
+}
+
+impl<'a> Drop for NewPath<'a> {
+    fn drop(&mut self) {
+        if let Some(last_offset) = self.offsets.last().copied() {
+            if self.buffer.len() == last_offset {
+                self.offsets.pop();
+            }
+        }
+    }
+}
+
 impl Paths {
     /// Creates a new empty `Paths` collection.
     pub fn new() -> Self {
-        Paths { paths: Vec::new() }
+        Paths {
+            buffer: Vec::new(),
+            offsets: Vec::new(),
+        }
     }
 
-    /// Creates a `Paths` collection from a vector of paths.
-    pub fn from_vec(paths: Vec<Path>) -> Self {
-        Paths { paths }
-    }
-
-    /// Adds a path to this collection.
-    pub fn push(&mut self, path: Path) {
-        self.paths.push(path);
+    pub fn new_path<'a>(&'a mut self) -> NewPath<'a> {
+        self.offsets.push(self.buffer.len());
+        NewPath::new(&mut self.buffer, &mut self.offsets)
     }
 
     /// Extends this collection with paths from another.
     pub fn extend(&mut self, other: Paths) {
-        self.paths.extend(other.paths);
+        self.offsets
+            .extend(other.offsets.into_iter().map(|o| o + self.buffer.len()));
+        self.buffer.extend(other.buffer);
+    }
+
+    pub fn len(&self) -> usize {
+        self.offsets.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.offsets.is_empty()
     }
 
     /// Returns the bounding box of all paths.
     pub fn bounding_box(&self) -> Box {
-        if self.paths.is_empty() {
+        if self.buffer.is_empty() {
             return Box::default();
         }
-        let mut bx = path_bounding_box(&self.paths[0]);
-        for path in self.paths.iter().skip(1) {
-            bx = bx.extend(path_bounding_box(path));
+        let mut bx = Box::new(self.buffer[0], self.buffer[0]);
+        for v in self.buffer.iter().skip(1) {
+            bx = bx.extend(Box::new(*v, *v));
         }
         bx
     }
 
+    pub fn iter_paths(&self) -> impl Iterator<Item = &[Vector]> {
+        (if self.offsets.is_empty() {
+            None
+        } else {
+            Some(
+                self.offsets
+                    .windows(2)
+                    .map(|window| {
+                        let (start, end) = (window[0], window[1]);
+                        &self.buffer[start..end]
+                    })
+                    .chain(std::iter::once(
+                        &self.buffer[self.offsets.last().copied().unwrap()..],
+                    )),
+            )
+        })
+        .into_iter()
+        .flatten()
+    }
+
     /// Applies a transformation matrix to all paths.
-    pub fn transform(&self, matrix: &Matrix) -> Paths {
-        let paths = self
-            .paths
-            .iter()
-            .map(|path| path_transform(path, matrix))
-            .collect();
-        Paths { paths }
+    pub fn transform(self, matrix: &Matrix) -> Paths {
+        Paths {
+            buffer: self
+                .buffer
+                .into_iter()
+                .map(|v| matrix.mul_position(v))
+                .collect(),
+            offsets: self.offsets,
+        }
     }
 
     /// Subdivides paths into smaller segments.
@@ -152,32 +236,37 @@ impl Paths {
     /// This is used internally for visibility testing. The `step` parameter
     /// controls the maximum distance between consecutive points.
     pub fn chop(&self, step: f64) -> Paths {
-        let paths = self
-            .paths
-            .iter()
-            .map(|path| path_chop(path, step))
-            .collect();
-        Paths { paths }
+        let mut result = Self::new();
+        for path in self.iter_paths() {
+            let mut new_path = result.new_path();
+            path_chop(path, step, &mut new_path);
+        }
+        result
     }
 
     pub fn chop_adaptive(&self, args: &RenderArgs) -> Paths {
-        let paths = self
-            .paths
-            .iter()
-            .map(|path| {
-                path_chop_adaptive(path, &args.screen_mat, args.width, args.height, args.step)
-            })
-            .collect();
-        Paths { paths }
+        let mut result = Self::new();
+        for path in self.iter_paths() {
+            let mut new_path = result.new_path();
+            path_chop_adaptive(
+                path,
+                &args.screen_mat,
+                args.width,
+                args.height,
+                args.step,
+                &mut new_path,
+            );
+        }
+        result
     }
 
     /// Filters paths using a custom filter.
     pub fn filter<F: Filter>(&self, f: &F) -> Paths {
-        let mut result = Vec::new();
-        for path in &self.paths {
-            result.extend(path_filter(path, f));
+        let mut result = Paths::new();
+        for path in self.iter_paths() {
+            path_filter(path, f, &mut result);
         }
-        Paths { paths: result }
+        result
     }
 
     /// Simplifies paths by removing redundant points.
@@ -185,12 +274,11 @@ impl Paths {
     /// Uses the Ramer-Douglas-Peucker algorithm to reduce the number of
     /// points while preserving the overall shape.
     pub fn simplify(&self, threshold: f64) -> Paths {
-        let paths = self
-            .paths
-            .iter()
-            .map(|path| path_simplify(path, threshold))
-            .collect();
-        Paths { paths }
+        let mut result = Paths::new();
+        for path in self.iter_paths() {
+            path_simplify(path, threshold, &mut result.new_path());
+        }
+        result
     }
 
     /// Converts the paths to an SVG string.
@@ -209,7 +297,7 @@ impl Paths {
             "<g transform=\"translate(0,{}) scale(1,-1)\">",
             height
         ));
-        for path in &self.paths {
+        for path in self.iter_paths() {
             lines.push(path_to_svg(path));
         }
         lines.push("</g></svg>".to_string());
@@ -262,7 +350,7 @@ impl Paths {
     /// Each path is written as a line of semicolon-separated x,y coordinates.
     pub fn write_to_txt(&self, path: &str) -> std::io::Result<()> {
         let mut file = std::fs::File::create(path)?;
-        for path_points in &self.paths {
+        for path_points in self.iter_paths() {
             let line: Vec<String> = path_points
                 .iter()
                 .map(|v| format!("{},{}", v.x, v.y))
@@ -348,73 +436,66 @@ fn draw_line(
     }
 }
 
-fn path_bounding_box(path: &Path) -> Box {
-    if path.is_empty() {
-        return Box::default();
-    }
-    let mut bx = Box::new(path[0], path[0]);
-    for v in path.iter().skip(1) {
-        bx = bx.extend(Box::new(*v, *v));
-    }
-    bx
-}
-
-fn path_transform(path: &Path, matrix: &Matrix) -> Path {
-    path.iter().map(|v| matrix.mul_position(*v)).collect()
-}
-
-fn path_chop(path: &Path, step: f64) -> Path {
-    let mut result = Vec::new();
+fn path_chop(path: &[Vector], step: f64, new_path: &mut NewPath) {
     for i in 0..path.len().saturating_sub(1) {
         let a = path[i];
         let b = path[i + 1];
         let v = b.sub(a);
         let l = v.length();
         if i == 0 {
-            result.push(a);
+            new_path.push(a);
         }
         let mut d = step;
         while d < l {
-            result.push(a.add(v.mul_scalar(d / l)));
+            new_path.push(a.add(v.mul_scalar(d / l)));
             d += step;
         }
-        result.push(b);
+        new_path.push(b);
     }
-    result
 }
 
 fn path_chop_adaptive(
-    path: &Path,
+    path: &[Vector],
     screen_mat: &Matrix,
     width: f64,
     height: f64,
     step: f64,
-) -> Path {
-    let mut result = vec![path[0]];
+    new_path: &mut NewPath,
+) {
+    if path.is_empty() {
+        return;
+    }
+
+    new_path.push(path[0]);
     let step_sq = step.powi(2);
-    path.iter()
-        .map(|&v| (v, screen_mat.mul_position_w(v)))
-        .collect::<Vec<_>>()
-        .windows(2)
-        .for_each(|window| {
-            recursive_subdivide(
-                (window[0], window[1]),
-                &|(a, _), (b, _)| {
-                    let mid = a.add(b).mul_scalar(0.5);
-                    (mid, screen_mat.mul_position_w(mid))
-                },
-                &|(a, sa), (b, sb)| {
-                    (sa.x < 0.0 && sb.x < 0.0
-                        || sa.y < 0.0 && sb.y < 0.0
-                        || sa.x > width && sb.x > width
-                        || sa.y > height && sb.y > height)
-                        || sa.distance_squared(sb) < step_sq
-                        || a.distance_squared(b) < crate::common::EPS
-                },
-                &mut |(x, _)| result.push(x),
-            )
-        });
-    result
+
+    let mut iter = path.iter();
+    let mut prev_v = *iter.next().unwrap();
+    let mut prev_sv = screen_mat.mul_position_w(prev_v);
+
+    for &curr_v in iter {
+        let curr_sv = screen_mat.mul_position_w(curr_v);
+
+        recursive_subdivide(
+            ((prev_v, prev_sv), (curr_v, curr_sv)),
+            &|(a, _), (b, _)| {
+                let mid = a.add(b).mul_scalar(0.5);
+                (mid, screen_mat.mul_position_w(mid))
+            },
+            &|(a, sa), (b, sb)| {
+                (sa.x < 0.0 && sb.x < 0.0
+                    || sa.y < 0.0 && sb.y < 0.0
+                    || sa.x > width && sb.x > width
+                    || sa.y > height && sb.y > height)
+                    || sa.distance_squared(sb) < step_sq
+                    || a.distance_squared(b) < crate::common::EPS
+            },
+            &mut |(x, _)| new_path.push(x),
+        );
+
+        prev_v = curr_v;
+        prev_sv = curr_sv;
+    }
 }
 
 /// Recursively subdivides an arc defined by angles `alpha` and `beta`
@@ -425,14 +506,15 @@ fn path_chop_adaptive(
 /// arc points are. The `screen_mat` is used to project the 3D points onto the screen
 /// for distance calculations. The `step_sq` parameter controls how closely the subdivided points
 /// approximate the arc on screen, with smaller values resulting in more points for a smoother arc.
-pub fn recursive_arc_subdivide(
+fn recursive_arc_subdivide(
     alpha: f64,
     beta: f64,
     r: f64,
     cuv: &(Vector, Vector, Vector),
     screen_mat: &Matrix,
     step_sq: f64,
-) -> Vec<f64> {
+    collector: &mut impl FnMut(f64),
+) {
     let screen_view = |x: f64| {
         screen_mat.mul_position_w(
             (cuv.0)
@@ -440,7 +522,7 @@ pub fn recursive_arc_subdivide(
                 .add((cuv.2).mul_scalar(x.sin() * r)),
         )
     };
-    let mut path = vec![alpha];
+    collector(alpha);
     crate::path::recursive_subdivide(
         ((alpha, screen_view(alpha)), (beta, screen_view(beta))),
         &|(alpha, _), (beta, _)| {
@@ -452,23 +534,8 @@ pub fn recursive_arc_subdivide(
             theta < PI / 180.0
                 || sa.distance_squared(sb) * theta / theta.sin() < step_sq && theta < PI / 3.0
         },
-        &mut |(x, _)| path.push(x),
+        &mut |(x, _)| collector(x),
     );
-    path
-}
-
-pub fn radius_expansion(path: &[f64], r: f64) -> Vec<f64> {
-    let mut radius: Vec<f64> = std::iter::once(0.0)
-        .chain(path.windows(2).map(|x| {
-            let (alpha, beta) = (x[0], x[1]);
-            let cos_theta = ((beta - alpha) / 2.0).cos();
-            r / cos_theta
-        }))
-        .collect();
-    let (back, front) = (radius.last().copied().unwrap(), radius[1]);
-    radius[0] = back;
-    radius.push(front);
-    radius
 }
 
 /// Generates a sequence of points along an arc defined by angles `alpha` and `beta`,
@@ -481,18 +548,29 @@ pub fn adaptive_arc(
     cuv: &(Vector, Vector, Vector),
     screen_mat: &Matrix,
     step_sq: f64,
-) -> Vec<Vector> {
-    let path = recursive_arc_subdivide(alpha, beta, r, cuv, screen_mat, step_sq);
-    let expanded_radius = radius_expansion(&path, r);
+    new_path: &mut NewPath,
+) {
+    recursive_arc_subdivide(alpha, beta, r, cuv, screen_mat, step_sq, &mut |x| {
+        new_path.push(Vector::new(x, 0., 0.))
+    });
     let (c, u, v) = cuv;
-    path.iter()
-        .enumerate()
-        .map(|(i, beta)| {
-            let max_r = expanded_radius[i].max(expanded_radius[i + 1]);
-            c.add(u.mul_scalar(beta.cos() * max_r))
-                .add(v.mul_scalar(beta.sin() * max_r))
-        })
-        .collect()
+    let slice = new_path.as_mut_slice();
+    let mut prev_r = r;
+    for i in 0..slice.len() {
+        let cur = slice[i].x;
+        let mut max_r = r;
+        max_r = max_r.max(prev_r);
+
+        if i + 1 < slice.len() {
+            let cos_theta = ((slice[i + 1].x - cur) / 2.0).cos();
+            prev_r = r / cos_theta;
+            max_r = max_r.max(prev_r);
+        }
+
+        slice[i] = c
+            .add(u.mul_scalar(cur.cos() * max_r))
+            .add(v.mul_scalar(cur.sin() * max_r));
+    }
 }
 
 /// Similar to `adaptive_arc`, but uses the original radius values
@@ -504,15 +582,18 @@ pub fn adaptive_arc_inner(
     cuv: &(Vector, Vector, Vector),
     screen_mat: &Matrix,
     step_sq: f64,
-) -> Vec<Vector> {
-    let path = recursive_arc_subdivide(alpha, beta, r, cuv, screen_mat, step_sq);
+    new_path: &mut NewPath,
+) {
+    recursive_arc_subdivide(alpha, beta, r, cuv, screen_mat, step_sq, &mut |x| {
+        new_path.push(Vector::new(x, 0., 0.))
+    });
     let (c, u, v) = cuv;
-    path.iter()
-        .map(|beta| {
-            c.add(u.mul_scalar(beta.cos() * r))
-                .add(v.mul_scalar(beta.sin() * r))
-        })
-        .collect()
+    new_path.as_mut_slice().iter_mut().for_each(|vector| {
+        let cur = vector.x;
+        *vector = c
+            .add(u.mul_scalar(cur.cos() * r))
+            .add(v.mul_scalar(cur.sin() * r));
+    });
 }
 
 pub fn recursive_subdivide<T: Copy>(
@@ -531,31 +612,23 @@ pub fn recursive_subdivide<T: Copy>(
     }
 }
 
-fn path_filter<F: Filter>(path: &Path, f: &F) -> Vec<Path> {
-    let mut result = Vec::new();
-    let mut current_path = Vec::new();
+fn path_filter<F: Filter>(path: &[Vector], f: &F, result: &mut Paths) {
+    let mut current_path = result.new_path();
 
     for v in path {
         if let Some(new_v) = f.filter(*v) {
             current_path.push(new_v);
         } else {
-            if current_path.len() > 1 {
-                result.push(current_path);
-            }
-            current_path = Vec::new();
+            drop(current_path);
+            current_path = result.new_path();
         }
     }
-
-    if current_path.len() > 1 {
-        result.push(current_path);
-    }
-
-    result
 }
 
-fn path_simplify(path: &Path, threshold: f64) -> Path {
+fn path_simplify(path: &[Vector], threshold: f64, new_path: &mut NewPath) {
     if path.len() < 3 {
-        return path.clone();
+        new_path.extend_from_slice(path);
+        return;
     }
     let a = path[0];
     let b = path[path.len() - 1];
@@ -571,17 +644,15 @@ fn path_simplify(path: &Path, threshold: f64) -> Path {
     }
 
     if distance > threshold {
-        let r1 = path_simplify(&path[..=index].to_vec(), threshold);
-        let r2 = path_simplify(&path[index..].to_vec(), threshold);
-        let mut result = r1[..r1.len() - 1].to_vec();
-        result.extend(r2);
-        result
+        path_simplify(&path[..=index], threshold, new_path);
+        new_path.pop();
+        path_simplify(&path[index..], threshold, new_path);
     } else {
-        vec![a, b]
+        new_path.extend([a, b]);
     }
 }
 
-fn path_to_svg(path: &Path) -> String {
+fn path_to_svg(path: &[Vector]) -> String {
     let coords: Vec<String> = path.iter().map(|v| format!("{},{}", v.x, v.y)).collect();
     let points = coords.join(" ");
     format!(

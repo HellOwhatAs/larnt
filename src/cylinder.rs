@@ -75,13 +75,15 @@ pub struct Cylinder {
 
 impl Cylinder {
     fn paths_striped(&self, num: u64) -> Paths {
-        let mut result = Vec::new();
+        let mut result = Paths::new();
         for a in (0..360).step_by((360 / num) as usize) {
             let x = self.radius * radians(a as f64).cos();
             let y = self.radius * radians(a as f64).sin();
-            result.push(vec![Vector::new(x, y, self.z0), Vector::new(x, y, self.z1)]);
+            result
+                .new_path()
+                .extend([Vector::new(x, y, self.z0), Vector::new(x, y, self.z1)]);
         }
-        Paths::from_vec(result)
+        result
     }
 
     fn paths_outline(&self, args: &RenderArgs) -> Paths {
@@ -92,6 +94,8 @@ impl Cylinder {
         //
         // This is of the form: a*cos(θ) + b*sin(θ) = c
         // Solution: θ = atan2(b, a) ± acos(c / sqrt(a^2 + b^2))
+        let mut result = Paths::new();
+
         let r = self.radius;
 
         let a = args.eye.x;
@@ -108,21 +112,18 @@ impl Cylinder {
         if ratio.abs() > 1.0 {
             // Eye is inside the cylinder - no proper silhouette
             // Fall back to full circles
-            return Paths::from_vec(
-                [self.z0, self.z1]
-                    .into_iter()
-                    .map(|z| {
-                        adaptive_arc_inner(
-                            0.0,
-                            PI * 2.0,
-                            r,
-                            &(Vector::new(0.0, 0.0, z), u, v),
-                            &args.screen_mat,
-                            step_sq,
-                        )
-                    })
-                    .collect(),
-            );
+            for z in [self.z0, self.z1] {
+                adaptive_arc_inner(
+                    0.0,
+                    PI * 2.0,
+                    r,
+                    &(Vector::new(0.0, 0.0, z), u, v),
+                    &args.screen_mat,
+                    step_sq,
+                    &mut result.new_path(),
+                )
+            }
+            return result;
         }
 
         let eye_azimuth = b.atan2(a);
@@ -131,32 +132,32 @@ impl Cylinder {
         let theta2 = eye_azimuth - angular_offset;
 
         // Front and back arcs seperately to pass visibility tests
-        let mut paths = [adaptive_arc, adaptive_arc_inner]
+        for (func, (alpha, beta)) in [adaptive_arc, adaptive_arc_inner]
             .iter()
             .zip([(theta2, theta1), (theta1, theta2 + PI * 2.0)])
-            .flat_map(|(func, (alpha, beta))| {
-                [self.z0, self.z1].into_iter().map(move |z| {
-                    func(
-                        alpha,
-                        beta,
-                        r,
-                        &(Vector::new(0.0, 0.0, z), u, v),
-                        &args.screen_mat,
-                        step_sq,
-                    )
-                })
-            })
-            .collect::<Vec<_>>();
+        {
+            for z in [self.z0, self.z1] {
+                func(
+                    alpha,
+                    beta,
+                    r,
+                    &(Vector::new(0.0, 0.0, z), u, v),
+                    &args.screen_mat,
+                    step_sq,
+                    &mut result.new_path(),
+                )
+            }
+        }
 
         // Silhouette lines from tangent points
         let a0 = Vector::new(r * theta1.cos(), r * theta1.sin(), self.z0);
         let a1 = Vector::new(r * theta1.cos(), r * theta1.sin(), self.z1);
         let b0 = Vector::new(r * theta2.cos(), r * theta2.sin(), self.z0);
         let b1 = Vector::new(r * theta2.cos(), r * theta2.sin(), self.z1);
-        paths.push(vec![a0, a1]);
-        paths.push(vec![b0, b1]);
+        result.new_path().extend([a0, a1]);
+        result.new_path().extend([b0, b1]);
 
-        Paths::from_vec(paths)
+        result
     }
 }
 
