@@ -140,6 +140,10 @@ impl<'a> NewPath<'a> {
     pub fn len(&self) -> usize {
         self.buffer.len() - self.offsets.last().copied().unwrap_or(0)
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 impl Extend<Vector> for NewPath<'_> {
@@ -150,10 +154,10 @@ impl Extend<Vector> for NewPath<'_> {
 
 impl<'a> Drop for NewPath<'a> {
     fn drop(&mut self) {
-        if let Some(last_offset) = self.offsets.last().copied() {
-            if self.buffer.len() == last_offset {
-                self.offsets.pop();
-            }
+        if let Some(last_offset) = self.offsets.last().copied()
+            && self.buffer.len() == last_offset
+        {
+            self.offsets.pop();
         }
     }
 }
