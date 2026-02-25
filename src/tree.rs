@@ -36,6 +36,10 @@ pub struct Tree<T> {
 }
 
 impl<T: Shape> Tree<T> {
+    pub fn shapes(&self) -> &[T] {
+        &self.shapes
+    }
+
     pub fn new(shapes: Vec<T>) -> Self {
         if shapes.is_empty() {
             return Tree {

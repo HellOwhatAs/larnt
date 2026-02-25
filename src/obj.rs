@@ -13,7 +13,6 @@
 //! ```
 
 use crate::mesh::Mesh;
-use crate::triangle::Triangle;
 use crate::util::parse_floats;
 use crate::vector::Vector;
 use std::fs::File;
@@ -85,13 +84,12 @@ pub fn load_obj(path: &str) -> std::io::Result<Mesh> {
 
                 for i in 1..fvs.len() - 1 {
                     let (i1, i2, i3) = (0, i, i + 1);
-                    let t = Triangle::new(vs[fvs[i1]], vs[fvs[i2]], vs[fvs[i3]]);
-                    triangles.push(t);
+                    triangles.extend([fvs[i1], fvs[i2], fvs[i3]]);
                 }
             }
             _ => {}
         }
     }
 
-    Ok(Mesh::new(triangles))
+    Ok(Mesh::new(vs, triangles))
 }

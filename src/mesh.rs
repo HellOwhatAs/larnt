@@ -13,37 +13,42 @@ use std::collections::HashMap;
 pub struct Mesh {
     bx: BBox,
     vertices: Vec<Vector>,
-    index_triangles: Vec<IndexTriangle>,
+    triangles: Vec<usize>,
     tree: Tree<Triangle>,
 }
 
 impl Mesh {
-    pub fn new(triangles: Vec<Triangle>) -> Self {
+    pub fn new(vertices: Vec<Vector>, triangles: Vec<usize>) -> Self {
+        let tree = Tree::new(
+            triangles
+                .chunks_exact(3)
+                .map(|w| Triangle::new(vertices[w[0]], vertices[w[1]], vertices[w[2]]))
+                .collect(),
+        );
+        Self {
+            bx: BBox::for_vectors(&vertices),
+            triangles,
+            vertices,
+            tree,
+        }
+    }
+
+    pub fn from_triangles(triangles: Vec<Triangle>) -> Self {
         let mut merger = VertexMerger::new(1e-6);
         let itriangles = triangles
             .iter()
-            .map(|t| IndexTriangle {
-                v1: merger.get_or_insert(t.v1),
-                v2: merger.get_or_insert(t.v2),
-                v3: merger.get_or_insert(t.v3),
-            })
+            .flat_map(|t| [t.v1, t.v2, t.v3].map(|v| merger.get_or_insert(v)))
             .collect();
-        Mesh {
+        Self {
             bx: BBox::for_shapes(&triangles),
-            index_triangles: itriangles,
+            triangles: itriangles,
             vertices: merger.vertices,
             tree: Tree::new(triangles),
         }
     }
 
-    pub fn triangles(&self) -> impl ExactSizeIterator<Item = Triangle> {
-        self.index_triangles.iter().map(|itr| {
-            Triangle::new(
-                self.vertices[itr.v1],
-                self.vertices[itr.v2],
-                self.vertices[itr.v3],
-            )
-        })
+    pub fn triangles(&self) -> &[Triangle] {
+        self.tree.shapes()
     }
 
     pub fn unit_cube(self) -> Self {
@@ -73,38 +78,47 @@ impl Mesh {
         for v in self.vertices.iter_mut() {
             *v = matrix.mul_position(*v);
         }
-        let triangles: Vec<Triangle> = self.triangles().collect();
-        self.bx = BBox::for_shapes(&triangles);
-        self.tree = Tree::new(triangles);
+        self.tree = Tree::new(
+            self.triangles
+                .chunks_exact(3)
+                .map(|w| {
+                    Triangle::new(
+                        self.vertices[w[0]],
+                        self.vertices[w[1]],
+                        self.vertices[w[2]],
+                    )
+                })
+                .collect(),
+        );
+        self.bx = BBox::for_shapes(self.triangles());
         self
     }
 
-    pub fn parametric_surface<F>(
-        get_point: F,
-        u_range: std::ops::Range<usize>,
-        v_range: std::ops::Range<usize>,
-    ) -> Mesh
-    where
-        F: Fn(usize, usize) -> Vector,
-    {
-        let mut triangles = Vec::with_capacity(u_range.len() * v_range.len() * 2);
-        for u in u_range {
-            for v in v_range.clone() {
-                let p00 = get_point(u, v);
-                let p10 = get_point(u + 1, v);
-                let p01 = get_point(u, v + 1);
-                let p11 = get_point(u + 1, v + 1);
+    pub fn parametric_surface(
+        points: Vec<Vector>,
+        u_steps: usize,
+        v_steps: usize,
+        indexer: impl Fn(usize, usize) -> usize,
+    ) -> Mesh {
+        let mut triangles = Vec::with_capacity(u_steps * v_steps * 6);
+        for u in 0..u_steps {
+            for v in 0..v_steps {
+                let i00 = indexer(u, v);
+                let i10 = indexer(u + 1, v);
+                let i01 = indexer(u, v + 1);
+                let i11 = indexer(u + 1, v + 1);
 
-                for [p1, p2, p3] in [[p00, p10, p01], [p10, p11, p01]] {
+                for i123 in [[i00, i10, i01], [i10, i11, i01]] {
+                    let [p1, p2, p3] = i123.map(|i| points[i]);
                     let cross = (p2.sub(p1)).cross(p3.sub(p1));
                     let area_squared = cross.x * cross.x + cross.y * cross.y + cross.z * cross.z;
                     if area_squared > crate::common::EPS {
-                        triangles.push(Triangle::new(p1, p2, p3));
+                        triangles.extend(i123);
                     }
                 }
             }
         }
-        Mesh::new(triangles)
+        Mesh::new(points, triangles)
     }
 }
 
@@ -125,9 +139,10 @@ impl Shape for Mesh {
         let mut paths = Paths::new();
         let mut normal_merger = VertexMerger::new(1e-6);
         let mut counter = HashMap::new();
-        self.index_triangles.iter().for_each(|it| {
-            let normal = normal_merger.get_or_insert(it.normalized_normal(&self.vertices));
-            it.paths().into_iter().for_each(|path| {
+        self.triangles.chunks_exact(3).for_each(|it| {
+            let normal = normal_merger
+                .get_or_insert(normalized_normal(it.iter().map(|&i| self.vertices[i])));
+            triangle_paths(it).into_iter().for_each(|path| {
                 counter
                     .entry((path, normal))
                     .and_modify(|i| *i += 1)
@@ -148,36 +163,24 @@ impl Shape for Mesh {
     }
 }
 
-/// Triangle defined by indices into a vertex list.
-struct IndexTriangle {
-    v1: usize,
-    v2: usize,
-    v3: usize,
+#[inline(always)]
+fn triangle_paths(i123: &[usize]) -> [(usize, usize); 3] {
+    let mut i123 = [0, 1, 2].map(|i| i123[i]);
+    i123.sort_unstable();
+    let [i1, i2, i3] = i123;
+    [(i1, i2), (i2, i3), (i1, i3)]
 }
 
-impl IndexTriangle {
-    fn paths(&self) -> [(usize, usize); 3] {
-        let [v1, v2, v3] = {
-            let mut vs = [self.v1, self.v2, self.v3];
-            vs.sort();
-            vs
-        };
-        [(v1, v2), (v2, v3), (v1, v3)]
-    }
-
-    fn normalized_normal(&self, vertices: &[Vector]) -> Vector {
-        let v1 = vertices[self.v1];
-        let v2 = vertices[self.v2];
-        let v3 = vertices[self.v3];
-        let normal = (v2.sub(v1)).cross(v3.sub(v1)).normalize();
-        if normal.x < 0.0
-            || (normal.x == 0.0 && normal.y < 0.0)
-            || (normal.x == 0.0 && normal.y == 0.0 && normal.z < 0.0)
-        {
-            normal.mul_scalar(-1.0)
-        } else {
-            normal
-        }
+fn normalized_normal(mut v123: impl Iterator<Item = Vector>) -> Vector {
+    let [v1, v2, v3] = std::array::from_fn(|_| v123.next().unwrap());
+    let normal = (v2.sub(v1)).cross(v3.sub(v1)).normalize();
+    if normal.x < 0.0
+        || (normal.x == 0.0 && normal.y < 0.0)
+        || (normal.x == 0.0 && normal.y == 0.0 && normal.z < 0.0)
+    {
+        normal.mul_scalar(-1.0)
+    } else {
+        normal
     }
 }
 

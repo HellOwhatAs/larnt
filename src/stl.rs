@@ -72,7 +72,7 @@ pub fn load_binary_stl(path: &str) -> std::io::Result<Mesh> {
         triangles.push(t);
     }
 
-    Ok(Mesh::new(triangles))
+    Ok(Mesh::from_triangles(triangles))
 }
 
 /// Saves a triangle mesh to a binary STL file.
@@ -162,13 +162,6 @@ pub fn load_stl(path: &str) -> std::io::Result<Mesh> {
         }
     }
 
-    let mut triangles = Vec::new();
-    for i in (0..vertices.len()).step_by(3) {
-        if i + 2 < vertices.len() {
-            let t = Triangle::new(vertices[i], vertices[i + 1], vertices[i + 2]);
-            triangles.push(t);
-        }
-    }
-
-    Ok(Mesh::new(triangles))
+    let triangles = (0..vertices.len()).collect();
+    Ok(Mesh::new(vertices, triangles))
 }

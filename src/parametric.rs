@@ -33,19 +33,19 @@ impl ParametricSurface {
                 grid.push(func(u, v));
             }
         }
-        let get_point = |i: usize, j: usize| grid[i * (v_steps + 1) + j];
 
-        Self::from_grid(get_point, u_steps, v_steps)
+        Self::from_grid(grid, u_steps, v_steps, |i, j| i * (v_steps + 1) + j)
     }
 
     pub fn from_grid(
-        get_point: impl Fn(usize, usize) -> Vector,
+        points: Vec<Vector>,
         u_steps: usize,
         v_steps: usize,
+        indexer: impl Fn(usize, usize) -> usize,
     ) -> Self {
         Self {
-            mesh: Mesh::parametric_surface(&get_point, 0..u_steps, 0..v_steps),
-            paths: Self::grid_paths(get_point, u_steps, v_steps),
+            paths: Self::grid_paths(|u, v| points[indexer(u, v)], u_steps, v_steps),
+            mesh: Mesh::parametric_surface(points, u_steps, v_steps, indexer),
         }
     }
 
