@@ -454,7 +454,7 @@ fn path_chop(path: &[Vector], step: f64, new_path: &mut NewPath) {
     }
 }
 
-pub fn path_chop_adaptive(
+fn path_chop_adaptive(
     path: &[Vector],
     screen_mat: &Matrix,
     width: f64,
@@ -506,14 +506,15 @@ pub fn path_chop_adaptive(
 /// arc points are. The `screen_mat` is used to project the 3D points onto the screen
 /// for distance calculations. The `step_sq` parameter controls how closely the subdivided points
 /// approximate the arc on screen, with smaller values resulting in more points for a smoother arc.
-pub fn recursive_arc_subdivide(
+fn recursive_arc_subdivide(
     alpha: f64,
     beta: f64,
     r: f64,
     cuv: &(Vector, Vector, Vector),
     screen_mat: &Matrix,
     step_sq: f64,
-) -> Vec<f64> {
+    collector: &mut impl FnMut(f64),
+) {
     let screen_view = |x: f64| {
         screen_mat.mul_position_w(
             (cuv.0)
@@ -521,7 +522,7 @@ pub fn recursive_arc_subdivide(
                 .add((cuv.2).mul_scalar(x.sin() * r)),
         )
     };
-    let mut path = vec![alpha];
+    collector(alpha);
     crate::path::recursive_subdivide(
         ((alpha, screen_view(alpha)), (beta, screen_view(beta))),
         &|(alpha, _), (beta, _)| {
@@ -533,23 +534,8 @@ pub fn recursive_arc_subdivide(
             theta < PI / 180.0
                 || sa.distance_squared(sb) * theta / theta.sin() < step_sq && theta < PI / 3.0
         },
-        &mut |(x, _)| path.push(x),
+        &mut |(x, _)| collector(x),
     );
-    path
-}
-
-pub fn radius_expansion(path: &[f64], r: f64) -> Vec<f64> {
-    let mut radius: Vec<f64> = std::iter::once(0.0)
-        .chain(path.windows(2).map(|x| {
-            let (alpha, beta) = (x[0], x[1]);
-            let cos_theta = ((beta - alpha) / 2.0).cos();
-            r / cos_theta
-        }))
-        .collect();
-    let (back, front) = (radius.last().copied().unwrap(), radius[1]);
-    radius[0] = back;
-    radius.push(front);
-    radius
 }
 
 /// Generates a sequence of points along an arc defined by angles `alpha` and `beta`,
@@ -564,14 +550,27 @@ pub fn adaptive_arc(
     step_sq: f64,
     new_path: &mut NewPath,
 ) {
-    let path = recursive_arc_subdivide(alpha, beta, r, cuv, screen_mat, step_sq);
-    let expanded_radius = radius_expansion(&path, r);
+    recursive_arc_subdivide(alpha, beta, r, cuv, screen_mat, step_sq, &mut |x| {
+        new_path.push(Vector::new(x, 0., 0.))
+    });
     let (c, u, v) = cuv;
-    new_path.extend(path.iter().enumerate().map(|(i, beta)| {
-        let max_r = expanded_radius[i].max(expanded_radius[i + 1]);
-        c.add(u.mul_scalar(beta.cos() * max_r))
-            .add(v.mul_scalar(beta.sin() * max_r))
-    }));
+    let slice = new_path.as_mut_slice();
+    let mut prev_r = r;
+    for i in 0..slice.len() {
+        let cur = slice[i].x;
+        let mut max_r = r;
+        max_r = max_r.max(prev_r);
+
+        if i + 1 < slice.len() {
+            let cos_theta = ((slice[i + 1].x - cur) / 2.0).cos();
+            prev_r = r / cos_theta;
+            max_r = max_r.max(prev_r);
+        }
+
+        slice[i] = c
+            .add(u.mul_scalar(cur.cos() * max_r))
+            .add(v.mul_scalar(cur.sin() * max_r));
+    }
 }
 
 /// Similar to `adaptive_arc`, but uses the original radius values
@@ -585,12 +584,16 @@ pub fn adaptive_arc_inner(
     step_sq: f64,
     new_path: &mut NewPath,
 ) {
-    let path = recursive_arc_subdivide(alpha, beta, r, cuv, screen_mat, step_sq);
+    recursive_arc_subdivide(alpha, beta, r, cuv, screen_mat, step_sq, &mut |x| {
+        new_path.push(Vector::new(x, 0., 0.))
+    });
     let (c, u, v) = cuv;
-    new_path.extend(path.iter().map(|beta| {
-        c.add(u.mul_scalar(beta.cos() * r))
-            .add(v.mul_scalar(beta.sin() * r))
-    }))
+    new_path.as_mut_slice().iter_mut().for_each(|vector| {
+        let cur = vector.x;
+        *vector = c
+            .add(u.mul_scalar(cur.cos() * r))
+            .add(v.mul_scalar(cur.sin() * r));
+    });
 }
 
 pub fn recursive_subdivide<T: Copy>(
