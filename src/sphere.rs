@@ -175,6 +175,8 @@ impl Shape for Sphere {
 impl Sphere {
     /// Outline texture: renders as a silhouette circle from the camera's perspective.
     fn paths_outline(&self, args: &RenderArgs) -> Paths {
+        let mut paths = Paths::new();
+
         let center = self.center;
         let radius = self.radius;
 
@@ -201,20 +203,21 @@ impl Sphere {
         let v = w.cross(u).normalize();
         let c = args.eye.add(w.mul_scalar(d));
 
-        let path = adaptive_arc(
+        adaptive_arc(
             0.0,
             PI * 2.,
             r,
             &(c, u, v),
             &args.screen_mat,
             args.step.powi(2),
+            &mut paths.new_path(),
         );
-        Paths::from_vec(vec![path])
+        paths
     }
 
     /// Latitude/longitude grid texture
     fn paths_lat_lng(&self, screen_mat: &Matrix, step: f64, n: i32, o: i32) -> Paths {
-        let mut paths = Vec::new();
+        let mut paths = Paths::new();
         let step_sq = step.powi(2);
 
         // Latitude lines
@@ -230,8 +233,15 @@ impl Sphere {
                 };
                 let (u, v) = (Vector::new(1., 0., 0.), Vector::new(0., 1., 0.));
 
-                let path = adaptive_arc(0.0, PI * 2.0, r, &(c, u, v), screen_mat, step_sq);
-                paths.push(path);
+                adaptive_arc(
+                    0.0,
+                    PI * 2.0,
+                    r,
+                    &(c, u, v),
+                    screen_mat,
+                    step_sq,
+                    &mut paths.new_path(),
+                );
                 lat += n;
             }
         }
@@ -248,57 +258,71 @@ impl Sphere {
                 };
                 let [alpha, beta] = [o, 180 - o].map(|x| radians(x as f64));
 
-                let path = adaptive_arc(alpha, beta, r, &(c, u, v), screen_mat, step_sq);
-                paths.push(path);
+                adaptive_arc(
+                    alpha,
+                    beta,
+                    r,
+                    &(c, u, v),
+                    screen_mat,
+                    step_sq,
+                    &mut paths.new_path(),
+                );
                 lng += n;
             }
         }
 
-        Paths::from_vec(paths)
+        paths
     }
 
     /// Random rotated equators (great circles)
     fn paths_random_equators(&self, screen_mat: &Matrix, step: f64, n: usize, seed: u64) -> Paths {
+        let mut paths = Paths::new();
         let mut rng = SmallRng::seed_from_u64(seed);
         let step_sq = step.powi(2);
         let (c, r) = (self.center, self.radius);
 
-        let mut paths = Vec::with_capacity(n);
         for _ in 0..n {
             let (u, v) = {
                 let [u, w] = [(); 2].map(|_| Vector::random_unit_vector(&mut rng));
                 (u, w.cross(u).normalize())
             };
 
-            let path = adaptive_arc(0.0, PI * 2.0, r, &(c, u, v), screen_mat, step_sq);
-            paths.push(path);
+            adaptive_arc(
+                0.0,
+                PI * 2.0,
+                r,
+                &(c, u, v),
+                screen_mat,
+                step_sq,
+                &mut paths.new_path(),
+            );
         }
 
-        Paths::from_vec(paths)
+        paths
     }
 
     /// Random point dots on the surface
     fn paths_random_fuzz(&self, num: usize, scale: f64, seed: u64) -> Paths {
+        let mut paths = Paths::new();
         let mut rng = SmallRng::seed_from_u64(seed);
-        let mut paths = Vec::new();
 
         for _ in 0..num {
             let v = Vector::random_unit_vector(&mut rng);
-            paths.push(vec![
+            paths.new_path().extend([
                 v.mul_scalar(self.radius).add(self.center),
                 v.mul_scalar(self.radius * scale).add(self.center),
             ]);
         }
 
-        Paths::from_vec(paths)
+        paths
     }
 
     /// Random concentric circles pattern
     fn paths_random_circles(&self, screen_mat: &Matrix, step: f64, num: usize, seed: u64) -> Paths {
+        let mut paths = Paths::new();
         let mut rng = SmallRng::seed_from_u64(seed);
-        let mut paths = Vec::new();
-        let mut seen: Vec<Vector> = Vec::new();
-        let mut radii: Vec<f64> = Vec::new();
+        let mut seen: Vec<Vector> = Vec::with_capacity(num);
+        let mut radii: Vec<f64> = Vec::with_capacity(num);
         let step_sq = step.powi(2);
 
         for _ in 0..num {
@@ -340,13 +364,20 @@ impl Sphere {
                     (r, c)
                 };
 
-                let path = adaptive_arc(0.0, PI * 2.0, r, &(c, p, q), screen_mat, step_sq);
-                paths.push(path);
+                adaptive_arc(
+                    0.0,
+                    PI * 2.0,
+                    r,
+                    &(c, p, q),
+                    screen_mat,
+                    step_sq,
+                    &mut paths.new_path(),
+                );
                 current_m *= 0.75;
             }
         }
 
-        Paths::from_vec(paths)
+        paths
     }
 }
 

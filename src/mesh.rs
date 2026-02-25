@@ -1,15 +1,13 @@
 use crate::bounding_box::Box;
-use crate::cube::Cube;
 use crate::hit::Hit;
 use crate::matrix::Matrix;
 use crate::path::Paths;
-use crate::plane::Plane;
 use crate::ray::Ray;
 use crate::shape::{RenderArgs, Shape};
 use crate::tree::Tree;
 use crate::triangle::Triangle;
 use crate::vector::Vector;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Triangle mesh shape.
@@ -108,34 +106,6 @@ impl Mesh {
         }
         Mesh::new(triangles)
     }
-
-    pub fn voxelize(&self, size: f64) -> Vec<Cube> {
-        let z1 = self.bx.min.z;
-        let z2 = self.bx.max.z;
-        let mut set: HashSet<(i64, i64, i64)> = HashSet::new();
-
-        let mut z = z1;
-        while z <= z2 {
-            let plane = Plane::new(Vector::new(0.0, 0.0, z), Vector::new(0.0, 0.0, 1.0));
-            let paths = plane.intersect_mesh(self);
-            for path in &paths.paths {
-                for v in path {
-                    let x = ((v.x / size + 0.5).floor() * size * 1000.0) as i64;
-                    let y = ((v.y / size + 0.5).floor() * size * 1000.0) as i64;
-                    let z = ((v.z / size + 0.5).floor() * size * 1000.0) as i64;
-                    set.insert((x, y, z));
-                }
-            }
-            z += size;
-        }
-
-        set.into_iter()
-            .map(|(x, y, z)| {
-                let v = Vector::new(x as f64 / 1000.0, y as f64 / 1000.0, z as f64 / 1000.0);
-                Cube::builder(v.sub_scalar(size / 2.0), v.add_scalar(size / 2.0)).build()
-            })
-            .collect()
-    }
 }
 
 impl Shape for Mesh {
@@ -165,6 +135,7 @@ impl Shape for Mesh {
     }
 
     fn paths(&self, _args: &RenderArgs) -> Paths {
+        let mut paths = Paths::new();
         let mut normal_merger = VertexMerger::new(1e-6);
         let mut counter = HashMap::new();
         self.index_triangles.iter().for_each(|it| {
@@ -176,13 +147,17 @@ impl Shape for Mesh {
                     .or_insert(1);
             })
         });
-        Paths::from_vec(
-            counter
-                .into_iter()
-                .filter(|(_, count)| *count == 1)
-                .map(|(((a, b), _), _)| vec![self.vertices[a], self.vertices[b]])
-                .collect(),
-        )
+
+        counter
+            .into_iter()
+            .filter(|(_, count)| *count == 1)
+            .for_each(|(((a, b), _), _)| {
+                paths
+                    .new_path()
+                    .extend([self.vertices[a], self.vertices[b]])
+            });
+
+        paths
     }
 }
 

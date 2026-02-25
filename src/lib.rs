@@ -40,7 +40,7 @@ pub use matrix::Matrix;
 pub use mesh::Mesh;
 pub use obj::load_obj;
 pub use parametric::ParametricSurface;
-pub use path::{Path, Paths};
+pub use path::{NewPath, Paths};
 pub use plane::Plane;
 pub use ray::Ray;
 pub use scene::Scene;

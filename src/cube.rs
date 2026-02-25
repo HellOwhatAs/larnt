@@ -117,7 +117,7 @@ impl Cube {
     fn paths_striped(&self, stripes: u64) -> Paths {
         let (x1, y1, z1) = (self.min.x, self.min.y, self.min.z);
         let (x2, y2, z2) = (self.max.x, self.max.y, self.max.z);
-        let mut paths = Vec::new();
+        let mut paths = Paths::new();
 
         for i in 0..=stripes {
             let p = i as f64 / stripes as f64;
@@ -126,16 +126,25 @@ impl Cube {
             let x_ = x2 - (x2 - x1) * p;
             let y_ = y2 - (y2 - y1) * p;
             if i != stripes {
-                paths.push(vec![Vector::new(x, y1, z1), Vector::new(x, y1, z2)]);
-                paths.push(vec![Vector::new(x_, y2, z1), Vector::new(x_, y2, z2)]);
-                paths.push(vec![Vector::new(x1, y_, z1), Vector::new(x1, y_, z2)]);
-                paths.push(vec![Vector::new(x2, y, z1), Vector::new(x2, y, z2)]);
+                for path in [
+                    [Vector::new(x, y1, z1), Vector::new(x, y1, z2)],
+                    [Vector::new(x_, y2, z1), Vector::new(x_, y2, z2)],
+                    [Vector::new(x1, y_, z1), Vector::new(x1, y_, z2)],
+                    [Vector::new(x2, y, z1), Vector::new(x2, y, z2)],
+                ] {
+                    paths.new_path().extend(path);
+                }
             }
             for z in [z1, z2] {
-                paths.push(vec![Vector::new(x, y, z), Vector::new(x_, y, z)]);
-                paths.push(vec![Vector::new(x, y, z), Vector::new(x, y_, z)]);
+                for path in [
+                    [Vector::new(x, y, z), Vector::new(x_, y, z)],
+                    [Vector::new(x, y, z), Vector::new(x, y_, z)],
+                ] {
+                    paths.new_path().extend(path);
+                }
             }
         }
-        Paths::from_vec(paths)
+
+        paths
     }
 }

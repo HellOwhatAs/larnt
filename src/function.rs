@@ -119,7 +119,7 @@ where
 
     /// Grid texture - lines along constant x and y (works with any function)
     fn paths_grid(&self, args: &RenderArgs, grid_size: f64) -> Paths {
-        let mut paths = Vec::new();
+        let mut paths = Paths::new();
         let step_sq = args.step.powi(2);
 
         // Lines along constant x
@@ -127,9 +127,11 @@ where
         let (a, b) = (self.bx.min.y, self.bx.max.y);
         while x <= self.bx.max.x {
             let f = |y| (self.func)(x, y).min(self.bx.max.z).max(self.bx.min.z);
-            let mut path = vec![Vector::new(x, a, f(a))];
+            let mut path = paths.new_path();
+            let (fa, fb) = (f(a), f(b));
+            path.push(Vector::new(x, a, fa));
             recursive_subdivide(
-                ((a, path[0].z), (b, f(b))),
+                ((a, fa), (b, fb)),
                 &|(a, _), (b, _)| {
                     let mid = (a + b) / 2.0;
                     (mid, f(mid))
@@ -141,7 +143,7 @@ where
                 },
                 &mut |(y, fy)| path.push(Vector::new(x, y, fy)),
             );
-            paths.push(zvisible_offset(path, args.eye));
+            zvisible_offset(path.as_mut_slice(), args.eye);
             x += grid_size;
         }
 
@@ -150,9 +152,11 @@ where
         let (a, b) = (self.bx.min.x, self.bx.max.x);
         while y <= self.bx.max.y {
             let f = |x| (self.func)(x, y).min(self.bx.max.z).max(self.bx.min.z);
-            let mut path = vec![Vector::new(a, y, f(a))];
+            let (fa, fb) = (f(a), f(b));
+            let mut path = paths.new_path();
+            path.push(Vector::new(a, y, fa));
             recursive_subdivide(
-                ((a, path[0].z), (b, f(b))),
+                ((a, fa), (b, fb)),
                 &|(a, _), (b, _)| {
                     let mid = (a + b) / 2.0;
                     (mid, f(mid))
@@ -164,22 +168,22 @@ where
                 },
                 &mut |(x, fx)| path.push(Vector::new(x, y, fx)),
             );
-            paths.push(zvisible_offset(path, args.eye));
+            zvisible_offset(path.as_mut_slice(), args.eye);
             y += grid_size;
         }
 
-        Paths::from_vec(paths)
+        paths
     }
 
     /// Swirl texture - radial lines with twist effect (best for negative z functions)
     fn paths_swirl(&self) -> Paths {
-        let mut paths = Vec::new();
+        let mut paths = Paths::new();
         let fine = 1.0 / 256.0;
         let max_radius = self.max_radius();
 
         let mut a = 0;
         while a < 360 {
-            let mut path = Vec::new();
+            let mut path = paths.new_path();
             let mut r = 0.0;
             while r <= max_radius {
                 let x = radians(a as f64).cos() * r;
@@ -199,27 +203,22 @@ where
                 {
                     path.push(Vector::new(x, y, z));
                 } else {
-                    // Point is outside bbox, start a new path segment
-                    if path.len() > 1 {
-                        paths.push(path);
-                    }
-                    path = Vec::new();
+                    drop(path);
+                    path = paths.new_path();
                 }
                 r += fine;
             }
-            if path.len() > 1 {
-                paths.push(path);
-            }
+
             a += 5;
         }
 
-        Paths::from_vec(paths)
+        paths
     }
 
     /// Spiral texture - single spiral path (works with any function)
     fn paths_spiral(&self) -> Paths {
-        let mut paths = Vec::new();
-        let mut path = Vec::new();
+        let mut paths = Paths::new();
+        let mut path = paths.new_path();
         let n = 10000;
         let max_radius = self.max_radius();
 
@@ -236,45 +235,47 @@ where
             {
                 path.push(Vector::new(x, y, z));
             } else {
-                // Point is outside bbox, start a new path segment
-                if path.len() > 1 {
-                    paths.push(path);
-                }
-                path = Vec::new();
+                drop(path);
+                path = paths.new_path();
             }
         }
 
-        if path.len() > 1 {
-            paths.push(path);
-        }
-
-        Paths::from_vec(paths)
+        drop(path);
+        paths
     }
 }
 
-fn zvisible_offset(path: Vec<Vector>, eye: Vector) -> Vec<Vector> {
-    let mut offsets = vec![0.0f64; path.len()];
-    let ez = eye.z;
-    for i in 1..path.len() - 1 {
-        let (a, c, b) = (path[i - 1], path[i], path[i + 1]);
-        let z = a.z
-            + (b.z - a.z)
-                * (((a.x - c.x).powi(2) + (a.y - c.y).powi(2))
-                    / ((a.x - b.x).powi(2) + (a.y - b.y).powi(2)))
-                .sqrt();
-        let offset = if (c.z > z) == (ez > z) { c.z - z } else { 0.0 };
-        if offset.abs() > offsets[i - 1].abs() {
-            offsets[i - 1] = offset;
-        }
-        if offset.abs() > offsets[i + 1].abs() {
-            offsets[i + 1] = offset;
-        }
+pub fn zvisible_offset(path: &mut [Vector], eye: Vector) {
+    let n = path.len();
+    if n < 3 {
+        return;
     }
-    path.into_iter()
-        .zip(offsets)
-        .map(|(mut v, z)| {
-            v.z += z;
-            v
-        })
-        .collect()
+
+    let ez = eye.z;
+
+    let mut o_minus_2 = 0.0_f64;
+    let mut o_minus_1 = 0.0_f64;
+
+    for i in 1..n - 1 {
+        let a = path[i - 1];
+        let c = path[i];
+        let b = path[i + 1];
+
+        let dist_ac_sq = (a.x - c.x).powi(2) + (a.y - c.y).powi(2);
+        let dist_ab_sq = (a.x - b.x).powi(2) + (a.y - b.y).powi(2);
+        let z = a.z + (b.z - a.z) * (dist_ac_sq / dist_ab_sq).sqrt();
+        let o_i = if (c.z > z) == (ez > z) { c.z - z } else { 0.0 };
+
+        let old = o_minus_2;
+        let new = o_i;
+        let final_offset = if new.abs() > old.abs() { new } else { old };
+
+        path[i - 1].z += final_offset;
+
+        o_minus_2 = o_minus_1;
+        o_minus_1 = o_i;
+    }
+
+    path[n - 2].z += o_minus_2;
+    path[n - 1].z += o_minus_1;
 }

@@ -83,10 +83,10 @@ impl Shape for Triangle {
     }
 
     fn paths(&self, _args: &RenderArgs) -> Paths {
-        Paths::from_vec(vec![
-            vec![self.v1, self.v2],
-            vec![self.v2, self.v3],
-            vec![self.v3, self.v1],
-        ])
+        let mut paths = Paths::new();
+        paths
+            .new_path()
+            .extend([self.v1, self.v2, self.v3, self.v1]);
+        paths
     }
 }

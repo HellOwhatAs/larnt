@@ -53,25 +53,21 @@ impl ParametricSurface {
     where
         F: Fn(usize, usize) -> Vector,
     {
-        let mut raw_paths = Vec::with_capacity(u_steps + 1 + v_steps + 1);
+        let mut paths = Paths::new();
 
         for v in 0..=v_steps {
-            let mut path = Vec::with_capacity(u_steps + 1);
-            for u in 0..=u_steps {
-                path.push(get_point(u, v));
-            }
-            raw_paths.push(path);
+            paths
+                .new_path()
+                .extend((0..=u_steps).map(|u| get_point(u, v)));
         }
 
         for u in 0..=u_steps {
-            let mut path = Vec::with_capacity(v_steps + 1);
-            for v in 0..=v_steps {
-                path.push(get_point(u, v));
-            }
-            raw_paths.push(path);
+            paths
+                .new_path()
+                .extend((0..=v_steps).map(|v| get_point(u, v)));
         }
 
-        Paths::from_vec(raw_paths)
+        paths
     }
 }
 
