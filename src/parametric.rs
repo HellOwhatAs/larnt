@@ -7,8 +7,8 @@ use crate::shape::{RenderArgs, Shape};
 use crate::vector::Vector;
 
 pub struct ParametricSurface {
-    mesh: Mesh,
-    paths: Paths,
+    pub mesh: Mesh,
+    pub paths: Paths,
 }
 
 impl ParametricSurface {
