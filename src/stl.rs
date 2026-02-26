@@ -15,7 +15,7 @@
 //! scene.add(mesh);
 //! ```
 
-use crate::mesh::Mesh;
+use crate::mesh::{Mesh, TriangleMesh};
 use crate::triangle::Triangle;
 use crate::util::parse_floats;
 use crate::vector::Vector;
@@ -105,6 +105,8 @@ pub fn save_binary_stl(path: &str, mesh: &Mesh) -> std::io::Result<()> {
 
     // Write triangles
     for triangle in triangles {
+        let triangle = triangle.as_ref();
+
         // Normal (placeholder - zeros)
         writer.write_all(&[0u8; 12])?;
 

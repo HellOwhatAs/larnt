@@ -1,12 +1,12 @@
 use crate::bounding_box::BBox;
 use crate::hit::Hit;
-use crate::matrix::Matrix;
 use crate::path::Paths;
 use crate::ray::Ray;
 use crate::shape::{RenderArgs, Shape};
 use crate::tree::Tree;
 use crate::triangle::Triangle;
 use crate::vector::Vector;
+use crate::{Matrix, TransformedShape};
 use std::collections::HashMap;
 
 /// Triangle mesh shape.
@@ -47,51 +47,14 @@ impl Mesh {
         }
     }
 
-    pub fn triangles(&self) -> &[Triangle] {
-        self.tree.shapes()
-    }
-
-    pub fn unit_cube(self) -> Self {
-        self.fit_inside(
-            BBox::new(Vector::default(), Vector::new(1.0, 1.0, 1.0)),
-            Vector::default(),
-        )
-        .move_to(Vector::default(), Vector::new(0.5, 0.5, 0.5))
-    }
-
-    pub fn move_to(self, position: Vector, anchor: Vector) -> Self {
-        let matrix = Matrix::translate(position.sub(self.bx.anchor(anchor)));
-        self.transform(&matrix)
-    }
-
-    pub fn fit_inside(self, bx: BBox, anchor: Vector) -> Self {
+    pub fn fit_inside(&self, bx: BBox, anchor: Vector) -> Matrix {
         let scale = bx.size().div(self.bx.size()).min_component();
         let extra = bx.size().sub(self.bx.size().mul_scalar(scale));
         let mut matrix = Matrix::identity();
         matrix = matrix.translated(self.bx.min.mul_scalar(-1.0));
         matrix = matrix.scaled(Vector::new(scale, scale, scale));
         matrix = matrix.translated(bx.min.add(extra.mul(anchor)));
-        self.transform(&matrix)
-    }
-
-    pub fn transform(mut self, matrix: &Matrix) -> Self {
-        for v in self.vertices.iter_mut() {
-            *v = matrix.mul_position(*v);
-        }
-        self.tree = Tree::new(
-            self.triangles
-                .chunks_exact(3)
-                .map(|w| {
-                    Triangle::new(
-                        self.vertices[w[0]],
-                        self.vertices[w[1]],
-                        self.vertices[w[2]],
-                    )
-                })
-                .collect(),
-        );
-        self.bx = BBox::for_shapes(self.triangles());
-        self
+        matrix
     }
 
     pub fn parametric_surface(
@@ -99,7 +62,7 @@ impl Mesh {
         u_steps: usize,
         v_steps: usize,
         indexer: impl Fn(usize, usize) -> usize,
-    ) -> Mesh {
+    ) -> Self {
         let mut triangles = Vec::with_capacity(u_steps * v_steps * 6);
         for u in 0..u_steps {
             for v in 0..v_steps {
@@ -118,7 +81,35 @@ impl Mesh {
                 }
             }
         }
-        Mesh::new(points, triangles)
+        Self::new(points, triangles)
+    }
+}
+
+impl AsRef<Triangle> for Triangle {
+    fn as_ref(&self) -> &Triangle {
+        self
+    }
+}
+
+pub trait TriangleMesh {
+    fn triangles(&self) -> impl Iterator<Item = impl AsRef<Triangle>> + ExactSizeIterator;
+}
+
+impl TriangleMesh for Mesh {
+    fn triangles(&self) -> impl Iterator<Item = impl AsRef<Triangle>> + ExactSizeIterator {
+        self.tree.shapes().iter()
+    }
+}
+
+impl TriangleMesh for TransformedShape<Mesh> {
+    fn triangles(&self) -> impl Iterator<Item = impl AsRef<Triangle>> + ExactSizeIterator {
+        self.shape.tree.shapes().iter().map(|triangle| {
+            Triangle::new(
+                self.matrix.mul_position(triangle.v1),
+                self.matrix.mul_position(triangle.v2),
+                self.matrix.mul_position(triangle.v3),
+            )
+        })
     }
 }
 

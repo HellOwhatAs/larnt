@@ -1,7 +1,7 @@
 use std::{fs::File, time::Duration};
 
 use image::{Delay, Frame, ImageBuffer, Rgba, codecs::gif::GifEncoder};
-use larnt::{BBox, Matrix, Plane, Vector, load_obj};
+use larnt::{BBox, Matrix, Plane, TransformedShape, Vector, load_obj};
 
 fn save_gif_from_iter(
     frames_iter: impl Iterator<Item = ImageBuffer<Rgba<u8>, Vec<u8>>>,
@@ -23,12 +23,12 @@ fn save_gif_from_iter(
 }
 
 fn main() {
-    let mesh = load_obj("examples/suzanne.obj")
-        .expect("Failed to load OBJ")
-        .fit_inside(
-            BBox::new(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)),
-            Vector::new(0.5, 0.5, 0.5),
-        );
+    let mesh = load_obj("examples/suzanne.obj").expect("Failed to load OBJ");
+    let matrix = mesh.fit_inside(
+        BBox::new(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)),
+        Vector::new(0.5, 0.5, 0.5),
+    );
+    let mesh = TransformedShape::new(mesh, matrix);
     let slices = 128;
     let size = 1024.0;
     save_gif_from_iter(

@@ -1,5 +1,5 @@
 use crate::common::EPS;
-use crate::mesh::Mesh;
+use crate::mesh::TriangleMesh;
 use crate::path::Paths;
 use crate::triangle::Triangle;
 use crate::vector::Vector;
@@ -46,10 +46,10 @@ impl Plane {
         }
     }
 
-    pub fn intersect_mesh(&self, m: &Mesh) -> Paths {
+    pub fn intersect_mesh(&self, m: &impl TriangleMesh) -> Paths {
         let mut result = Paths::new();
         for t in m.triangles() {
-            if let Some((v1, v2)) = self.intersect_triangle(&t) {
+            if let Some((v1, v2)) = self.intersect_triangle(t.as_ref()) {
                 result.new_path().extend([v1, v2]);
             }
         }

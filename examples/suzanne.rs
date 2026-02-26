@@ -1,9 +1,14 @@
-use larnt::{Matrix, TransformedShape, Vector, load_obj, render};
+use larnt::{BBox, Matrix, Mesh, TransformedShape, Vector, load_obj, render};
 
 fn main() {
-    let mesh = load_obj("examples/suzanne.obj")
-        .expect("Failed to load OBJ")
-        .unit_cube();
+    let mesh: Mesh = load_obj("examples/suzanne.obj").expect("Failed to load OBJ");
+    let matrix = mesh
+        .fit_inside(
+            BBox::new(Vector::new(0.0, 0.0, 0.0), Vector::new(1.0, 1.0, 1.0)),
+            Vector::new(0.0, 0.0, 0.0),
+        )
+        .translated(Vector::new(-0.5, -0.5, -0.5));
+    let mesh = TransformedShape::new(mesh, matrix);
 
     let transform = Matrix::rotate(Vector::new(0.0, 1.0, 0.0), 0.5);
 
