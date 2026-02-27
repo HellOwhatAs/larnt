@@ -17,7 +17,7 @@ fn main() {
     let torus_mesh = ParametricSurface::new(klein_func, (0.0, 2.0 * PI), (0.0, 2.0 * PI), 128, 64);
 
     render(vec![torus_mesh])
-        .eye(Vector::new(5., 5., 5.))
+        .eye(Vector::new(5., 0.5, 5.))
         .call()
         .write_to_png("out.png", 1024.0, 1024.0);
 }

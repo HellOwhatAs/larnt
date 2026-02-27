@@ -165,5 +165,5 @@ pub fn load_stl(path: &str) -> std::io::Result<Mesh> {
     }
 
     let triangles = (0..vertices.len()).collect();
-    Ok(Mesh::new(vertices, triangles))
+    Ok(Mesh::builder(vertices, triangles).build())
 }

@@ -7,32 +7,40 @@ use crate::tree::Tree;
 use crate::triangle::Triangle;
 use crate::vector::Vector;
 use crate::{Matrix, TransformedShape};
-use std::collections::HashMap;
+use bon::Builder;
+use std::collections::{HashMap, HashSet};
+
+#[derive(Debug, Clone, Default)]
+pub enum MeshTexture {
+    #[default]
+    Triangles,
+    Polygonal,
+    Silhouette,
+}
 
 /// Triangle mesh shape.
+#[derive(Builder)]
 pub struct Mesh {
-    bx: BBox,
-    vertices: Vec<Vector>,
-    triangles: Vec<usize>,
+    #[builder(start_fn)]
+    pub vertices: Vec<Vector>,
+    #[builder(start_fn)]
+    pub triangles: Vec<usize>,
+    #[builder(skip = BBox::for_vectors(&vertices))]
+    pub bx: BBox,
+    #[builder(default)]
+    pub flipped_triangles: HashSet<(usize, usize)>,
+    #[builder(default)]
+    pub texture: MeshTexture,
+    #[builder(skip = Tree::new(
+        triangles
+            .chunks_exact(3)
+            .map(|w| Triangle::new(vertices[w[0]], vertices[w[1]], vertices[w[2]]))
+            .collect(),
+    ))]
     tree: Tree<Triangle>,
 }
 
 impl Mesh {
-    pub fn new(vertices: Vec<Vector>, triangles: Vec<usize>) -> Self {
-        let tree = Tree::new(
-            triangles
-                .chunks_exact(3)
-                .map(|w| Triangle::new(vertices[w[0]], vertices[w[1]], vertices[w[2]]))
-                .collect(),
-        );
-        Self {
-            bx: BBox::for_vectors(&vertices),
-            triangles,
-            vertices,
-            tree,
-        }
-    }
-
     pub fn from_triangles(triangles: Vec<Triangle>) -> Self {
         let mut merger = VertexMerger::new(1e-6);
         let itriangles = triangles
@@ -44,6 +52,8 @@ impl Mesh {
             triangles: itriangles,
             vertices: merger.vertices,
             tree: Tree::new(triangles),
+            flipped_triangles: HashSet::new(),
+            texture: MeshTexture::default(),
         }
     }
 
@@ -57,31 +67,100 @@ impl Mesh {
         matrix
     }
 
-    pub fn parametric_surface(
-        points: Vec<Vector>,
-        u_steps: usize,
-        v_steps: usize,
-        indexer: impl Fn(usize, usize) -> usize,
-    ) -> Self {
-        let mut triangles = Vec::with_capacity(u_steps * v_steps * 6);
-        for u in 0..u_steps {
-            for v in 0..v_steps {
-                let i00 = indexer(u, v);
-                let i10 = indexer(u + 1, v);
-                let i01 = indexer(u, v + 1);
-                let i11 = indexer(u + 1, v + 1);
-
-                for i123 in [[i00, i10, i01], [i10, i11, i01]] {
-                    let [p1, p2, p3] = i123.map(|i| points[i]);
-                    let cross = (p2.sub(p1)).cross(p3.sub(p1));
-                    let area_squared = cross.x * cross.x + cross.y * cross.y + cross.z * cross.z;
-                    if area_squared > crate::common::EPS {
-                        triangles.extend(i123);
-                    }
-                }
-            }
+    pub fn filter_paths(&self, group_keeper: impl Fn(&[(usize, usize, usize)]) -> bool) -> Paths {
+        let mut paths = Paths::new();
+        if self.triangles.len() < 3 {
+            return paths;
         }
-        Self::new(points, triangles)
+
+        let edges = {
+            let mut edges = self
+                .triangles
+                .chunks_exact(3)
+                .enumerate()
+                .flat_map(|(face_idx, chunk)| {
+                    let [i1, i2, i3] = [chunk[0], chunk[1], chunk[2]];
+                    [
+                        (i1.min(i2), i1.max(i2), face_idx),
+                        (i2.min(i3), i2.max(i3), face_idx),
+                        (i3.min(i1), i3.max(i1), face_idx),
+                    ]
+                })
+                .collect::<Vec<_>>();
+            edges.sort_unstable_by_key(|e| (e.0, e.1));
+            edges
+        };
+
+        let mut i = 0;
+        while i < edges.len() {
+            let current_edge = (edges[i].0, edges[i].1);
+            let mut count = 1;
+
+            while i + count < edges.len()
+                && (edges[i + count].0, edges[i + count].1) == current_edge
+            {
+                count += 1;
+            }
+
+            if group_keeper(&edges[i..i + count]) {
+                paths
+                    .new_path()
+                    .extend([self.vertices[current_edge.0], self.vertices[current_edge.1]]);
+            }
+
+            i += count;
+        }
+
+        paths
+    }
+
+    pub fn triangle_paths(&self, _args: &RenderArgs) -> Paths {
+        self.filter_paths(|_| true)
+    }
+
+    pub fn polygonal_paths(&self, _args: &RenderArgs) -> Paths {
+        let face_normals: Vec<Vector> = self
+            .triangles
+            .chunks_exact(3)
+            .map(|chunk| normalized_normal(chunk.iter().map(|&i| self.vertices[i])))
+            .collect();
+        self.filter_paths(|edges| {
+            if edges.len() == 1 {
+                true
+            } else {
+                let base_normal = face_normals[edges[0].2];
+                edges.iter().skip(1).any(|e| {
+                    let other_normal = face_normals[e.2];
+                    base_normal.distance_squared(other_normal) > crate::common::EPS
+                })
+            }
+        })
+    }
+
+    pub fn silhouette_paths(&self, args: &RenderArgs) -> Paths {
+        let face_data: Vec<_> = self
+            .triangles
+            .chunks_exact(3)
+            .map(|chunk| {
+                let [v1, v2, v3] = [0, 1, 2].map(|i| self.vertices[chunk[i]]);
+                let true_normal = (v2.sub(v1)).cross(v3.sub(v1)).normalize();
+                let view_dir = args.eye.sub(v1);
+                true_normal.dot(view_dir)
+            })
+            .collect();
+        self.filter_paths(|edges| {
+            if edges.len() == 2 {
+                let [dot1, dot2] = [0, 1].map(|i| face_data[edges[i].2]);
+                let (a, b) = (edges[0].2, edges[1].2);
+                let key = if a < b { (a, b) } else { (b, a) };
+                if self.flipped_triangles.contains(&key) {
+                    return dot1 * dot2 >= 0.0;
+                }
+                dot1 * dot2 <= 0.0
+            } else {
+                true
+            }
+        })
     }
 }
 
@@ -126,40 +205,13 @@ impl Shape for Mesh {
         self.tree.intersect(r)
     }
 
-    fn paths(&self, _args: &RenderArgs) -> Paths {
-        let mut paths = Paths::new();
-        let mut normal_merger = VertexMerger::new(1e-6);
-        let mut counter = HashMap::new();
-        self.triangles.chunks_exact(3).for_each(|it| {
-            let normal = normal_merger
-                .get_or_insert(normalized_normal(it.iter().map(|&i| self.vertices[i])));
-            triangle_paths(it).into_iter().for_each(|path| {
-                counter
-                    .entry((path, normal))
-                    .and_modify(|i| *i += 1)
-                    .or_insert(1);
-            })
-        });
-
-        counter
-            .into_iter()
-            .filter(|(_, count)| *count == 1)
-            .for_each(|(((a, b), _), _)| {
-                paths
-                    .new_path()
-                    .extend([self.vertices[a], self.vertices[b]])
-            });
-
-        paths
+    fn paths(&self, args: &RenderArgs) -> Paths {
+        match self.texture {
+            MeshTexture::Triangles => self.triangle_paths(args),
+            MeshTexture::Polygonal => self.polygonal_paths(args),
+            MeshTexture::Silhouette => self.silhouette_paths(args),
+        }
     }
-}
-
-#[inline(always)]
-fn triangle_paths(i123: &[usize]) -> [(usize, usize); 3] {
-    let mut i123 = [0, 1, 2].map(|i| i123[i]);
-    i123.sort_unstable();
-    let [i1, i2, i3] = i123;
-    [(i1, i2), (i2, i3), (i1, i3)]
 }
 
 fn normalized_normal(mut v123: impl Iterator<Item = Vector>) -> Vector {
