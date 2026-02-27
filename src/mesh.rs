@@ -1,5 +1,4 @@
 use crate::bounding_box::BBox;
-use crate::common::EPS;
 use crate::hit::Hit;
 use crate::path::Paths;
 use crate::ray::Ray;
@@ -8,34 +7,40 @@ use crate::tree::Tree;
 use crate::triangle::Triangle;
 use crate::vector::Vector;
 use crate::{Matrix, TransformedShape};
+use bon::Builder;
 use std::collections::{HashMap, HashSet};
 
+#[derive(Debug, Clone, Default)]
+pub enum MeshTexture {
+    #[default]
+    Triangles,
+    Polygonal,
+    Silhouette,
+}
+
 /// Triangle mesh shape.
+#[derive(Builder)]
 pub struct Mesh {
-    bx: BBox,
+    #[builder(start_fn)]
     pub vertices: Vec<Vector>,
+    #[builder(start_fn)]
     pub triangles: Vec<usize>,
+    #[builder(skip = BBox::for_vectors(&vertices))]
+    pub bx: BBox,
+    #[builder(default)]
+    pub flipped_triangles: HashSet<(usize, usize)>,
+    #[builder(default)]
+    pub texture: MeshTexture,
+    #[builder(skip = Tree::new(
+        triangles
+            .chunks_exact(3)
+            .map(|w| Triangle::new(vertices[w[0]], vertices[w[1]], vertices[w[2]]))
+            .collect(),
+    ))]
     tree: Tree<Triangle>,
-    pub flipped_triangles: Option<HashSet<(usize, usize)>>,
 }
 
 impl Mesh {
-    pub fn new(vertices: Vec<Vector>, triangles: Vec<usize>) -> Self {
-        let tree = Tree::new(
-            triangles
-                .chunks_exact(3)
-                .map(|w| Triangle::new(vertices[w[0]], vertices[w[1]], vertices[w[2]]))
-                .collect(),
-        );
-        Self {
-            bx: BBox::for_vectors(&vertices),
-            triangles,
-            vertices,
-            tree,
-            flipped_triangles: None,
-        }
-    }
-
     pub fn from_triangles(triangles: Vec<Triangle>) -> Self {
         let mut merger = VertexMerger::new(1e-6);
         let itriangles = triangles
@@ -47,7 +52,8 @@ impl Mesh {
             triangles: itriangles,
             vertices: merger.vertices,
             tree: Tree::new(triangles),
-            flipped_triangles: None,
+            flipped_triangles: HashSet::new(),
+            texture: MeshTexture::default(),
         }
     }
 
@@ -59,124 +65,6 @@ impl Mesh {
         matrix = matrix.scaled(Vector::new(scale, scale, scale));
         matrix = matrix.translated(bx.min.add(extra.mul(anchor)));
         matrix
-    }
-
-    pub fn parametric_surface(
-        points: Vec<Vector>,
-        u_steps: usize,
-        v_steps: usize,
-        indexer: impl Fn(usize, usize) -> usize,
-    ) -> Self {
-        let (u_mapper, v_mapper) = {
-            let upoints =
-                |u| -> Vec<Vector> { (0..v_steps).map(|v| points[indexer(u, v)]).collect() };
-            let vpoints =
-                |v| -> Vec<Vector> { (0..u_steps).map(|u| points[indexer(u, v)]).collect() };
-            let [u0, ue] = [0, u_steps].map(upoints);
-            let [v0, ve] = [0, v_steps].map(vpoints);
-            let u_mapper = CyclicMapping::check_equal(&u0, &ue);
-            let v_mapper = CyclicMapping::check_equal(&v0, &ve);
-            (u_mapper, v_mapper)
-        };
-
-        let mut triangles = Vec::with_capacity(u_steps * v_steps * 6);
-        let mut build_triangles = |u: usize, v: usize| -> (Option<usize>, Option<usize>) {
-            let u_mapper = u_mapper.filter(|_| u == u_steps - 1);
-            let v_mapper = v_mapper.filter(|_| v == v_steps - 1);
-
-            let get_idx = |du: bool, dv: bool| {
-                let base_u = if du { u + 1 } else { u };
-                let base_v = if dv { v + 1 } else { v };
-                let pu = match (du, u_mapper, dv, v_mapper) {
-                    (true, Some(_), _, _) => 0,
-                    (_, _, true, Some(vmap)) => vmap.map_index_inv(base_u),
-                    _ => base_u,
-                };
-                let pv = match (dv, v_mapper, du, u_mapper) {
-                    (true, Some(_), _, _) => 0,
-                    (_, _, true, Some(umap)) => umap.map_index_inv(base_v),
-                    _ => base_v,
-                };
-                indexer(pu, pv)
-            };
-
-            let i00 = get_idx(false, false);
-            let i10 = get_idx(true, false);
-            let i01 = get_idx(false, true);
-            let i11 = get_idx(true, true);
-
-            let mut add_triangle = |a, b, c| {
-                (a != b && a != c && b != c).then(|| {
-                    let tri_idx = triangles.len() / 3;
-                    triangles.extend([a, b, c]);
-                    tri_idx
-                })
-            };
-            let prev = add_triangle(i00, i10, i01);
-            let next = add_triangle(i10, i11, i01);
-            (prev, next)
-        };
-
-        let flipped_triangles = {
-            let mut flipped_triangles: Option<HashSet<(usize, usize)>> = None;
-            let mut u_rev = u_mapper
-                .is_some_and(|m| m.is_reverse())
-                .then(|| vec![None; v_steps * 2]);
-            let mut v_rev = v_mapper
-                .is_some_and(|m| m.is_reverse())
-                .then(|| vec![None; u_steps * 2]);
-
-            for u in 0..u_steps {
-                for v in 0..v_steps {
-                    let (prev_tri, next_tri) = build_triangles(u, v);
-                    if let Some(uarr) = &mut u_rev {
-                        if u == 0 {
-                            uarr[v] = prev_tri;
-                        }
-                        if u == u_steps - 1 {
-                            uarr[v_steps + v] = next_tri;
-                        }
-                    }
-                    if let Some(varr) = &mut v_rev {
-                        if v == 0 {
-                            varr[u] = prev_tri;
-                        }
-                        if v == v_steps - 1 {
-                            varr[u_steps + u] = next_tri;
-                        }
-                    }
-                }
-            }
-
-            let mut process_flipped =
-                |x0: &[Option<usize>], xe: &[Option<usize>], ysteps: usize, xmap: CyclicMapping| {
-                    for (ib, b) in xe
-                        .iter()
-                        .copied()
-                        .enumerate()
-                        .filter_map(|(i, ob)| ob.map(|b| (i, b)))
-                    {
-                        let ib_next = (ib + 1) % ysteps;
-                        let ia = xmap.map_index_inv(ib_next);
-                        if let Some(a) = x0[ia] {
-                            let flipped = flipped_triangles.get_or_insert_default();
-                            flipped.insert(if a < b { (a, b) } else { (b, a) });
-                        }
-                    }
-                };
-
-            if let (Some(uarr), Some(umap)) = (u_rev, u_mapper) {
-                process_flipped(&uarr[..v_steps], &uarr[v_steps..], v_steps, umap);
-            }
-            if let (Some(varr), Some(vmap)) = (v_rev, v_mapper) {
-                process_flipped(&varr[..u_steps], &varr[u_steps..], u_steps, vmap);
-            }
-            flipped_triangles
-        };
-
-        let mut result = Self::new(points, triangles);
-        result.flipped_triangles = flipped_triangles;
-        result
     }
 
     pub fn filter_paths(&self, group_keeper: impl Fn(&[(usize, usize, usize)]) -> bool) -> Paths {
@@ -226,7 +114,11 @@ impl Mesh {
         paths
     }
 
-    pub fn vanilla_paths(&self, _args: &RenderArgs) -> Paths {
+    pub fn triangle_paths(&self, _args: &RenderArgs) -> Paths {
+        self.filter_paths(|_| true)
+    }
+
+    pub fn polygonal_paths(&self, _args: &RenderArgs) -> Paths {
         let face_normals: Vec<Vector> = self
             .triangles
             .chunks_exact(3)
@@ -259,13 +151,10 @@ impl Mesh {
         self.filter_paths(|edges| {
             if edges.len() == 2 {
                 let [dot1, dot2] = [0, 1].map(|i| face_data[edges[i].2]);
-                if let Some(flipped) = &self.flipped_triangles
-                    && flipped.contains(&{
-                        let (a, b) = (edges[0].2, edges[1].2);
-                        if a < b { (a, b) } else { (b, a) }
-                    })
-                {
-                    return dot1 * dot2 > 0.0;
+                let (a, b) = (edges[0].2, edges[1].2);
+                let key = if a < b { (a, b) } else { (b, a) };
+                if self.flipped_triangles.contains(&key) {
+                    return dot1 * dot2 >= 0.0;
                 }
                 dot1 * dot2 <= 0.0
             } else {
@@ -317,67 +206,11 @@ impl Shape for Mesh {
     }
 
     fn paths(&self, args: &RenderArgs) -> Paths {
-        self.silhouette_paths(args)
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum CyclicMapping {
-    Forward(usize, usize),
-    Reverse(usize, usize),
-}
-
-impl CyclicMapping {
-    #[inline]
-    pub fn is_reverse(&self) -> bool {
-        matches!(self, CyclicMapping::Reverse(_, _))
-    }
-
-    #[inline]
-    pub fn map_index(&self, a_idx: usize) -> usize {
-        match *self {
-            CyclicMapping::Forward(offset, len) => (offset + a_idx) % len,
-            CyclicMapping::Reverse(offset, len) => (offset + len - (a_idx % len)) % len,
+        match self.texture {
+            MeshTexture::Triangles => self.triangle_paths(args),
+            MeshTexture::Polygonal => self.polygonal_paths(args),
+            MeshTexture::Silhouette => self.silhouette_paths(args),
         }
-    }
-
-    #[inline]
-    pub fn map_index_inv(&self, b_idx: usize) -> usize {
-        match *self {
-            CyclicMapping::Forward(offset, len) => (b_idx + len - (offset % len)) % len,
-            CyclicMapping::Reverse(offset, len) => (offset + len - (b_idx % len)) % len,
-        }
-    }
-
-    pub fn check_equal(a: &[Vector], b: &[Vector]) -> Option<CyclicMapping> {
-        let n = a.len();
-        if a.len() != b.len() || n == 0 {
-            return None;
-        }
-        for i in 0..n {
-            if a[0].distance_squared(b[i]) <= EPS {
-                let (b1, b2) = b.split_at(i);
-                let a_tail = &a[1..];
-                let forward_match = a_tail
-                    .iter()
-                    .zip(b2[1..].iter().chain(b1.iter()))
-                    .all(|(va, &vb)| va.distance_squared(vb) <= EPS);
-                if forward_match {
-                    return Some(CyclicMapping::Forward(i, n));
-                }
-
-                let reverse_match = a_tail
-                    .iter()
-                    .rev()
-                    .zip(b2[1..].iter().chain(b1.iter()))
-                    .all(|(va, &vb)| va.distance_squared(vb) <= EPS);
-
-                if reverse_match {
-                    return Some(CyclicMapping::Reverse(i, n));
-                }
-            }
-        }
-        None
     }
 }
 

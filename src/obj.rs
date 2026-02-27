@@ -91,5 +91,5 @@ pub fn load_obj(path: &str) -> std::io::Result<Mesh> {
         }
     }
 
-    Ok(Mesh::new(vs, triangles))
+    Ok(Mesh::builder(vs, triangles).build())
 }
