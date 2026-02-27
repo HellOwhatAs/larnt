@@ -67,175 +67,113 @@ impl Mesh {
         v_steps: usize,
         indexer: impl Fn(usize, usize) -> usize,
     ) -> Self {
+        let (u_mapper, v_mapper) = {
+            let upoints =
+                |u| -> Vec<Vector> { (0..v_steps).map(|v| points[indexer(u, v)]).collect() };
+            let vpoints =
+                |v| -> Vec<Vector> { (0..u_steps).map(|u| points[indexer(u, v)]).collect() };
+            let [u0, ue] = [0, u_steps].map(upoints);
+            let [v0, ve] = [0, v_steps].map(vpoints);
+            let u_mapper = CyclicMapping::check_equal(&u0, &ue);
+            let v_mapper = CyclicMapping::check_equal(&v0, &ve);
+            (u_mapper, v_mapper)
+        };
+
         let mut triangles = Vec::with_capacity(u_steps * v_steps * 6);
-        let mut flipped_triangles = None;
-
-        let [u0, ue] = [0, u_steps].map(|u| {
-            (0..v_steps)
-                .map(|v| points[indexer(u, v)])
-                .collect::<Vec<_>>()
-        });
-        let [v0, ve] = [0, v_steps].map(|v| {
-            (0..u_steps)
-                .map(|u| points[indexer(u, v)])
-                .collect::<Vec<_>>()
-        });
-        let u_mapper = CyclicMapping::check_equal(&u0, &ue);
-        let v_mapper = CyclicMapping::check_equal(&v0, &ve);
-
-        let mut build_triangles = |u: usize, v: usize| -> (usize, usize) {
+        let mut build_triangles = |u: usize, v: usize| -> (Option<usize>, Option<usize>) {
             let u_mapper = u_mapper.filter(|_| u == u_steps - 1);
             let v_mapper = v_mapper.filter(|_| v == v_steps - 1);
-            let (p00, p10, p01, p11) = match (u_mapper, v_mapper) {
-                (None, None) => ((u, v), (u + 1, v), (u, v + 1), (u + 1, v + 1)),
-                (None, Some(vmap)) => (
-                    (u, v),
-                    (u + 1, v),
-                    (vmap.map_index_inv(u), 0),
-                    (vmap.map_index_inv(u + 1), 0),
-                ),
-                (Some(umap), None) => (
-                    (u, v),
-                    (0, umap.map_index_inv(v)),
-                    (u, v + 1),
-                    (0, umap.map_index_inv(v + 1)),
-                ),
-                (Some(umap), Some(vmap)) => (
-                    (u, v),
-                    (0, umap.map_index_inv(v)),
-                    (vmap.map_index_inv(u), 0),
-                    (0, 0),
-                ),
+
+            let get_idx = |du: bool, dv: bool| {
+                let base_u = if du { u + 1 } else { u };
+                let base_v = if dv { v + 1 } else { v };
+                let pu = match (du, u_mapper, dv, v_mapper) {
+                    (true, Some(_), _, _) => 0,
+                    (_, _, true, Some(vmap)) => vmap.map_index_inv(base_u),
+                    _ => base_u,
+                };
+                let pv = match (dv, v_mapper, du, u_mapper) {
+                    (true, Some(_), _, _) => 0,
+                    (_, _, true, Some(umap)) => umap.map_index_inv(base_v),
+                    _ => base_v,
+                };
+                indexer(pu, pv)
             };
 
-            let i00 = indexer(p00.0, p00.1);
-            let i10 = indexer(p10.0, p10.1);
-            let i01 = indexer(p01.0, p01.1);
-            let i11 = indexer(p11.0, p11.1);
+            let i00 = get_idx(false, false);
+            let i10 = get_idx(true, false);
+            let i01 = get_idx(false, true);
+            let i11 = get_idx(true, true);
 
-            let prev = triangles.len() / 3;
-            for [a, b, c] in [[i00, i10, i01], [i10, i11, i01]] {
-                if a != b && a != c && b != c {
+            let mut add_triangle = |a, b, c| {
+                (a != b && a != c && b != c).then(|| {
+                    let tri_idx = triangles.len() / 3;
                     triangles.extend([a, b, c]);
-                }
-            }
-            let next = triangles.len() / 3 - 1;
+                    tri_idx
+                })
+            };
+            let prev = add_triangle(i00, i10, i01);
+            let next = add_triangle(i10, i11, i01);
             (prev, next)
         };
 
-        match (u_mapper, v_mapper) {
-            (u_mapper, Some(vmap))
-                if vmap.is_reverse() && u_mapper.map_or(true, |umap| !umap.is_reverse()) =>
-            {
-                let mut flipped = HashSet::new();
-                let mut v0 = vec![usize::MAX; u_steps];
-                let mut ve = vec![usize::MAX; u_steps];
-                for u in 0..u_steps {
-                    v0[u] = build_triangles(u, 0).0;
-                }
-                for v in 1..(v_steps - 1) {
-                    for u in 0..u_steps {
-                        build_triangles(u, v);
-                    }
-                }
-                for u in 0..u_steps {
-                    ve[u] = build_triangles(u, v_steps - 1).1;
-                }
-                for (ib, b) in ve.into_iter().enumerate() {
-                    let ib = (ib + 1) % u_steps;
-                    let ia = vmap.map_index_inv(ib);
-                    let a = v0[ia];
-                    flipped.insert(if a < b { (a, b) } else { (b, a) });
-                }
-                if !flipped.is_empty() {
-                    flipped_triangles = Some(flipped);
-                };
-            }
-            (Some(umap), v_mapper)
-                if umap.is_reverse() && v_mapper.map_or(true, |vmap| !vmap.is_reverse()) =>
-            {
-                let mut flipped = HashSet::new();
-                let mut u0 = vec![usize::MAX; v_steps];
-                let mut ue = vec![usize::MAX; v_steps];
+        let flipped_triangles = {
+            let mut flipped_triangles: Option<HashSet<(usize, usize)>> = None;
+            let mut u_rev = u_mapper
+                .is_some_and(|m| m.is_reverse())
+                .then(|| vec![None; v_steps * 2]);
+            let mut v_rev = v_mapper
+                .is_some_and(|m| m.is_reverse())
+                .then(|| vec![None; u_steps * 2]);
+
+            for u in 0..u_steps {
                 for v in 0..v_steps {
-                    u0[v] = build_triangles(0, v).0;
-                }
-                for u in 1..(u_steps - 1) {
-                    for v in 0..v_steps {
-                        build_triangles(u, v);
+                    let (prev_tri, next_tri) = build_triangles(u, v);
+                    if let Some(uarr) = &mut u_rev {
+                        if u == 0 {
+                            uarr[v] = prev_tri;
+                        }
+                        if u == u_steps - 1 {
+                            uarr[v_steps + v] = next_tri;
+                        }
+                    }
+                    if let Some(varr) = &mut v_rev {
+                        if v == 0 {
+                            varr[u] = prev_tri;
+                        }
+                        if v == v_steps - 1 {
+                            varr[u_steps + u] = next_tri;
+                        }
                     }
                 }
-                for v in 0..v_steps {
-                    ue[v] = build_triangles(u_steps - 1, v).1;
-                }
-                for (ib, b) in ue.into_iter().enumerate() {
-                    let ib = (ib + 1) % v_steps;
-                    let ia = umap.map_index_inv(ib);
-                    let a = u0[ia];
-                    flipped.insert(if a < b { (a, b) } else { (b, a) });
-                }
-                if !flipped.is_empty() {
-                    flipped_triangles = Some(flipped);
+            }
+
+            let mut process_flipped =
+                |x0: &[Option<usize>], xe: &[Option<usize>], ysteps: usize, xmap: CyclicMapping| {
+                    for (ib, b) in xe
+                        .iter()
+                        .copied()
+                        .enumerate()
+                        .filter_map(|(i, ob)| ob.map(|b| (i, b)))
+                    {
+                        let ib_next = (ib + 1) % ysteps;
+                        let ia = xmap.map_index_inv(ib_next);
+                        if let Some(a) = x0[ia] {
+                            let flipped = flipped_triangles.get_or_insert_default();
+                            flipped.insert(if a < b { (a, b) } else { (b, a) });
+                        }
+                    }
                 };
-            }
-            (Some(umap), Some(vmap)) if umap.is_reverse() && vmap.is_reverse() => {
-                let mut flipped = HashSet::new();
-                let mut u0 = vec![usize::MAX; v_steps];
-                let mut ue = vec![usize::MAX; v_steps];
-                let mut v0 = vec![usize::MAX; u_steps];
-                let mut ve = vec![usize::MAX; u_steps];
-                for u in 0..u_steps {
-                    v0[u] = build_triangles(u, 0).0;
-                }
-                u0[0] = v0[0];
-                for v in 1..v_steps {
-                    u0[v] = build_triangles(0, v).0;
-                }
-                for u in 1..(u_steps - 1) {
-                    for v in 1..(v_steps - 1) {
-                        build_triangles(u, v);
-                    }
-                }
-                ue[0] = v0[u_steps - 1];
-                ve[0] = u0[v_steps - 1];
-                for u in 1..u_steps {
-                    ve[u] = build_triangles(u, v_steps - 1).1;
-                }
-                for v in 1..(v_steps - 1) {
-                    ue[v] = build_triangles(u_steps - 1, v).1;
-                }
-                ue[v_steps - 1] = ve[u_steps - 1];
 
-                if umap.is_reverse() {
-                    for (ib, b) in ue.into_iter().enumerate() {
-                        let ib = (ib + 1) % v_steps;
-                        let ia = umap.map_index_inv(ib);
-                        let a = u0[ia];
-                        flipped.insert(if a < b { (a, b) } else { (b, a) });
-                    }
-                }
-
-                if vmap.is_reverse() {
-                    for (ib, b) in ve.into_iter().enumerate() {
-                        let ib = (ib + 1) % u_steps;
-                        let ia = vmap.map_index_inv(ib);
-                        let a = v0[ia];
-                        flipped.insert(if a < b { (a, b) } else { (b, a) });
-                    }
-                }
-
-                if !flipped.is_empty() {
-                    flipped_triangles = Some(flipped);
-                };
+            if let (Some(uarr), Some(umap)) = (u_rev, u_mapper) {
+                process_flipped(&uarr[..v_steps], &uarr[v_steps..], v_steps, umap);
             }
-            _ => {
-                for u in 0..u_steps {
-                    for v in 0..v_steps {
-                        build_triangles(u, v);
-                    }
-                }
+            if let (Some(varr), Some(vmap)) = (v_rev, v_mapper) {
+                process_flipped(&varr[..u_steps], &varr[u_steps..], u_steps, vmap);
             }
-        }
+            flipped_triangles
+        };
+
         let mut result = Self::new(points, triangles);
         result.flipped_triangles = flipped_triangles;
         result
