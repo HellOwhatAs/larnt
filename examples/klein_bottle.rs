@@ -14,9 +14,9 @@ fn main() {
         let z = sin_u_half * sin_v + cos_u_half * sin_2v;
         Vector::new(x, y, z)
     };
-    let torus_mesh = ParametricSurface::new(klein_func, (0.0, 2.0 * PI), (0.0, 2.0 * PI), 128, 64);
+    let klein = ParametricSurface::new(klein_func, (0.0, 2.0 * PI), (0.0, 2.0 * PI), 128, 64);
 
-    render(vec![torus_mesh])
+    render(vec![klein])
         .eye(Vector::new(5., 0.5, 5.))
         .call()
         .write_to_png("out.png", 1024.0, 1024.0);

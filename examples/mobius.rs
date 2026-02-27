@@ -1,27 +1,33 @@
-use larnt::{ParametricSurface, Vector, render};
+use larnt::{ParametricSurface, Primitive, Vector, mesh::MeshTexture, render};
 use std::f64::consts::PI;
 
 fn main() {
-    let r = 2.0;
-    let width = 1.0;
-    let thickness = 0.1;
+    let radius = 2.0;
+    let width = 0.5;
 
-    let solid_mobius_func = |u: f64, v: f64| -> Vector {
-        let cx = width * v.cos();
-        let cz = thickness * v.sin();
-
-        let twist = u / 2.0;
-        let rx = cx * twist.cos() - cz * twist.sin();
-        let rz = cx * twist.sin() + cz * twist.cos();
-
-        let x = (r + rx) * u.cos();
-        let y = (r + rx) * u.sin();
-        let z = rz;
+    let mobius_func = |u: f64, v: f64| -> Vector {
+        let x = (radius + (v / 2.0) * (u / 2.0).cos()) * u.cos();
+        let y = (radius + (v / 2.0) * (u / 2.0).cos()) * u.sin();
+        let z = (v / 2.0) * (u / 2.0).sin();
         Vector::new(x, y, z)
     };
-    let torus_mesh = ParametricSurface::new(solid_mobius_func, (0.0, 4.0 * PI), (0.0, PI), 160, 20);
-    render(vec![torus_mesh])
-        .eye(Vector::new(4., 4., 4.))
+    let mut mobius =
+        ParametricSurface::new_mesh(mobius_func, (0.0, 2.0 * PI), (-width, width), 80, 20);
+    mobius.texture = MeshTexture::Silhouette;
+
+    let mobius_func2 = |u: f64, v: f64| -> Vector {
+        let x = (radius + (v / 2.0) * (u / 2.0).cos()) * u.cos() - 2.0;
+        let z = (radius + (v / 2.0) * (u / 2.0).cos()) * u.sin();
+        let y = (v / 2.0) * (u / 2.0).sin();
+        Vector::new(x, y, z)
+    };
+    let mut mobius2 =
+        ParametricSurface::new_mesh(mobius_func2, (0.0, 2.0 * PI), (-width, width), 80, 20);
+    mobius2.texture = MeshTexture::Silhouette;
+
+    render::<Primitive>(vec![mobius.into(), mobius2.into()])
+        .eye(Vector::new(3., -5., 1.))
+        .center(Vector::new(-0.2, 0., 0.))
         .call()
         .write_to_png("out.png", 1024.0, 1024.0);
 }

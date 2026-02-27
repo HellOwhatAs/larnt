@@ -25,6 +25,8 @@
 use rand::Rng;
 use std::ops::{Add, Div, Mul, Sub};
 
+use crate::common::EPS;
+
 /// A 3D vector with x, y, and z components.
 ///
 /// `Vector` is the fundamental type for 3D mathematics in `larnt`. It supports
@@ -226,6 +228,23 @@ impl Vector {
 
     pub fn min_component(&self) -> f64 {
         self.x.min(self.y).min(self.z)
+    }
+
+    pub fn max_component(&self) -> f64 {
+        self.x.max(self.y).max(self.z)
+    }
+
+    pub fn map(self, f: impl Fn(f64) -> f64) -> Vector {
+        let Vector { x, y, z } = self;
+        Vector {
+            x: f(x),
+            y: f(y),
+            z: f(z),
+        }
+    }
+
+    pub fn all_close(self, other: Vector) -> bool {
+        self.sub(other).map(|x| x.abs()).max_component() < EPS
     }
 
     pub fn segment_distance(&self, v: Vector, w: Vector) -> f64 {
