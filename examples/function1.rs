@@ -1,15 +1,25 @@
-use larnt::{ParametricSurface, Vector, render};
+use larnt::{ParametricSurface, Primitive, Vector, mesh::MeshTexture, render};
 
 fn main() {
     let func = |u: f64, v: f64| -> Vector {
         let z = 2.0 * (u.powi(2) + v.powi(2)).sqrt().sin();
         Vector::new(u, v, z)
     };
-    let mesh = ParametricSurface::new(func, (-20.0, 20.0), (-20.0, 20.0), 100, 100);
+    let range = (-20.0, 20.0);
+    let surface = ParametricSurface::new(func, range, range, 100, 100);
+    let mut mesh = ParametricSurface::new_mesh(
+        |u, v| func(u, v).add(Vector::new(-6., -2., 20.)),
+        range,
+        range,
+        200,
+        200,
+    );
+    mesh.texture = MeshTexture::Silhouette;
 
-    render(vec![mesh])
-        .eye(Vector::new(45., 25., 30.))
-        .center(Vector::new(4., 0., 0.))
+    render::<Primitive>(vec![surface.into(), mesh.into()])
+        .eye(Vector::new(75., 35., 50.))
+        .center(Vector::new(2., 0., 10.))
+        .fovy(32.)
         .call()
         .to_image(1024.0, 1024.0)
         .linewidth(1.5)
