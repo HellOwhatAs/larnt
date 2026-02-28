@@ -97,8 +97,8 @@ pub fn render<T: Shape>(
         paths = paths.chop_adaptive(&args);
     }
 
-    paths = {
-        let tree = Tree::new(shapes);
+    let tree = Tree::new(shapes);
+    let filter = {
         let visible = |eye: Vector, point: Vector| -> bool {
             let v = eye.sub(point);
             if v.length() == 0.0 {
@@ -108,12 +108,12 @@ pub fn render<T: Shape>(
             let hit = tree.intersect(r);
             hit.t >= v.length()
         };
-        let filter = ClipFilter::new(matrix, eye, visible);
-        paths.filter(&filter)
+        ClipFilter::new(matrix, eye, visible)
     };
+    paths = paths.filter(&filter);
 
     if step > 0.0 {
-        paths = paths.simplify(1e-6);
+        paths = paths.simplify(step / height.max(width));
     }
 
     paths.transform(&viewport_mat)
