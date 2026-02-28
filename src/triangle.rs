@@ -79,7 +79,7 @@ impl Shape for Triangle {
         Self::intersect_vertices(self.v1, self.v2, self.v3, r)
     }
 
-    fn paths(&self, _args: &RenderArgs) -> Paths {
+    fn paths(&self, _args: &RenderArgs) -> Paths<Vector> {
         let mut paths = Paths::new();
         paths
             .new_path()

@@ -73,7 +73,7 @@ pub struct Cylinder {
 }
 
 impl Cylinder {
-    fn paths_striped(&self, num: u64) -> Paths {
+    fn paths_striped(&self, num: u64) -> Paths<Vector> {
         let mut result = Paths::new();
         for a in (0..360).step_by((360 / num) as usize) {
             let x = self.radius * radians(a as f64).cos();
@@ -85,7 +85,7 @@ impl Cylinder {
         result
     }
 
-    fn paths_outline(&self, args: &RenderArgs) -> Paths {
+    fn paths_outline(&self, args: &RenderArgs) -> Paths<Vector> {
         // For a cylinder with radius r aligned along Z-axis, the silhouette
         // generators are found by solving:
         // E.x * cos(θ) + E.y * sin(θ) = r
@@ -207,7 +207,7 @@ impl Shape for Cylinder {
         Hit::no_hit()
     }
 
-    fn paths(&self, args: &RenderArgs) -> Paths {
+    fn paths(&self, args: &RenderArgs) -> Paths<Vector> {
         match self.texture {
             CylinderTexture::Outline => self.paths_outline(args),
             CylinderTexture::Striped(num) => self.paths_striped(num),

@@ -82,7 +82,7 @@ macro_rules! impl_shape_for_enum {
             fn intersect(&self, r: Ray) -> Hit { match self { $( $enum_name::$variant(inner) => inner.intersect(r), )* } }
 
             #[inline(always)]
-            fn paths(&self, args: &RenderArgs) -> Paths { match self { $( $enum_name::$variant(inner) => inner.paths(args), )* } }
+            fn paths(&self, args: &RenderArgs) -> Paths<Vector> { match self { $( $enum_name::$variant(inner) => inner.paths(args), )* } }
         }
     };
 }

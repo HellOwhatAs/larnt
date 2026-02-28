@@ -158,7 +158,7 @@ impl Shape for Sphere {
         Hit::no_hit()
     }
 
-    fn paths(&self, args: &RenderArgs) -> Paths {
+    fn paths(&self, args: &RenderArgs) -> Paths<Vector> {
         match self.texture {
             SphereTexture::Outline => self.paths_outline(args),
             SphereTexture::LatLng { n, o } => self.paths_lat_lng(&args.screen_mat, args.step, n, o),
@@ -177,7 +177,7 @@ impl Shape for Sphere {
 
 impl Sphere {
     /// Outline texture: renders as a silhouette circle from the camera's perspective.
-    fn paths_outline(&self, args: &RenderArgs) -> Paths {
+    fn paths_outline(&self, args: &RenderArgs) -> Paths<Vector> {
         let mut paths = Paths::new();
 
         let center = self.center;
@@ -219,7 +219,7 @@ impl Sphere {
     }
 
     /// Latitude/longitude grid texture
-    fn paths_lat_lng(&self, screen_mat: &Matrix, step: f64, n: i32, o: i32) -> Paths {
+    fn paths_lat_lng(&self, screen_mat: &Matrix, step: f64, n: i32, o: i32) -> Paths<Vector> {
         let mut paths = Paths::new();
         let step_sq = step.powi(2);
 
@@ -278,7 +278,13 @@ impl Sphere {
     }
 
     /// Random rotated equators (great circles)
-    fn paths_random_equators(&self, screen_mat: &Matrix, step: f64, n: usize, seed: u64) -> Paths {
+    fn paths_random_equators(
+        &self,
+        screen_mat: &Matrix,
+        step: f64,
+        n: usize,
+        seed: u64,
+    ) -> Paths<Vector> {
         let mut paths = Paths::new();
         let mut rng = SmallRng::seed_from_u64(seed);
         let step_sq = step.powi(2);
@@ -305,7 +311,7 @@ impl Sphere {
     }
 
     /// Random point dots on the surface
-    fn paths_random_fuzz(&self, num: usize, scale: f64, seed: u64) -> Paths {
+    fn paths_random_fuzz(&self, num: usize, scale: f64, seed: u64) -> Paths<Vector> {
         let mut paths = Paths::new();
         let mut rng = SmallRng::seed_from_u64(seed);
 
@@ -321,7 +327,13 @@ impl Sphere {
     }
 
     /// Random concentric circles pattern
-    fn paths_random_circles(&self, screen_mat: &Matrix, step: f64, num: usize, seed: u64) -> Paths {
+    fn paths_random_circles(
+        &self,
+        screen_mat: &Matrix,
+        step: f64,
+        num: usize,
+        seed: u64,
+    ) -> Paths<Vector> {
         let mut paths = Paths::new();
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut seen: Vec<Vector> = Vec::with_capacity(num);

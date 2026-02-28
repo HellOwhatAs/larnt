@@ -46,7 +46,7 @@ impl Plane {
         }
     }
 
-    pub fn intersect_mesh(&self, m: &impl TriangleMesh) -> Paths {
+    pub fn intersect_mesh(&self, m: &impl TriangleMesh) -> Paths<Vector> {
         let mut result = Paths::new();
         for t in m.triangles() {
             if let Some((v1, v2)) = self.intersect_triangle(t.as_ref()) {

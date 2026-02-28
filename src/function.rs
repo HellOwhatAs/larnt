@@ -98,7 +98,7 @@ where
         Hit::no_hit()
     }
 
-    fn paths(&self, args: &RenderArgs) -> Paths {
+    fn paths(&self, args: &RenderArgs) -> Paths<Vector> {
         match self.texture {
             FunctionTexture::Grid(grid_size) => self.paths_grid(args, grid_size),
             FunctionTexture::Swirl => self.paths_swirl(),
@@ -118,7 +118,7 @@ where
     }
 
     /// Grid texture - lines along constant x and y (works with any function)
-    fn paths_grid(&self, args: &RenderArgs, grid_size: f64) -> Paths {
+    fn paths_grid(&self, args: &RenderArgs, grid_size: f64) -> Paths<Vector> {
         let mut paths = Paths::new();
         let step_sq = args.step.powi(2);
 
@@ -176,7 +176,7 @@ where
     }
 
     /// Swirl texture - radial lines with twist effect (best for negative z functions)
-    fn paths_swirl(&self) -> Paths {
+    fn paths_swirl(&self) -> Paths<Vector> {
         let mut paths = Paths::new();
         let fine = 1.0 / 256.0;
         let max_radius = self.max_radius();
@@ -216,7 +216,7 @@ where
     }
 
     /// Spiral texture - single spiral path (works with any function)
-    fn paths_spiral(&self) -> Paths {
+    fn paths_spiral(&self) -> Paths<Vector> {
         let mut paths = Paths::new();
         let mut path = paths.new_path();
         let n = 10000;

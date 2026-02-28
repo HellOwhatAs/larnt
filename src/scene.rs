@@ -68,7 +68,7 @@ pub fn render<T: Shape>(
     #[builder(default = 0.1)] near: f64,
     #[builder(default = 1e3)] far: f64,
     #[builder(default = 1.0)] step: f64,
-) -> Paths {
+) -> Paths<Vector> {
     let aspect = width / height;
     let matrix = Matrix::look_at(eye, center, up);
     let matrix = matrix.with_perspective(fovy, aspect, near, far);

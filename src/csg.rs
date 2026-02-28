@@ -149,7 +149,7 @@ impl<T: Shape> Shape for BooleanShape<T> {
         self.intersect(Ray::new(r.position(h.t + 0.01), r.direction))
     }
 
-    fn paths(&self, args: &RenderArgs) -> Paths {
+    fn paths(&self, args: &RenderArgs) -> Paths<Vector> {
         let mut p = self.a.paths(args);
         p.extend(self.b.paths(args));
         p = p.chop_adaptive(args);

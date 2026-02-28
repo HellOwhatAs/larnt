@@ -91,7 +91,7 @@ pub trait Shape {
     /// These paths are the visual representation of the shape. For a cube,
     /// this might be the 12 edges. For a sphere, it could be latitude and
     /// longitude lines. Custom implementations can return any pattern.
-    fn paths(&self, args: &RenderArgs) -> Paths;
+    fn paths(&self, args: &RenderArgs) -> Paths<Vector>;
 }
 
 #[derive(Debug, Clone)]
@@ -118,7 +118,7 @@ impl<T: Shape + ?Sized> Shape for &T {
         (*self).intersect(r)
     }
 
-    fn paths(&self, args: &RenderArgs) -> Paths {
+    fn paths(&self, args: &RenderArgs) -> Paths<Vector> {
         (*self).paths(args)
     }
 }
@@ -143,7 +143,7 @@ impl Shape for EmptyShape {
         Hit::no_hit()
     }
 
-    fn paths(&self, _args: &RenderArgs) -> Paths {
+    fn paths(&self, _args: &RenderArgs) -> Paths<Vector> {
         Paths::new()
     }
 }
@@ -206,7 +206,7 @@ impl<T: Shape> Shape for TransformedShape<T> {
         self.shape.intersect(self.inverse.mul_ray(r))
     }
 
-    fn paths(&self, args: &RenderArgs) -> Paths {
+    fn paths(&self, args: &RenderArgs) -> Paths<Vector> {
         self.shape
             .paths(&RenderArgs {
                 screen_mat: args.screen_mat.mul(&self.matrix),

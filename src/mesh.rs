@@ -67,7 +67,10 @@ impl Mesh {
         matrix
     }
 
-    pub fn filter_paths(&self, group_keeper: impl Fn(&[(usize, usize, usize)]) -> bool) -> Paths {
+    pub fn filter_paths(
+        &self,
+        group_keeper: impl Fn(&[(usize, usize, usize)]) -> bool,
+    ) -> Paths<usize> {
         let mut paths = Paths::new();
         if self.triangles.len() < 3 {
             return paths;
@@ -103,9 +106,7 @@ impl Mesh {
             }
 
             if group_keeper(&edges[i..i + count]) {
-                paths
-                    .new_path()
-                    .extend([self.vertices[current_edge.0], self.vertices[current_edge.1]]);
+                paths.new_path().extend([current_edge.0, current_edge.1]);
             }
 
             i += count;
@@ -114,11 +115,13 @@ impl Mesh {
         paths
     }
 
-    pub fn triangle_paths(&self, _args: &RenderArgs) -> Paths {
+    pub fn triangle_paths(&self, _args: &RenderArgs) -> Paths<Vector> {
         self.filter_paths(|_| true)
+            .splice_exact()
+            .map(|i| self.vertices[i])
     }
 
-    pub fn polygonal_paths(&self, _args: &RenderArgs) -> Paths {
+    pub fn polygonal_paths(&self, _args: &RenderArgs) -> Paths<Vector> {
         let face_normals: Vec<Vector> = self
             .triangles
             .chunks_exact(3)
@@ -135,9 +138,11 @@ impl Mesh {
                 })
             }
         })
+        .splice_exact()
+        .map(|i| self.vertices[i])
     }
 
-    pub fn silhouette_paths(&self, args: &RenderArgs) -> Paths {
+    pub fn silhouette_paths(&self, args: &RenderArgs) -> Paths<Vector> {
         let face_data: Vec<_> = self
             .triangles
             .chunks_exact(3)
@@ -161,6 +166,8 @@ impl Mesh {
                 true
             }
         })
+        .splice_exact()
+        .map(|i| self.vertices[i])
     }
 }
 
@@ -205,7 +212,7 @@ impl Shape for Mesh {
         self.tree.intersect(r)
     }
 
-    fn paths(&self, args: &RenderArgs) -> Paths {
+    fn paths(&self, args: &RenderArgs) -> Paths<Vector> {
         match self.texture {
             MeshTexture::Triangles => self.triangle_paths(args),
             MeshTexture::Polygonal => self.polygonal_paths(args),

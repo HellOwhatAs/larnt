@@ -102,7 +102,7 @@ impl Shape for Cube {
         Hit::no_hit()
     }
 
-    fn paths(&self, _args: &RenderArgs) -> Paths {
+    fn paths(&self, _args: &RenderArgs) -> Paths<Vector> {
         match self.texture {
             CubeTexture::Vanilla => self.paths_striped(1),
             CubeTexture::Striped(stripes) => self.paths_striped(stripes),
@@ -111,7 +111,7 @@ impl Shape for Cube {
 }
 
 impl Cube {
-    fn paths_striped(&self, stripes: u64) -> Paths {
+    fn paths_striped(&self, stripes: u64) -> Paths<Vector> {
         let (x1, y1, z1) = (self.min.x, self.min.y, self.min.z);
         let (x2, y2, z2) = (self.max.x, self.max.y, self.max.z);
         let mut paths = Paths::new();

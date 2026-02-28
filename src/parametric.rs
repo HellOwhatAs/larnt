@@ -9,7 +9,7 @@ use std::collections::HashSet;
 
 pub struct ParametricSurface {
     mesh: Mesh,
-    paths: Paths,
+    paths: Paths<Vector>,
 }
 
 impl ParametricSurface {
@@ -77,7 +77,7 @@ impl ParametricSurface {
         }
     }
 
-    fn grid_paths<F>(get_point: F, u_steps: usize, v_steps: usize) -> Paths
+    fn grid_paths<F>(get_point: F, u_steps: usize, v_steps: usize) -> Paths<Vector>
     where
         F: Fn(usize, usize) -> Vector,
     {
@@ -245,7 +245,7 @@ impl Shape for ParametricSurface {
         self.mesh.intersect(r)
     }
 
-    fn paths(&self, _args: &RenderArgs) -> Paths {
+    fn paths(&self, _args: &RenderArgs) -> Paths<Vector> {
         self.paths.clone()
     }
 }
@@ -282,7 +282,7 @@ impl CyclicMapping {
         }
     }
 
-    pub fn new_raw<T>(a: &[T], b: &[T], eq: impl Fn(&T, &T) -> bool) -> Option<CyclicMapping> {
+    pub fn new_eq<T>(a: &[T], b: &[T], eq: impl Fn(&T, &T) -> bool) -> Option<CyclicMapping> {
         let n = a.len();
         if n < 2 || a.len() != b.len() {
             return None;
@@ -317,10 +317,10 @@ impl CyclicMapping {
     }
 
     pub fn new<T: Eq>(a: &[T], b: &[T]) -> Option<CyclicMapping> {
-        Self::new_raw(a, b, |a, b| a == b)
+        Self::new_eq(a, b, |a, b| a == b)
     }
 
     pub fn new_vector(a: &[Vector], b: &[Vector]) -> Option<Self> {
-        Self::new_raw(a, b, |a, &b| a.all_close(b))
+        Self::new_eq(a, b, |a, &b| a.all_close(b))
     }
 }

@@ -31,6 +31,7 @@ use crate::vector::Vector;
 use bon::bon;
 #[cfg(feature = "image")]
 use image::{ImageBuffer, Pixel, Rgba};
+use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::io::Write;
 
@@ -51,13 +52,118 @@ use std::io::Write;
 /// ]);
 /// ```
 #[derive(Debug, Clone, Default)]
-pub struct Paths {
-    buffer: Vec<Vector>,
+pub struct Paths<T> {
+    buffer: Vec<T>,
     offsets: Vec<usize>,
 }
 
+impl<T> Paths<T> {
+    /// Creates a new empty `Paths` collection.
+    pub fn new() -> Self {
+        Paths {
+            buffer: Vec::new(),
+            offsets: Vec::new(),
+        }
+    }
+
+    pub fn with_capacity(total_len: usize, len: usize) -> Self {
+        Paths {
+            buffer: Vec::with_capacity(total_len),
+            offsets: Vec::with_capacity(len),
+        }
+    }
+
+    pub fn new_path<'a>(&'a mut self) -> NewPath<'a, T> {
+        self.offsets.push(self.buffer.len());
+        NewPath::new(&mut self.buffer, &mut self.offsets)
+    }
+
+    /// Extends this collection with paths from another.
+    pub fn extend(&mut self, other: Self) {
+        self.offsets
+            .extend(other.offsets.into_iter().map(|o| o + self.buffer.len()));
+        self.buffer.extend(other.buffer);
+    }
+
+    pub fn map<F, U>(self, f: F) -> Paths<U>
+    where
+        F: FnMut(T) -> U,
+    {
+        Paths {
+            buffer: self.buffer.into_iter().map(f).collect(),
+            offsets: self.offsets,
+        }
+    }
+
+    pub fn get(&self, index: usize) -> Option<&[T]> {
+        match (self.offsets.get(index), self.offsets.get(index + 1)) {
+            (Some(&i), None) => Some(&self.buffer[i..]),
+            (Some(&i1), Some(&i2)) => Some(&self.buffer[i1..i2]),
+            _ => None,
+        }
+    }
+
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut [T]> {
+        match (self.offsets.get(index), self.offsets.get(index + 1)) {
+            (Some(&i), None) => Some(&mut self.buffer[i..]),
+            (Some(&i1), Some(&i2)) => Some(&mut self.buffer[i1..i2]),
+            _ => None,
+        }
+    }
+
+    pub fn total_len(&self) -> usize {
+        self.buffer.len()
+    }
+
+    pub fn len(&self) -> usize {
+        self.offsets.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.offsets.is_empty()
+    }
+
+    pub fn iter_paths(&self) -> impl Iterator<Item = &[T]> {
+        (if self.offsets.is_empty() {
+            None
+        } else {
+            Some(
+                self.offsets
+                    .windows(2)
+                    .map(|window| {
+                        let (start, end) = (window[0], window[1]);
+                        &self.buffer[start..end]
+                    })
+                    .chain(std::iter::once(
+                        &self.buffer[self.offsets.last().copied().unwrap()..],
+                    )),
+            )
+        })
+        .into_iter()
+        .flatten()
+    }
+}
+
+impl<'a, T> std::ops::Index<usize> for Paths<T> {
+    type Output = [T];
+    fn index(&self, index: usize) -> &Self::Output {
+        self.get(index).expect(&format!(
+            "index out of bounds: the len is {} but the index is {index}",
+            self.len()
+        ))
+    }
+}
+impl<'a, T> std::ops::IndexMut<usize> for Paths<T> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        let len = self.len();
+        self.get_mut(index).expect(&format!(
+            "index out of bounds: the len is {len} but the index is {index}",
+        ))
+    }
+}
+
 #[bon]
-impl Paths {
+impl Paths<Vector> {
     /// Converts the paths to an ImageBuffer.
     ///
     /// # Arguments
@@ -101,96 +207,7 @@ impl Paths {
     }
 }
 
-pub struct NewPath<'a> {
-    buffer: &'a mut Vec<Vector>,
-    offsets: &'a mut Vec<usize>,
-}
-
-impl<'a> NewPath<'a> {
-    pub fn new(buffer: &'a mut Vec<Vector>, offsets: &'a mut Vec<usize>) -> Self {
-        NewPath { buffer, offsets }
-    }
-
-    pub fn push(&mut self, v: Vector) {
-        self.buffer.push(v);
-    }
-
-    pub fn pop(&mut self) -> Option<Vector> {
-        if self.buffer.len() > self.offsets.last().copied().unwrap_or(0) {
-            self.buffer.pop()
-        } else {
-            None
-        }
-    }
-
-    pub fn extend_from_slice(&mut self, slice: &[Vector]) {
-        self.buffer.extend_from_slice(slice);
-    }
-
-    pub fn as_slice(&self) -> &[Vector] {
-        let start = self.offsets.last().copied().unwrap_or(0);
-        &self.buffer[start..]
-    }
-
-    pub fn as_mut_slice(&mut self) -> &mut [Vector] {
-        let start = self.offsets.last().copied().unwrap_or(0);
-        &mut self.buffer[start..]
-    }
-
-    pub fn len(&self) -> usize {
-        self.buffer.len() - self.offsets.last().copied().unwrap_or(0)
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
-
-impl Extend<Vector> for NewPath<'_> {
-    fn extend<T: IntoIterator<Item = Vector>>(&mut self, iter: T) {
-        self.buffer.extend(iter);
-    }
-}
-
-impl<'a> Drop for NewPath<'a> {
-    fn drop(&mut self) {
-        if let Some(last_offset) = self.offsets.last().copied()
-            && self.buffer.len() == last_offset
-        {
-            self.offsets.pop();
-        }
-    }
-}
-
-impl Paths {
-    /// Creates a new empty `Paths` collection.
-    pub fn new() -> Self {
-        Paths {
-            buffer: Vec::new(),
-            offsets: Vec::new(),
-        }
-    }
-
-    pub fn new_path<'a>(&'a mut self) -> NewPath<'a> {
-        self.offsets.push(self.buffer.len());
-        NewPath::new(&mut self.buffer, &mut self.offsets)
-    }
-
-    /// Extends this collection with paths from another.
-    pub fn extend(&mut self, other: Paths) {
-        self.offsets
-            .extend(other.offsets.into_iter().map(|o| o + self.buffer.len()));
-        self.buffer.extend(other.buffer);
-    }
-
-    pub fn len(&self) -> usize {
-        self.offsets.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.offsets.is_empty()
-    }
-
+impl Paths<Vector> {
     /// Returns the bounding box of all paths.
     pub fn bounding_box(&self) -> BBox {
         if self.buffer.is_empty() {
@@ -203,29 +220,9 @@ impl Paths {
         bx
     }
 
-    pub fn iter_paths(&self) -> impl Iterator<Item = &[Vector]> {
-        (if self.offsets.is_empty() {
-            None
-        } else {
-            Some(
-                self.offsets
-                    .windows(2)
-                    .map(|window| {
-                        let (start, end) = (window[0], window[1]);
-                        &self.buffer[start..end]
-                    })
-                    .chain(std::iter::once(
-                        &self.buffer[self.offsets.last().copied().unwrap()..],
-                    )),
-            )
-        })
-        .into_iter()
-        .flatten()
-    }
-
     /// Applies a transformation matrix to all paths.
-    pub fn transform(self, matrix: &Matrix) -> Paths {
-        Paths {
+    pub fn transform(self, matrix: &Matrix) -> Self {
+        Self {
             buffer: self
                 .buffer
                 .into_iter()
@@ -239,7 +236,7 @@ impl Paths {
     ///
     /// This is used internally for visibility testing. The `step` parameter
     /// controls the maximum distance between consecutive points.
-    pub fn chop(&self, step: f64) -> Paths {
+    pub fn chop(&self, step: f64) -> Self {
         let mut result = Self::new();
         for path in self.iter_paths() {
             let mut new_path = result.new_path();
@@ -248,7 +245,7 @@ impl Paths {
         result
     }
 
-    pub fn chop_adaptive(&self, args: &RenderArgs) -> Paths {
+    pub fn chop_adaptive(&self, args: &RenderArgs) -> Self {
         let mut result = Self::new();
         for path in self.iter_paths() {
             let mut new_path = result.new_path();
@@ -265,7 +262,7 @@ impl Paths {
     }
 
     /// Filters paths using a custom filter.
-    pub fn filter<F: Filter>(&self, f: &F) -> Paths {
+    pub fn filter<F: Filter>(&self, f: &F) -> Self {
         let mut result = Paths::new();
         for path in self.iter_paths() {
             path_filter(path, f, &mut result);
@@ -277,7 +274,7 @@ impl Paths {
     ///
     /// Uses the Ramer-Douglas-Peucker algorithm to reduce the number of
     /// points while preserving the overall shape.
-    pub fn simplify(&self, threshold: f64) -> Paths {
+    pub fn simplify(&self, threshold: f64) -> Self {
         let mut result = Paths::new();
         for path in self.iter_paths() {
             path_simplify(path, threshold, &mut result.new_path());
@@ -365,6 +362,225 @@ impl Paths {
     }
 }
 
+impl<T: Copy> Paths<T> {
+    pub fn splice<K, FK, FS, I, FC>(
+        &self,
+        mut head_key_fn: FK,
+        mut search_keys_fn: FS,
+        mut is_match: FC,
+        skip_overlap: bool,
+    ) -> Paths<T>
+    where
+        K: Eq + std::hash::Hash,
+        FK: FnMut(&T) -> K,
+        FS: FnMut(&T) -> I,
+        I: IntoIterator<Item = K>,
+        FC: FnMut(&T, &T) -> bool,
+    {
+        if self.len() == 0 {
+            return Paths::new();
+        }
+
+        let mut starts: HashMap<K, Vec<Endpoint>> = HashMap::new();
+        let mut graph = PathGraph::new(self.len());
+
+        for (id, arr) in self.iter_paths().enumerate() {
+            if let Some(first) = arr.first() {
+                starts
+                    .entry(head_key_fn(first))
+                    .or_default()
+                    .push(Endpoint::new(id, false));
+            }
+            if let Some(last) = arr.last() {
+                starts
+                    .entry(head_key_fn(last))
+                    .or_default()
+                    .push(Endpoint::new(id, true));
+            }
+        }
+
+        for id in 0..self.len() {
+            let arr = &self[id];
+            if arr.is_empty() {
+                continue;
+            }
+
+            for is_last in [false, true] {
+                let ep = Endpoint::new(id, is_last);
+                if graph.is_connected(ep) {
+                    continue;
+                }
+
+                let pt = if is_last {
+                    arr.last().unwrap()
+                } else {
+                    arr.first().unwrap()
+                };
+
+                'search: for key in search_keys_fn(pt) {
+                    if let Some(candidates) = starts.get_mut(&key) {
+                        for i in (0..candidates.len()).rev() {
+                            let succ_ep = candidates[i];
+
+                            if succ_ep.path_id() == id {
+                                continue;
+                            }
+
+                            if graph.is_connected(succ_ep) {
+                                candidates.swap_remove(i);
+                                continue;
+                            }
+
+                            let succ_arr = &self[succ_ep.path_id()];
+                            let succ_pt = if succ_ep.is_last() {
+                                succ_arr.last().unwrap()
+                            } else {
+                                succ_arr.first().unwrap()
+                            };
+
+                            if is_match(pt, succ_pt) {
+                                candidates.swap_remove(i);
+                                graph.link(ep, succ_ep);
+                                break 'search;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        self.reassemble_paths(&graph, skip_overlap)
+    }
+
+    fn reassemble_paths(&self, graph: &PathGraph, skip_overlap: bool) -> Paths<T> {
+        let n = self.len();
+        let mut paths_out = Paths::with_capacity(self.total_len(), n);
+        let mut visited = vec![false; n];
+
+        for is_ring_pass in [false, true] {
+            for id in 0..n {
+                if visited[id] || self[id].is_empty() {
+                    continue;
+                }
+
+                let ep_first = Endpoint::new(id, false);
+                let ep_last = Endpoint::new(id, true);
+
+                let is_endpoint = !graph.is_connected(ep_first) || !graph.is_connected(ep_last);
+                if !is_ring_pass && !is_endpoint {
+                    continue;
+                }
+
+                let mut entry_ep = if !graph.is_connected(ep_first) {
+                    ep_first
+                } else {
+                    ep_last
+                };
+                let mut current_id = id;
+                let mut new_path = paths_out.new_path();
+
+                loop {
+                    visited[current_id] = true;
+                    let arr = &self[current_id];
+                    let skip_n = if skip_overlap && !new_path.is_empty() {
+                        1
+                    } else {
+                        0
+                    };
+
+                    if entry_ep.is_last() {
+                        new_path.extend(arr.iter().rev().skip(skip_n).copied());
+                    } else {
+                        new_path.extend(arr.iter().skip(skip_n).copied());
+                    }
+
+                    if let Some(next_entry_ep) = graph.next(entry_ep.opposite()) {
+                        let next_id = next_entry_ep.path_id();
+                        if visited[next_id] {
+                            break;
+                        }
+                        current_id = next_id;
+                        entry_ep = next_entry_ep;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+        paths_out
+    }
+
+    pub fn splice_exact(&self) -> Paths<T>
+    where
+        T: std::hash::Hash + std::cmp::Eq + Copy,
+    {
+        self.splice(|&x| x, |&x| [x], |a, b| a == b, true)
+    }
+}
+
+pub struct NewPath<'a, T> {
+    buffer: &'a mut Vec<T>,
+    offsets: &'a mut Vec<usize>,
+}
+
+impl<'a, T> NewPath<'a, T> {
+    pub fn new(buffer: &'a mut Vec<T>, offsets: &'a mut Vec<usize>) -> Self {
+        NewPath { buffer, offsets }
+    }
+
+    pub fn push(&mut self, v: T) {
+        self.buffer.push(v);
+    }
+
+    pub fn pop(&mut self) -> Option<T> {
+        if self.buffer.len() > self.offsets.last().copied().unwrap_or(0) {
+            self.buffer.pop()
+        } else {
+            None
+        }
+    }
+
+    pub fn as_slice(&self) -> &[T] {
+        let start = self.offsets.last().copied().unwrap_or(0);
+        &self.buffer[start..]
+    }
+
+    pub fn as_mut_slice(&mut self) -> &mut [T] {
+        let start = self.offsets.last().copied().unwrap_or(0);
+        &mut self.buffer[start..]
+    }
+
+    pub fn len(&self) -> usize {
+        self.buffer.len() - self.offsets.last().copied().unwrap_or(0)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl<T: Copy> NewPath<'_, T> {
+    pub fn extend_from_slice(&mut self, slice: &[T]) {
+        self.buffer.extend_from_slice(slice);
+    }
+}
+
+impl<T> Extend<T> for NewPath<'_, T> {
+    fn extend<T1: IntoIterator<Item = T>>(&mut self, iter: T1) {
+        self.buffer.extend(iter);
+    }
+}
+
+impl<'a, T> Drop for NewPath<'a, T> {
+    fn drop(&mut self) {
+        if let Some(last_offset) = self.offsets.last().copied()
+            && self.buffer.len() == last_offset
+        {
+            self.offsets.pop();
+        }
+    }
+}
+
 #[cfg(feature = "image")]
 fn draw_line(
     img: &mut ImageBuffer<Rgba<u8>, Vec<u8>>,
@@ -440,7 +656,7 @@ fn draw_line(
     }
 }
 
-fn path_chop(path: &[Vector], step: f64, new_path: &mut NewPath) {
+fn path_chop(path: &[Vector], step: f64, new_path: &mut NewPath<Vector>) {
     for i in 0..path.len().saturating_sub(1) {
         let a = path[i];
         let b = path[i + 1];
@@ -464,7 +680,7 @@ fn path_chop_adaptive(
     width: f64,
     height: f64,
     step: f64,
-    new_path: &mut NewPath,
+    new_path: &mut NewPath<Vector>,
 ) {
     if path.is_empty() {
         return;
@@ -552,7 +768,7 @@ pub fn adaptive_arc(
     cuv: &(Vector, Vector, Vector),
     screen_mat: &Matrix,
     step_sq: f64,
-    new_path: &mut NewPath,
+    new_path: &mut NewPath<Vector>,
 ) {
     recursive_arc_subdivide(alpha, beta, r, cuv, screen_mat, step_sq, &mut |x| {
         new_path.push(Vector::new(x, 0., 0.))
@@ -586,7 +802,7 @@ pub fn adaptive_arc_inner(
     cuv: &(Vector, Vector, Vector),
     screen_mat: &Matrix,
     step_sq: f64,
-    new_path: &mut NewPath,
+    new_path: &mut NewPath<Vector>,
 ) {
     recursive_arc_subdivide(alpha, beta, r, cuv, screen_mat, step_sq, &mut |x| {
         new_path.push(Vector::new(x, 0., 0.))
@@ -616,7 +832,7 @@ pub fn recursive_subdivide<T: Copy>(
     }
 }
 
-fn path_filter<F: Filter>(path: &[Vector], f: &F, result: &mut Paths) {
+fn path_filter<F: Filter>(path: &[Vector], f: &F, result: &mut Paths<Vector>) {
     let mut current_path = result.new_path();
 
     for v in path {
@@ -629,7 +845,7 @@ fn path_filter<F: Filter>(path: &[Vector], f: &F, result: &mut Paths) {
     }
 }
 
-fn path_simplify(path: &[Vector], threshold: f64, new_path: &mut NewPath) {
+fn path_simplify(path: &[Vector], threshold: f64, new_path: &mut NewPath<Vector>) {
     if path.len() < 3 {
         new_path.extend_from_slice(path);
         return;
@@ -663,4 +879,59 @@ fn path_to_svg(path: &[Vector]) -> String {
         "<polyline stroke=\"black\" fill=\"none\" points=\"{}\" />",
         points
     )
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+struct Endpoint(usize);
+
+impl Endpoint {
+    #[inline]
+    fn new(path_id: usize, is_last: bool) -> Self {
+        Endpoint(path_id * 2 + if is_last { 1 } else { 0 })
+    }
+    #[inline]
+    fn path_id(self) -> usize {
+        self.0 / 2
+    }
+    #[inline]
+    fn is_last(self) -> bool {
+        (self.0 & 1) != 0
+    }
+    #[inline]
+    fn opposite(self) -> Self {
+        Endpoint(self.0 ^ 1)
+    }
+}
+
+struct PathGraph {
+    links: Vec<usize>,
+}
+
+impl PathGraph {
+    fn new(path_count: usize) -> Self {
+        Self {
+            links: vec![usize::MAX; path_count * 2],
+        }
+    }
+
+    #[inline]
+    fn link(&mut self, a: Endpoint, b: Endpoint) {
+        self.links[a.0] = b.0;
+        self.links[b.0] = a.0;
+    }
+
+    #[inline]
+    fn is_connected(&self, ep: Endpoint) -> bool {
+        self.links[ep.0] != usize::MAX
+    }
+
+    #[inline]
+    fn next(&self, ep: Endpoint) -> Option<Endpoint> {
+        let val = self.links[ep.0];
+        if val == usize::MAX {
+            None
+        } else {
+            Some(Endpoint(val))
+        }
+    }
 }

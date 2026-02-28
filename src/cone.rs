@@ -39,7 +39,7 @@ pub struct Cone {
 }
 
 impl Cone {
-    fn paths_striped(&self, num: u64) -> Paths {
+    fn paths_striped(&self, num: u64) -> Paths<Vector> {
         let mut result = Paths::new();
         for a in (0..360).step_by((360 / num) as usize) {
             let x = self.radius * radians(a as f64).cos();
@@ -52,7 +52,7 @@ impl Cone {
         result
     }
 
-    fn paths_outline(&self, args: &RenderArgs) -> Paths {
+    fn paths_outline(&self, args: &RenderArgs) -> Paths<Vector> {
         // For a cone with apex at (0,0,h) and base circle radius r at z=0,
         // the silhouette generators are found by solving:
         // E.x * cos(θ) + E.y * sin(θ) = r * (1 - E.z / h)
@@ -171,7 +171,7 @@ impl Shape for Cone {
         Hit::no_hit()
     }
 
-    fn paths(&self, args: &RenderArgs) -> Paths {
+    fn paths(&self, args: &RenderArgs) -> Paths<Vector> {
         match self.texture {
             ConeTexture::Outline => self.paths_outline(args),
             ConeTexture::Striped(num) => self.paths_striped(num),
