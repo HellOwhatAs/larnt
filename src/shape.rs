@@ -203,7 +203,10 @@ impl<T: Shape> Shape for TransformedShape<T> {
     }
 
     fn intersect(&self, r: Ray) -> Hit {
-        self.shape.intersect(self.inverse.mul_ray(r))
+        let (transformed_ray, scale) = self.inverse.mul_ray(r);
+        let mut hit = self.shape.intersect(transformed_ray);
+        hit.t /= scale;
+        hit
     }
 
     fn paths(&self, args: &RenderArgs) -> Paths<Vector> {
