@@ -1,14 +1,15 @@
-// Takes about 1s to render.
 #set page(height: auto, margin: 0pt)
 #import "../lib.typ": *
+#import "@preview/lilaq:0.5.0": linspace
 
 #{
-  let f(x, y) = 0.7 * calc.sin(calc.sqrt(20 * (x * x + y * y)))
-  let (min, max) = ((-4., -4., -4.), (4., 4., 4.))
+  let f(x, y) = (x, y, 2.0 * calc.sin(calc.sqrt(x * x + y * y)))
   image(
     render(
-      eye: (8., 8., 8.),
-      func(f, min, max, step: .1),
+      eye: (75., 35., 50.),
+      center: (5., 0., 0.),
+      fovy: 32.,
+      surface(linspace(-20.0, 20.0, num: 100), linspace(-20.0, 20.0, num: 100), f),
     ),
     width: 100%,
   )

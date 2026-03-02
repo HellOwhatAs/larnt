@@ -36,7 +36,7 @@ pub use filter::{ClipFilter, Filter};
 pub use function::{Direction, Function, FunctionTexture};
 pub use hit::Hit;
 pub use matrix::Matrix;
-pub use mesh::Mesh;
+pub use mesh::{Mesh, MeshTexture};
 pub use obj::load_obj;
 pub use parametric::ParametricSurface;
 pub use path::{NewPath, Paths};

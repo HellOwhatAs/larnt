@@ -1,5 +1,4 @@
 pub mod constructor;
-pub mod interp;
 
 use ciborium::de::from_reader;
 use image::{ImageFormat, Rgba};

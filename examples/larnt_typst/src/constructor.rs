@@ -1,6 +1,4 @@
-use crate::interp;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub enum Matrix {
@@ -138,34 +136,40 @@ impl SphereTexture {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum Direction {
-    Above,
-    Below,
+#[derive(Serialize, Deserialize, Default)]
+pub enum MeshTexture {
+    #[default]
+    Triangles,
+    Polygonal,
+    Silhouette,
 }
 
-impl Direction {
-    fn to_direction(self) -> larnt::Direction {
+impl MeshTexture {
+    fn to_texture(self) -> larnt::MeshTexture {
         match self {
-            Direction::Above => larnt::Direction::Above,
-            Direction::Below => larnt::Direction::Below,
+            MeshTexture::Triangles => larnt::MeshTexture::Triangles,
+            MeshTexture::Polygonal => larnt::MeshTexture::Polygonal,
+            MeshTexture::Silhouette => larnt::MeshTexture::Silhouette,
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum FunctionTexture {
-    Grid(f64),
-    Swirl,
-    Spiral,
+#[derive(Serialize, Deserialize, Default)]
+pub enum ParametricSurfaceTexture {
+    #[default]
+    Grid,
+    Triangles,
+    Polygonal,
+    Silhouette,
 }
 
-impl FunctionTexture {
-    fn to_texture(self) -> larnt::FunctionTexture {
+impl ParametricSurfaceTexture {
+    fn to_texture(self) -> Option<larnt::MeshTexture> {
         match self {
-            FunctionTexture::Grid(step) => larnt::FunctionTexture::Grid(step),
-            FunctionTexture::Swirl => larnt::FunctionTexture::Swirl,
-            FunctionTexture::Spiral => larnt::FunctionTexture::Spiral,
+            ParametricSurfaceTexture::Grid => None,
+            ParametricSurfaceTexture::Triangles => Some(larnt::MeshTexture::Triangles),
+            ParametricSurfaceTexture::Polygonal => Some(larnt::MeshTexture::Polygonal),
+            ParametricSurfaceTexture::Silhouette => Some(larnt::MeshTexture::Silhouette),
         }
     }
 }
@@ -194,23 +198,22 @@ pub enum LnShape {
         radius: f64,
         texture: SphereTexture,
     },
-    Function {
-        samples: Vec<Vec<f64>>,
-        bbox: ([f64; 3], [f64; 3]),
-        direction: Direction,
-        texture: FunctionTexture,
-        step: f64,
-    },
     Triangle {
         v1: [f64; 3],
         v2: [f64; 3],
         v3: [f64; 3],
     },
-    Mesh(Vec<LnShape>),
+    Mesh {
+        vertices: Vec<[f64; 3]>,
+        triangles: Vec<usize>,
+        flipped_triangles: Vec<(usize, usize)>,
+        texture: MeshTexture,
+    },
     ParametricSurface {
         samples: Vec<(f64, f64, f64)>,
         u_steps: usize,
         v_steps: usize,
+        texture: ParametricSurfaceTexture,
     },
 
     Difference(Vec<LnShape>),
@@ -222,119 +225,106 @@ pub enum LnShape {
 }
 
 impl LnShape {
-    pub fn to_shape(self) -> Result<Arc<dyn larnt::Shape + Send + Sync>, String> {
+    pub fn to_shape(self) -> Result<larnt::Primitive, String> {
         Ok(match self {
             LnShape::Cone {
                 radius,
                 v0,
                 v1,
                 texture,
-            } => Arc::new(
-                larnt::new_transformed_cone(
-                    larnt::Vector::new(v0[0], v0[1], v0[2]),
-                    larnt::Vector::new(v1[0], v1[1], v1[2]),
-                    radius,
-                )
-                .texture(texture.to_texture())
-                .call(),
-            ),
+            } => larnt::new_transformed_cone(
+                larnt::Vector::new(v0[0], v0[1], v0[2]),
+                larnt::Vector::new(v1[0], v1[1], v1[2]),
+                radius,
+            )
+            .texture(texture.to_texture())
+            .call()
+            .into(),
             LnShape::Cube { min, max, texture } => {
                 let min_v = larnt::Vector::new(min[0], min[1], min[2]);
                 let max_v = larnt::Vector::new(max[0], max[1], max[2]);
-                Arc::new(
-                    larnt::Cube::builder(min_v, max_v)
-                        .texture(texture.to_texture())
-                        .build(),
-                )
+                larnt::Cube::builder(min_v, max_v)
+                    .texture(texture.to_texture())
+                    .build()
+                    .into()
             }
             LnShape::Cylinder {
                 radius,
                 v0,
                 v1,
                 texture,
-            } => Arc::new(
-                larnt::new_transformed_cylinder(
-                    larnt::Vector::new(v0[0], v0[1], v0[2]),
-                    larnt::Vector::new(v1[0], v1[1], v1[2]),
-                    radius,
-                )
-                .texture(texture.to_texture())
-                .call(),
-            ),
+            } => larnt::new_transformed_cylinder(
+                larnt::Vector::new(v0[0], v0[1], v0[2]),
+                larnt::Vector::new(v1[0], v1[1], v1[2]),
+                radius,
+            )
+            .texture(texture.to_texture())
+            .call()
+            .into(),
             LnShape::Sphere {
                 center,
                 radius,
                 texture,
             } => {
                 let center_v = larnt::Vector::new(center[0], center[1], center[2]);
-                let sphere = larnt::Sphere::builder(center_v, radius).texture(texture.to_texture());
-                Arc::new(sphere.build())
-            }
-            LnShape::Function {
-                samples,
-                bbox,
-                direction,
-                texture,
-                step,
-            } => {
-                if samples.len() < 2 || samples[0].len() < 2 {
-                    return Err("Function samples must be at least 2x2".to_string());
-                }
-                if samples.iter().any(|row| row.len() != samples[0].len()) {
-                    return Err("Function samples must have consistent row lengths".to_string());
-                }
-                let grid = interp::BilinearGrid::new(
-                    samples[0].len(),
-                    samples.len(),
-                    samples.into_iter().flatten().collect(),
-                    (bbox.0[0], bbox.1[0]),
-                    (bbox.0[1], bbox.1[1]),
-                );
-                let func = larnt::Function::builder(
-                    move |x, y| grid.get(x, y),
-                    larnt::Box::new(
-                        larnt::Vector::new(bbox.0[0], bbox.0[1], bbox.0[2]),
-                        larnt::Vector::new(bbox.1[0], bbox.1[1], bbox.1[2]),
-                    ),
-                )
-                .direction(direction.to_direction())
-                .step(step)
-                .texture(texture.to_texture());
-                Arc::new(func.build())
+                larnt::Sphere::builder(center_v, radius)
+                    .texture(texture.to_texture())
+                    .build()
+                    .into()
             }
             LnShape::Triangle { v1, v2, v3 } => {
                 let v1_v = larnt::Vector::new(v1[0], v1[1], v1[2]);
                 let v2_v = larnt::Vector::new(v2[0], v2[1], v2[2]);
                 let v3_v = larnt::Vector::new(v3[0], v3[1], v3[2]);
-                Arc::new(larnt::Triangle::new(v1_v, v2_v, v3_v))
+                larnt::Triangle::new(v1_v, v2_v, v3_v).into()
             }
-            LnShape::Mesh(ln_shapes) => {
-                let mut triangles = Vec::new();
-                for lnshape in ln_shapes {
-                    if let LnShape::Triangle { v1, v2, v3 } = &lnshape {
-                        triangles.push(larnt::Triangle::new(
-                            larnt::Vector::new(v1[0], v1[1], v1[2]),
-                            larnt::Vector::new(v2[0], v2[1], v2[2]),
-                            larnt::Vector::new(v3[0], v3[1], v3[2]),
-                        ));
-                    } else {
-                        return Err("Mesh can only contain Triangle shapes".to_string());
-                    }
-                }
-                Arc::new(larnt::Mesh::new(triangles))
-            }
+            LnShape::Mesh {
+                vertices,
+                triangles,
+                flipped_triangles,
+                texture,
+            } => larnt::Mesh::builder(
+                vertices
+                    .into_iter()
+                    .map(|[x, y, z]| larnt::Vector::new(x, y, z))
+                    .collect(),
+                triangles,
+            )
+            .flipped_triangles(flipped_triangles.into_iter().collect())
+            .texture(texture.to_texture())
+            .build()
+            .into(),
             LnShape::ParametricSurface {
                 samples,
                 u_steps,
                 v_steps,
-            } => Arc::new(larnt::ParametricSurface::from_grid(
-                |i: usize, j: usize| {
-                    let (x, y, z) = samples[i * (v_steps + 1) + j];
-                    larnt::Vector::new(x, y, z)
-                },
-                u_steps,
-                v_steps,
-            )),
+                texture,
+            } => {
+                if let Some(texture) = texture.to_texture() {
+                    let mut mesh = larnt::ParametricSurface::mesh_from_grid(
+                        samples
+                            .into_iter()
+                            .map(|(x, y, z)| larnt::Vector::new(x, y, z))
+                            .collect(),
+                        u_steps,
+                        v_steps,
+                        |i, j| i * (v_steps + 1) + j,
+                    );
+                    mesh.texture = texture;
+                    mesh.into()
+                } else {
+                    larnt::ParametricSurface::from_grid(
+                        samples
+                            .into_iter()
+                            .map(|(x, y, z)| larnt::Vector::new(x, y, z))
+                            .collect(),
+                        u_steps,
+                        v_steps,
+                        |i, j| i * (v_steps + 1) + j,
+                    )
+                    .into()
+                }
+            }
             LnShape::Difference(ln_shapes) => {
                 let shapes = ln_shapes
                     .into_iter()
@@ -365,10 +355,7 @@ impl LnShape {
                         Err(e) => return Err(e),
                     }
                 } else {
-                    Arc::new(larnt::TransformedShape::new(
-                        shape.to_shape()?,
-                        matrix.to_matrix(),
-                    ))
+                    larnt::TransformedShape::new(shape.to_shape()?, matrix.to_matrix()).into()
                 }
             }
         })
@@ -386,24 +373,25 @@ pub fn render(
     near: f64,
     far: f64,
     step: f64,
-) -> Result<larnt::Paths, String> {
+) -> Result<larnt::Paths<larnt::Vector>, String> {
     let eye = larnt::Vector::new(eye[0], eye[1], eye[2]);
     let center = larnt::Vector::new(center[0], center[1], center[2]);
     let up = larnt::Vector::new(up[0], up[1], up[2]);
 
-    let mut scene = larnt::Scene::new();
-    for shape in shapes {
-        scene.add_arc(shape.to_shape()?);
-    }
-    Ok(scene
-        .render(eye)
-        .center(center)
-        .up(up)
-        .width(width)
-        .height(height)
-        .fovy(fovy)
-        .near(near)
-        .far(far)
-        .step(step)
-        .call())
+    Ok(larnt::render(
+        shapes
+            .into_iter()
+            .map(|shape| shape.to_shape())
+            .collect::<Result<Vec<larnt::Primitive>, String>>()?,
+    )
+    .eye(eye)
+    .center(center)
+    .up(up)
+    .width(width)
+    .height(height)
+    .fovy(fovy)
+    .near(near)
+    .far(far)
+    .step(step)
+    .call())
 }

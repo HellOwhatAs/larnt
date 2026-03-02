@@ -5,6 +5,9 @@
 #let random_equators(seed, n: 100) = ("RandomEquators": (seed: seed, n: n))
 #let random_fuzz(seed, num: 500, scale: 1.1) = ("RandomFuzz": (seed: seed, num: num, scale: scale))
 #let random_circles(seed, num: 140) = ("RandomCircles": (seed: seed, num: num))
-#let grid(grid_size: 1.0 / 8.0) = ("Grid": grid_size)
+#let triangles() = "Triangles"
+#let polygonal() = "Polygonal"
+#let silhouette() = "Silhouette"
+#let grid() = "Grid"
 #let swirl() = "Swirl"
 #let spiral() = "Spiral"

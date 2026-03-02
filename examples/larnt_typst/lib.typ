@@ -181,103 +181,6 @@
   )
 }
 
-/// The function-defined shape.
-///
-/// _Note that the function is sampled over a grid defined by `min`, `max`, and `n` due to typst wasm plugin limitations. Then the sampled values are intepolated with bilinear interpolation for rendering._
-///
-/// ```example
-/// #image(render(
-///   eye: (4., 3., 3.),
-///   center: (0., 0., 1.5),
-///   width: 1024.,
-///   func((x, y) => 0.3 * (x * x + y * y), (-2., -2., -2.), (2., 2., 4.)),
-/// ))
-/// ```
-///
-/// -> shape
-#let func(
-  /// The function or pre-sampled 2d-array defining the shape's surface.
-  /// -> function | array
-  func,
-  /// The minimum corner of the bounding box, given as an array of three floats representing the x, y, and z coordinates.
-  /// -> array
-  min,
-  /// The maximum corner of the bounding box, given as an array of three floats representing the x, y, and z coordinates.
-  /// -> array
-  max,
-  /// The direction of the shape's surface. Can be either "Below" or "Above".
-  /// -> str
-  direction: "Below",
-  /// The number of samples along each axis if `func` is a function. Higher number of samples results in more accurate rendering but longer rendering time.
-  /// -> int
-  n: 50,
-  /// The step size for the intersect algorithm. Smaller step size results in more accurate occlusion rendering but longer rendering time.
-  ///
-  /// ```example
-  /// #let f(x, y) = 0.7 * calc.sin(calc.sqrt(20 * (x * x + y * y)))
-  /// #let (min, max) = ((-4., -4., -4.), (4., 4., 4.))
-  /// #image(
-  ///   render(
-  ///     eye: (14., 5., 14.),
-  ///     center: (0., 5., 0.),
-  ///     height: 640.,
-  ///     func(f, min, max, step: .5),
-  ///     translate(func(f, min, max, step: 5.), (0., 10., 0.)),
-  ///   ),
-  /// )
-  /// ```
-  ///
-  /// -> float
-  step: 0.01,
-  /// The texture pattern of the shape's surface. Can be one of `grid`, `spiral`, or `swirl`.
-  ///
-  /// ```example
-  /// #let (min, max) = ((-1., -1., -1.), (1., 1., 1.))
-  /// #image(render(
-  ///   eye: (2.5, 0.4, 1.5),
-  ///   func((x, y) => x * y, min, max, texture: texture.spiral()),
-  ///   func((x, y) => 0.0, min, max, step: .01),
-  /// ))
-  /// ```
-  ///
-  /// -> texture
-  texture: texture.grid(),
-) = {
-  assert(
-    (type(func) == function or type(func) == array)
-      and type(min) == array
-      and min.len() == 3
-      and min.all(i => type(i) == float)
-      and type(max) == array
-      and max.len() == 3
-      and max.all(i => type(i) == float)
-      and type(direction) == str,
-    message: "func(...) expects `func` be a function or array, `min` and `max` be arrays of 3 floats, `direction` be strings",
-  )
-  assert(
-    direction in ("Below", "Above"),
-    message: "func(...) direction must be one of Below, Above",
-  )
-  assert(step > 0, message: "func(...) step must be a positive float")
-  return (
-    Function: (
-      samples: if type(func) == function {
-        range(n + 1).map(x => range(n + 1).map(y => {
-          let x = min.at(0) + (max.at(0) - min.at(0)) * x / n
-          let y = min.at(1) + (max.at(1) - min.at(1)) * y / n
-          func(x, y)
-        }))
-      } else {
-        func
-      },
-      bbox: (min, max),
-      direction: direction,
-      texture: texture,
-      step: step,
-    ),
-  )
-}
-
 /// The triangle shape.
 ///
 /// ```example
@@ -320,49 +223,43 @@
 ///
 /// ```example
 /// #image(render(
-///   eye: (2., 2., 2.),
-///   center: (0., 0., 0.),
-///   height: 512.,
-///   mesh((
-///     triangle((0., 1., 0.), (1., 0., 0.), (0., 0., 0.)),
-///     triangle((0., 1., 0.), (1., 0., 0.), (1., 1., 0.))
-///   )),
-/// ))
-/// ```
-/// ```example
-/// #let (n, r, h) = (8, 1.5, 2.0)
-/// #let trs = (
-///   (range(0, 360, step: int(360 / n))
-///   .map(x => x * 1deg) + (0,))
-///   .windows(2).map(x => {
-///   let (a, b) = x
-///   triangle(
-///   (calc.cos(a) * r, calc.sin(a) * r, 0.),
-///   (0., 0., h),
-///   (calc.cos(b) * r, calc.sin(b) * r, 0.),
-///   )
-/// }))
-/// #image(render(
+///   eye: (2., 3., 2.),
 ///   fovy: 30.,
-///   rotate(mesh(trs), (0., 1., 0.), 1.2),
+///   height: 360.,
+///   mesh(
+///     ((0., 0., 0.), (1., 0., 0.), (0., 1., 0.), (1., 1., 0.)),
+///     (0, 1, 2, 3, 2, 1),
+///   ),
 /// ))
 /// ```
 ///
 /// -> shape
 #let mesh(
-  /// An array of triangle shapes.
+  /// An array of vertices if triangles.
+  /// -> array
+  vertices,
+  /// An array of indices defining the triangle vertices. Each group of three consecutive indices represents one triangle, referencing the corresponding vertices in the `vertices` array.
   /// -> array
   triangles,
+  /// An array of normal flipped triangle index pairs.
+  /// Useful for non-orientable surface such as Möbius strip and Klein bottle.
+  /// -> array
+  flipped_triangles: (),
+  /// Texture of the Mesh.  Can be one of `triangles`, `polygonal`, or `silhouette`.
+  /// -> texture
+  texture: texture.triangles(),
 ) = {
   assert(
-    type(triangles) == array
-      and triangles.all(t => (
-        type(t) == dictionary and "Triangle" in t
-      )),
-    message: "mesh(triangles) expects an array of triangles",
+    type(vertices) == array and type(triangles) == array and type(flipped_triangles) == array,
+    message: "mesh(..) expects three array",
   )
   return (
-    Mesh: triangles,
+    Mesh: (
+      vertices: vertices,
+      triangles: triangles,
+      flipped_triangles: flipped_triangles,
+      texture: texture,
+    ),
   )
 }
 
@@ -373,6 +270,7 @@
 /// #import "@preview/lilaq:0.5.0": linspace
 /// #image(render(
 ///   eye: (3., 3., 3.),
+///   height: 600.,
 ///   surface(
 ///     linspace(0, calc.pi * 2, num: 64),
 ///     linspace(0.0, calc.pi * 2, num: 32),
@@ -396,12 +294,16 @@
   v,
   /// The function that defines the surface, given as a function that takes two floats (u and v) and returns an array of three floats representing the x, y, and z coordinates of the surface point corresponding to those parameters.
   func,
+  /// The texture pattern of the surface. Can be one of `grid`, `triangles`, `polygonal`, or `silhouette`.
+  /// -> texture
+  texture: texture.grid(),
 ) = {
   (
     ParametricSurface: (
       samples: u.map(u => v.map(v => func(u, v))).join(),
       u_steps: u.len() - 1,
       v_steps: v.len() - 1,
+      texture: texture,
     ),
   )
 }
@@ -657,3 +559,21 @@
     cbor.encode(shapes.pos()),
   )
 }
+
+
+#import "@preview/lilaq:0.5.0": linspace
+#set page(width: auto, height: auto, margin: 0pt)
+#image(render(
+  eye: (3., -5., 2.),
+  surface(
+    linspace(0., 2. * calc.pi),
+    linspace(-0.5, 0.5),
+    (u, v) => {
+      let x = (2.0 + (v / 2.0) * calc.cos(u / 2.0)) * calc.cos(u)
+      let y = (2.0 + (v / 2.0) * calc.cos(u / 2.0)) * calc.sin(u)
+      let z = (v / 2.0) * calc.sin(u / 2.0)
+      (x, y, z)
+    },
+    texture: "Silhouette",
+  ),
+))
