@@ -102,4 +102,7 @@ fn main() {
             .zip(static_dispatch.iter_paths())
             .all(|(a, b)| a == b)
     );
+    static_dispatch
+        .write_to_png("out.png", 1024., 1024.)
+        .expect("Failed to write PNG");
 }
