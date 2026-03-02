@@ -112,7 +112,7 @@ pub fn render<T: Shape>(
     paths = paths.filter(&filter);
 
     if step > 0.0 {
-        paths = paths.simplify(step / height.max(width));
+        paths = paths.simplify(1e-6);
     }
 
     paths.transform(&viewport_mat)

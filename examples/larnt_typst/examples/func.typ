@@ -4,7 +4,6 @@
 #import "@preview/lilaq:0.5.0": linspace
 
 #{
-  let (min, max) = ((-3., -3., -4.), (3., 3., 2.))
   image(
     render(
       eye: (3., 0., 3.),
