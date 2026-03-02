@@ -46,8 +46,7 @@ fn main() {
     ])
     .eye(Vector::new(2., 7., 5.))
     .center(Vector::new(0.3, 0., 0.))
-    .up(Vector::new(1., 0., 1.))
-    .fovy(40.)
+    .fovy(36.)
     .call()
     .write_to_png("out.png", 1024.0, 1024.0)
     .expect("Failed to write PNG");
