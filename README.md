@@ -67,17 +67,17 @@ _The output of an OpenGL pipeline is a rastered image. The output of `larnt` is 
     <tr>
         <td>
             <a href="examples/torus.rs">
-                <img alt="torus" src="https://github.com/user-attachments/assets/fb63c340-8288-4962-ad20-def83f4a9311" />
+                <img alt="torus" src="https://github.com/user-attachments/assets/ec9a8181-3bfc-401f-9108-a0c2478cbbdc" />
             </a>
         </td>
         <td>
             <a href="examples/mobius.rs">
-                <img alt="mobius" src="https://github.com/user-attachments/assets/99ccff8f-6d5f-4178-ac2b-2201fee329f7" />
+                <img alt="mobius" src="https://github.com/user-attachments/assets/39421666-0d61-42e3-a5af-ee5718fcfd17" />
             </a>
         </td>
         <td>
             <a href="examples/klein_bottle.rs">
-                <img alt="klein_bottle" src="https://github.com/user-attachments/assets/68214ff1-b2de-4532-ab05-62a04c355a93" />
+                <img alt="klein_bottle" src="https://github.com/user-attachments/assets/cc6b4b4f-f645-4ecf-90dd-5d01dc2f576a" />
             </a>
         </td>
     </tr>
