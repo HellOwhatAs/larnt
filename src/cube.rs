@@ -6,13 +6,12 @@
 //! # Example
 //!
 //! ```
-//! use larnt::{Cube, Scene, Vector};
+//! use larnt::{Cube, Vector, render};
 //!
 //! // Create a 2x2x2 cube centered at the origin
 //! let cube = Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build();
 //!
-//! let mut scene = Scene::new();
-//! scene.add(cube);
+//! let paths = render(vec![cube]).eye(Vector::new(4.0, 3.0, 2.0)).call();
 //! ```
 
 use crate::bounding_box::BBox;

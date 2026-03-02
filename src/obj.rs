@@ -5,11 +5,10 @@
 //! # Example
 //!
 //! ```no_run
-//! use larnt::{load_obj, Scene, Vector};
+//! use larnt::{load_obj, render};
 //!
 //! let mesh = load_obj("model.obj").expect("Failed to load OBJ");
-//! let mut scene = Scene::new();
-//! scene.add(mesh);
+//! let paths = render(vec![mesh]).eye(larnt::Vector::new(4.0, 3.0, 2.0)).call();
 //! ```
 
 use crate::mesh::Mesh;

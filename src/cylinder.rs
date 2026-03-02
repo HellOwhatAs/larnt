@@ -7,13 +7,12 @@
 //! # Example
 //!
 //! ```
-//! use larnt::{Cylinder, Scene, Vector};
+//! use larnt::{Cylinder, Vector, render};
 //!
 //! // Create a cylinder with radius 1.0, from z=0 to z=2
 //! let cylinder = Cylinder::builder(1.0, 0.0, 2.0).build();
 //!
-//! let mut scene = Scene::new();
-//! scene.add(cylinder);
+//! let paths = render(vec![cylinder]).eye(Vector::new(4.0, 3.0, 2.0)).call();
 //! ```
 
 use crate::bounding_box::BBox;

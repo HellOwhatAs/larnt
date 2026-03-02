@@ -19,5 +19,6 @@ fn main() {
     render(vec![klein])
         .eye(Vector::new(5., 0.5, 5.))
         .call()
-        .write_to_png("out.png", 1024.0, 1024.0);
+        .write_to_png("out.png", 1024.0, 1024.0)
+        .expect("Failed to write PNG");
 }

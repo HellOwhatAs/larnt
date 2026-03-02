@@ -6,13 +6,11 @@
 //! # Example
 //!
 //! ```no_run
-//! use larnt::{load_binary_stl, load_stl, save_binary_stl, Scene, Vector};
+//! use larnt::{load_binary_stl, load_stl, save_binary_stl, Vector, render};
 //!
 //! // Load a binary STL file
 //! let mesh = load_binary_stl("model.stl").expect("Failed to load STL");
-//!
-//! let mut scene = Scene::new();
-//! scene.add(mesh);
+//! let paths = render(vec![mesh]).eye(Vector::new(4.0, 3.0, 2.0)).call();
 //! ```
 
 use crate::mesh::{Mesh, TriangleMesh};

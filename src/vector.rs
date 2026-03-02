@@ -1,7 +1,7 @@
 //! 3D vector mathematics.
 //!
 //! This module provides the [`Vector`] struct for 3D vector operations.
-//! Vectors are used throughout `larnt` for positions, directions, and colors.
+//! Vectors are used throughout `larnt` for positions and directions.
 //!
 //! # Example
 //!

@@ -14,7 +14,9 @@ fn main() {
         .call();
 
     // save the result as a png
-    paths.write_to_png("out.png", width, height);
+    paths
+        .write_to_png("out.png", width, height)
+        .expect("Failed to write PNG");
 
     // save the result as an svg
     paths

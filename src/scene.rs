@@ -1,19 +1,18 @@
 //! Scene management and rendering.
 //!
-//! This module provides the [`Scene`] struct, which is the main container for
-//! 3D objects and handles the rendering pipeline.
+//! This module provides the [`render`] function, which is the main entry point
+//! for rendering a collection of shapes into 2D paths.
 //!
 //! # Example
 //!
 //! ```
-//! use larnt::{Cube, Scene, Vector};
+//! use larnt::{Cube, Vector, render};
 //!
-//! let mut scene = Scene::new();
-//! scene.add(Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build());
+//! let cube = Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build();
 //!
 //! let eye = Vector::new(4.0, 3.0, 2.0);
-//! let paths = scene.render(eye).call();
-//! paths.write_to_png("output.png", 1024.0, 1024.0);
+//! let paths = render(vec![cube]).eye(eye).call();
+//! paths.write_to_png("output.png", 1024.0, 1024.0).expect("Failed to write PNG");
 //! ```
 
 use crate::filter::ClipFilter;
@@ -25,36 +24,36 @@ use crate::tree::Tree;
 use crate::vector::Vector;
 use bon::builder;
 
-/// Renders the scene to 2D paths.
+/// Renders a collection of shapes to 2D paths.
 ///
 /// This is the main rendering function. It:
-/// 1. Compiles the BVH tree if needed
-/// 2. Gets all paths from shapes
-/// 3. Chops paths for visibility testing
-/// 4. Filters out hidden portions
+/// 1. Gets all paths from shapes
+/// 2. Chops paths adaptively for visibility testing (if `step > 0.0`)
+/// 3. Builds a BVH tree and filters out hidden portions
+/// 4. Simplifies paths (if `step > 0.0`)
 /// 5. Projects to 2D screen space
 ///
 /// # Arguments
 ///
+/// * `shapes` - The shapes to render (passed as the start argument to the builder)
 /// * `eye` - Camera position
-/// * `center` - Point the camera looks at
-/// * `up` - Up direction vector
-/// * `width` - Output width in pixels
-/// * `height` - Output height in pixels
-/// * `fovy` - Vertical field of view in degrees
-/// * `near` - Near clipping plane distance
-/// * `far` - Far clipping plane distance
-/// * `step` - Path subdivision step size for visibility testing
+/// * `center` - Point the camera looks at (default: origin)
+/// * `up` - Up direction vector (default: `+Z`)
+/// * `width` - Output width in pixels (default: 1024)
+/// * `height` - Output height in pixels (default: 1024)
+/// * `fovy` - Vertical field of view in degrees (default: 50)
+/// * `near` - Near clipping plane distance (default: 0.1)
+/// * `far` - Far clipping plane distance (default: 1000)
+/// * `step` - Path subdivision step size for visibility testing (default: 1.0)
 ///
 /// # Example
 ///
 /// ```
-/// use larnt::{Scene, Cube, Vector};
+/// use larnt::{Cube, Vector, render};
 ///
-/// let mut scene = Scene::new();
-/// scene.add(Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build());
+/// let cube = Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build();
 ///
-/// let paths = scene.render(Vector::new(4.0, 3.0, 2.0)).call();
+/// let paths = render(vec![cube]).eye(Vector::new(4.0, 3.0, 2.0)).call();
 /// ```
 #[builder]
 pub fn render<T: Shape>(

@@ -123,14 +123,13 @@ larnt = { git = "https://github.com/HellOwhatAs/larnt.git" }
 To understand how `larnt` works, it's useful to start with the `Shape` trait:
 
 ```rust
-use larnt::{Box, Hit, Paths, Ray, Vector, RenderArgs};
+use larnt::{BBox, Hit, Paths, Ray, Vector, RenderArgs};
 
 pub trait Shape {
-    fn compile(&mut self) {}
-    fn bounding_box(&self) -> Box;
+    fn bounding_box(&self) -> BBox;
     fn contains(&self, v: Vector, f: f64) -> bool;
     fn intersect(&self, r: Ray) -> Hit;
-    fn paths(&self, args: &RenderArgs) -> Paths;
+    fn paths(&self, args: &RenderArgs) -> Paths<Vector>;
 }
 ```
 
@@ -161,19 +160,19 @@ operations.
 ### The Code
 
 ```rust
-use larnt::{Cube, Scene, Vector};
+use larnt::{Cube, Vector, render};
 
 // create a scene and add a single cube
-let mut scene = Scene::new();
-scene.add(Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build());
+let mut shapes = Vec::new();
+shapes.push(Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build());
 
 let eye = Vector::new(4.0, 3.0, 2.0); // camera position
 let width = 1024.0; // rendered width
 let height = 1024.0; // rendered height
 
 // compute 2D paths that depict the 3D scene
-let paths = scene
-    .render(eye)
+let paths = render(shapes)
+    .eye(eye)
     .center(Vector::new(0.0, 0.0, 0.0)) // camera looks at
     .up(Vector::new(0.0, 0.0, 1.0)) // up direction
     .width(width) // rendered width
@@ -187,7 +186,7 @@ let paths = scene
     .call();
 
 // render the paths in an image
-paths.write_to_png("out.png", width, height);
+paths.write_to_png("out.png", width, height).expect("Failed to write PNG");
 
 // save the paths as an svg
 paths
@@ -206,7 +205,7 @@ shown in the skyscrapers example above. We can implement the `Shape` trait
 for a custom type.
 
 ```rust
-use larnt::{Cube, Shape, RenderArgs, Paths, Vector, Box, Hit, Ray};
+use larnt::{BBox, Cube, Shape, RenderArgs, Paths, Vector, Hit, Ray};
 
 struct StripedCube {
     cube: Cube,
@@ -214,7 +213,7 @@ struct StripedCube {
 }
 
 impl Shape for StripedCube {
-    fn bounding_box(&self) -> Box {
+    fn bounding_box(&self) -> BBox {
         self.cube.bounding_box()
     }
 
@@ -226,8 +225,8 @@ impl Shape for StripedCube {
         self.cube.intersect(r)
     }
 
-    fn paths(&self, _: &RenderArgs) -> Paths {
-        let mut paths = Vec::new();
+    fn paths(&self, _: &RenderArgs) -> Paths<Vector> {
+        let mut paths = Paths::new();
         let (x1, y1, z1) = (self.cube.min.x, self.cube.min.y, self.cube.min.z);
         let (x2, y2, z2) = (self.cube.max.x, self.cube.max.y, self.cube.max.z);
 
@@ -235,12 +234,12 @@ impl Shape for StripedCube {
             let p = i as f64 / self.stripes as f64;
             let x = x1 + (x2 - x1) * p;
             let y = y1 + (y2 - y1) * p;
-            paths.push(vec![Vector::new(x, y1, z1), Vector::new(x, y1, z2)]);
-            paths.push(vec![Vector::new(x, y2, z1), Vector::new(x, y2, z2)]);
-            paths.push(vec![Vector::new(x1, y, z1), Vector::new(x1, y, z2)]);
-            paths.push(vec![Vector::new(x2, y, z1), Vector::new(x2, y, z2)]);
+            paths.new_path().extend([Vector::new(x, y1, z1), Vector::new(x, y1, z2)]);
+            paths.new_path().extend([Vector::new(x, y2, z1), Vector::new(x, y2, z2)]);
+            paths.new_path().extend([Vector::new(x1, y, z1), Vector::new(x1, y, z2)]);
+            paths.new_path().extend([Vector::new(x2, y, z1), Vector::new(x2, y, z2)]);
         }
-        Paths::from_vec(paths)
+        paths
     }
 }
 ```
@@ -253,33 +252,30 @@ You can easily construct complex solids using Intersection, Difference.
 
 ```rust
 use larnt::{
-    Cube, CubeTexture, Cylinder, Matrix, Sphere, SphereTexture, TransformedShape, Vector,
-    new_difference, new_intersection, radians,
+    Cube, CubeTexture, Cylinder, Matrix, Primitive, Sphere, SphereTexture, TransformedShape,
+    Vector, new_difference, new_intersection, radians,
 };
-use std::sync::Arc;
 
-let shape = new_difference(vec![
+let shape: Primitive = new_difference(vec![
     new_intersection(vec![
-        Arc::new(
-            Sphere::builder(Vector::default(), 1.0)
-                .texture(SphereTexture::lat_lng().call())
-                .build(),
-        ),
-        Arc::new(
-            Cube::builder(Vector::new(-0.8, -0.8, -0.8), Vector::new(0.8, 0.8, 0.8))
-                .texture(CubeTexture::striped().stripes(10).call())
-                .build(),
-        ),
+        Sphere::builder(Vector::default(), 1.0)
+            .texture(SphereTexture::lat_lng().call())
+            .build()
+            .into(),
+        Cube::builder(Vector::new(-0.8, -0.8, -0.8), Vector::new(0.8, 0.8, 0.8))
+            .texture(CubeTexture::striped().stripes(10).call())
+            .build()
+            .into(),
     ]),
-    Arc::new(Cylinder::builder(0.4, -2.0, 2.0).build()),
-    Arc::new(TransformedShape::new(
-        Arc::new(Cylinder::builder(0.4, -2.0, 2.0).build()),
+    Cylinder::builder(0.4, -2.0, 2.0).build().into(),
+    TransformedShape::new(
+        Cylinder::builder(0.4, -2.0, 2.0).build().into(),
         Matrix::rotate(Vector::new(1.0, 0.0, 0.0), radians(90.0)),
-    )),
-    Arc::new(TransformedShape::new(
-        Arc::new(Cylinder::builder(0.4, -2.0, 2.0).build()),
+    ).into(),
+    TransformedShape::new(
+        Cylinder::builder(0.4, -2.0, 2.0).build().into(),
         Matrix::rotate(Vector::new(0.0, 1.0, 0.0), radians(90.0)),
-    )),
+    ).into(),
 ]);
 ```
 

@@ -5,22 +5,20 @@
 //!
 //! # Types
 //!
-//! - [`Path`]: A single path (sequence of [`Vector`] points)
-//! - [`Paths`]: A collection of paths
+//! - [`Paths`]: A collection of paths (the primary output type from rendering)
+//! - [`NewPath`]: A builder for appending a single path into a [`Paths`] collection
 //!
 //! # Example
 //!
 //! ```
-//! use larnt::{Cube, Scene, Vector};
+//! use larnt::{Cube, Vector, render};
 //!
-//! let mut scene = Scene::new();
-//! scene.add(Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build());
-//!
-//! let paths = scene.render(Vector::new(4.0, 3.0, 2.0)).call();
+//! let cube = Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build();
+//! let paths = render(vec![cube]).eye(Vector::new(4.0, 3.0, 2.0)).call();
 //!
 //! // Output to different formats
-//! paths.write_to_png("output.png", 1024.0, 1024.0);
-//! paths.write_to_svg("output.svg", 1024.0, 1024.0).unwrap();
+//! paths.write_to_png("output.png", 1024.0, 1024.0).expect("Failed to write PNG");
+//! paths.write_to_svg("output.svg", 1024.0, 1024.0).expect("Failed to write PNG");
 //! ```
 
 use crate::bounding_box::BBox;
@@ -46,10 +44,13 @@ use std::io::Write;
 /// use larnt::{Paths, Vector};
 ///
 /// // Create paths manually
-/// let paths = Paths::from_vec(vec![
-///     vec![Vector::new(0.0, 0.0, 0.0), Vector::new(1.0, 1.0, 0.0)],
-///     vec![Vector::new(1.0, 0.0, 0.0), Vector::new(0.0, 1.0, 0.0)],
-/// ]);
+/// let mut paths = Paths::new();
+/// paths.new_path().extend([Vector::new(0.0, 0.0, 0.0), Vector::new(1.0, 1.0, 0.0)]);
+/// let mut new_path = paths.new_path();
+/// new_path.push(Vector::new(1.0, 0.0, 0.0));
+/// new_path.push(Vector::new(0.0, 1.0, 0.0));
+/// drop(new_path);
+/// println!("{:?}", paths);
 /// ```
 #[derive(Debug, Clone, Default)]
 pub struct Paths<T> {
@@ -310,12 +311,10 @@ impl Paths<Vector> {
     /// # Example
     ///
     /// ```
-    /// use larnt::{Scene, Cube, Vector};
+    /// use larnt::{Cube, Vector, render};
     ///
-    /// let mut scene = Scene::new();
-    /// scene.add(Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build());
-    ///
-    /// let paths = scene.render(Vector::new(4.0, 3.0, 2.0)).call();
+    /// let cube = Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build();
+    /// let paths = render(vec![cube]).eye(Vector::new(4.0, 3.0, 2.0)).call();
     ///
     /// paths.write_to_svg("output.svg", 1024.0, 1024.0).unwrap();
     /// ```
@@ -331,19 +330,22 @@ impl Paths<Vector> {
     /// # Example
     ///
     /// ```
-    /// use larnt::{Scene, Sphere, Vector};
+    /// use larnt::{Sphere, Vector, render};
     ///
-    /// let mut scene = Scene::new();
-    /// scene.add(Sphere::builder(Vector::new(0.0, 0.0, 0.0), 1.0).build());
+    /// let sphere = Sphere::builder(Vector::new(0.0, 0.0, 0.0), 1.0).build();
+    /// let paths = render(vec![sphere]).eye(Vector::new(4.0, 3.0, 2.0)).call();
     ///
-    /// let paths = scene.render(Vector::new(4.0, 3.0, 2.0)).call();
-    ///
-    /// paths.write_to_png("output.png", 512.0, 512.0);
+    /// paths.write_to_png("output.png", 512.0, 512.0).expect("Failed to write PNG");
     /// ```
     #[cfg(feature = "png")]
-    pub fn write_to_png(&self, path: &str, width: f64, height: f64) {
+    pub fn write_to_png(
+        &self,
+        path: &str,
+        width: f64,
+        height: f64,
+    ) -> Result<(), image::ImageError> {
         let img = self.to_image(width, height).linewidth(2.5).call();
-        img.save(path).expect("Failed to save PNG");
+        img.save(path)
     }
 
     /// Writes the paths to a text file.

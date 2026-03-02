@@ -7,7 +7,7 @@
 //! # Example
 //!
 //! ```
-//! use larnt::{Scene, Sphere, SphereTexture, Vector};
+//! use larnt::{Sphere, SphereTexture, Vector, render};
 //!
 //! // Create a unit sphere at the origin with the default outline texture
 //! let sphere = Sphere::builder(Vector::new(0.0, 0.0, 0.0), 1.0).build();
@@ -17,9 +17,7 @@
 //!     .texture(SphereTexture::random_fuzz(42).call())
 //!     .build();
 //!
-//! let mut scene = Scene::new();
-//! scene.add(sphere);
-//! scene.add(sphere_fuzz);
+//! let paths = render(vec![sphere, sphere_fuzz]).eye(Vector::new(4.0, 3.0, 2.0)).call();
 //! ```
 
 use crate::hit::Hit;

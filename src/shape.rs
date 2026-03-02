@@ -9,7 +9,7 @@
 //! To create a custom shape, implement the [`Shape`] trait:
 //!
 //! ```no_run
-//! use larnt::{Shape, RenderArgs, Paths, Vector, Box, Hit, Ray};
+//! use larnt::{BBox, Shape, RenderArgs, Paths, Vector, Hit, Ray};
 //!
 //! struct MySphere {
 //!     center: Vector,
@@ -17,8 +17,8 @@
 //! }
 //!
 //! impl Shape for MySphere {
-//!     fn bounding_box(&self) -> Box {
-//!         Box::new(
+//!     fn bounding_box(&self) -> BBox {
+//!         BBox::new(
 //!             self.center.sub_scalar(self.radius),
 //!             self.center.add_scalar(self.radius),
 //!         )
@@ -33,7 +33,7 @@
 //!         Hit::no_hit()
 //!     }
 //!
-//!     fn paths(&self, args: &RenderArgs) -> Paths {
+//!     fn paths(&self, args: &RenderArgs) -> Paths<Vector> {
 //!         // Return paths that represent this shape's surface
 //!         Paths::new()
 //!     }
@@ -49,7 +49,7 @@ use crate::vector::Vector;
 
 /// The core trait for all renderable 3D geometry.
 ///
-/// Any type implementing `Shape` can be added to a [`Scene`](crate::Scene) and rendered.
+/// Any type implementing `Shape` can be passed to [`render`](crate::render) and rendered.
 /// The trait requires methods for bounding box computation, containment testing,
 /// ray intersection, and path generation.
 ///
@@ -59,10 +59,6 @@ use crate::vector::Vector;
 /// - [`contains`](Shape::contains): Tests if a point is inside the solid
 /// - [`intersect`](Shape::intersect): Tests for ray-solid intersection
 /// - [`paths`](Shape::paths): Returns the 3D paths to render
-///
-/// # Optional Methods
-///
-/// - [`compile`](Shape::compile): Perform any preprocessing (default: no-op)
 pub trait Shape {
     /// Returns the axis-aligned bounding box of this shape.
     ///
@@ -158,12 +154,11 @@ impl Shape for EmptyShape {
 ///
 /// ```
 /// use larnt::{Cube, Matrix, TransformedShape, Vector, radians};
-/// use std::sync::Arc;
 ///
-/// let cube = Arc::new(Cube::builder(
+/// let cube = Cube::builder(
 ///     Vector::new(-1.0, -1.0, -1.0),
 ///     Vector::new(1.0, 1.0, 1.0),
-/// ).build());
+/// ).build();
 ///
 /// // Rotate cube 45 degrees around Z axis
 /// let transform = Matrix::rotate(Vector::new(0.0, 0.0, 1.0), radians(45.0));

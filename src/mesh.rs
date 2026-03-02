@@ -125,7 +125,7 @@ impl Mesh {
         let face_normals: Vec<Vector> = self
             .triangles
             .chunks_exact(3)
-            .map(|chunk| normalized_normal(chunk.iter().map(|&i| self.vertices[i])))
+            .map(|chunk| normal(chunk.iter().map(|&i| self.vertices[i])).normalize())
             .collect();
         self.filter_paths(|edges| {
             if edges.len() == 1 {
@@ -133,8 +133,8 @@ impl Mesh {
             } else {
                 let base_normal = face_normals[edges[0].2];
                 edges.iter().skip(1).any(|e| {
-                    let other_normal = face_normals[e.2];
-                    base_normal.distance_squared(other_normal) > crate::common::EPS
+                    let cos_theta = base_normal.dot(face_normals[e.2]);
+                    cos_theta.abs() < 1.0 - crate::common::EPS
                 })
             }
         })
@@ -147,9 +147,8 @@ impl Mesh {
             .triangles
             .chunks_exact(3)
             .map(|chunk| {
-                let [v1, v2, v3] = [0, 1, 2].map(|i| self.vertices[chunk[i]]);
-                let true_normal = (v2.sub(v1)).cross(v3.sub(v1)).normalize();
-                let view_dir = args.eye.sub(v1);
+                let true_normal = normal(chunk.iter().map(|&i| self.vertices[i])).normalize();
+                let view_dir = args.eye.sub(self.vertices[chunk[0]]);
                 true_normal.dot(view_dir)
             })
             .collect();
@@ -221,17 +220,10 @@ impl Shape for Mesh {
     }
 }
 
-fn normalized_normal(mut v123: impl Iterator<Item = Vector>) -> Vector {
+fn normal(mut v123: impl Iterator<Item = Vector>) -> Vector {
     let [v1, v2, v3] = std::array::from_fn(|_| v123.next().unwrap());
     let normal = (v2.sub(v1)).cross(v3.sub(v1)).normalize();
-    if normal.x < 0.0
-        || (normal.x == 0.0 && normal.y < 0.0)
-        || (normal.x == 0.0 && normal.y == 0.0 && normal.z < 0.0)
-    {
-        normal.mul_scalar(-1.0)
-    } else {
-        normal
-    }
+    normal
 }
 
 struct VertexMerger {
