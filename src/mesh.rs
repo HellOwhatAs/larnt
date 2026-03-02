@@ -19,7 +19,7 @@ pub enum MeshTexture {
 }
 
 /// Triangle mesh shape.
-#[derive(Builder)]
+#[derive(Debug, Clone, Builder)]
 pub struct Mesh {
     #[builder(start_fn)]
     pub vertices: Vec<Vector>,

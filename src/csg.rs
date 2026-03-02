@@ -37,6 +37,7 @@ pub enum Op {
 }
 
 /// A shape created by combining two shapes with a boolean operation.
+#[derive(Debug, Clone)]
 pub struct BooleanShape<T> {
     /// The operation to perform.
     pub op: Op,

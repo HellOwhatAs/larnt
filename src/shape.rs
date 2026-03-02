@@ -164,6 +164,7 @@ impl Shape for EmptyShape {
 /// let transform = Matrix::rotate(Vector::new(0.0, 0.0, 1.0), radians(45.0));
 /// let rotated = TransformedShape::new(cube, transform);
 /// ```
+#[derive(Debug, Clone)]
 pub struct TransformedShape<T> {
     /// The underlying shape being transformed.
     pub shape: T,

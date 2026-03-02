@@ -5,7 +5,7 @@ use crate::ray::Ray;
 use crate::shape::Shape;
 use crate::vector::Vector;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct BvhNode {
     pub bx: BBox,
     pub left_first: usize,
@@ -30,6 +30,7 @@ struct PrimInfo<T> {
     centroid: (f64, f64, f64),
 }
 
+#[derive(Debug, Clone)]
 pub struct Tree<T> {
     nodes: Vec<BvhNode>,
     shapes: Vec<T>,

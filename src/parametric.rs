@@ -7,6 +7,7 @@ use crate::shape::{RenderArgs, Shape};
 use crate::vector::Vector;
 use std::collections::HashSet;
 
+#[derive(Debug, Clone)]
 pub struct ParametricSurface {
     mesh: Mesh,
     paths: Paths<Vector>,

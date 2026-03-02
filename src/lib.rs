@@ -51,9 +51,6 @@ pub use triangle::Triangle;
 pub use util::{degrees, median, radians};
 pub use vector::Vector;
 
-use derive_more::From;
-
-#[derive(From)]
 pub enum Primitive {
     EmptyShape(EmptyShape),
     Cone(Cone),
@@ -67,6 +64,38 @@ pub enum Primitive {
     BooleanShape(BooleanShape<Self>),
     Dynamic(Box<dyn Shape + Send + Sync>),
 }
+
+impl_shape_for_enum!(Primitive {
+    EmptyShape,
+    Cone,
+    Cube,
+    Cylinder,
+    Sphere,
+    Triangle,
+    Mesh,
+    ParametricSurface,
+    TransformedShape,
+    BooleanShape,
+    Dynamic,
+});
+
+impl_from_for_enum!(Primitive {
+    EmptyShape,
+    Cone,
+    Cube,
+    Cylinder,
+    Sphere,
+    Triangle(Box<Triangle>),
+    Triangle(Triangle => Box::new),
+    Mesh(Box<Mesh>),
+    Mesh(Mesh => Box::new),
+    ParametricSurface(Box<ParametricSurface>),
+    ParametricSurface(ParametricSurface => Box::new),
+    TransformedShape(Box<TransformedShape<Self>>),
+    TransformedShape(TransformedShape<Self> => Box::new),
+    BooleanShape(BooleanShape<Self>),
+    Dynamic(Box<dyn Shape + Send + Sync>),
+});
 
 #[macro_export]
 macro_rules! impl_shape_for_enum {
@@ -86,39 +115,191 @@ macro_rules! impl_shape_for_enum {
         }
     };
 }
-impl_shape_for_enum!(Primitive {
-    EmptyShape,
-    Cone,
-    Cube,
-    Cylinder,
-    Sphere,
-    Triangle,
-    Mesh,
-    ParametricSurface,
-    TransformedShape,
-    BooleanShape,
-    Dynamic,
-});
 
 #[macro_export]
-macro_rules! impl_from_boxed_variant_for_enum {
-    ($enum_name:ident {
-        $(
-            $variant:ident $( < $($generic:ty),+ $(,)? > )?
-        ),* $(,)?
-    }) => {
-        $(
-            impl From<$variant $( < $($generic),+ > )?> for $enum_name {
-                fn from(val: $variant $( < $($generic),+ > )?) -> Self {
-                    $enum_name::$variant(Box::new(val))
-                }
-            }
-        )*
+macro_rules! impl_from_for_enum {
+    // ==========================================
+    // 0. Public Entry Point
+    // ==========================================
+    (
+        $enum_name:ident {
+            $($body:tt)*
+        }
+    ) => {
+        impl_from_for_enum!(@parse_level $enum_name ; $($body)*);
     };
+
+    // ==========================================
+    // 1. @parse_level: Process direct child nodes at the top level
+    // ==========================================
+
+    // Case 1: With a custom mapping function (mapper), and has nested child nodes
+    (@parse_level $enum_name:ident ; $variant:ident ( $type:ty => $mapper:expr ) { $($children:tt)* } $(, $($rest:tt)*)? ) => {
+        impl From<$type> for $enum_name {
+            fn from(val: $type) -> Self { $enum_name::$variant(($mapper)(val)) }
+        }
+        impl_from_for_enum!(@flatten_map $enum_name, $variant, $type, $mapper ; $($children)*);
+        $( impl_from_for_enum!(@parse_level $enum_name ; $($rest)*); )?
+    };
+
+    // Case 2: With a custom mapping function (mapper), no nested child nodes
+    (@parse_level $enum_name:ident ; $variant:ident ( $type:ty => $mapper:expr ) $(, $($rest:tt)*)? ) => {
+        impl From<$type> for $enum_name {
+            fn from(val: $type) -> Self { $enum_name::$variant(($mapper)(val)) }
+        }
+        $( impl_from_for_enum!(@parse_level $enum_name ; $($rest)*); )?
+    };
+
+    // Case 3: Explicitly declared type (e.g., A(A<usize>)), and has nested child nodes
+    (@parse_level $enum_name:ident ; $variant:ident ( $type:ty ) { $($children:tt)* } $(, $($rest:tt)*)? ) => {
+        impl From<$type> for $enum_name {
+            fn from(val: $type) -> Self { $enum_name::$variant(val) }
+        }
+        impl_from_for_enum!(@flatten $enum_name, $variant, $type ; $($children)*);
+        $( impl_from_for_enum!(@parse_level $enum_name ; $($rest)*); )?
+    };
+
+    // Case 4: Implicit type (same as variant name), and has nested child nodes
+    (@parse_level $enum_name:ident ; $variant:ident { $($children:tt)* } $(, $($rest:tt)*)? ) => {
+        impl From<$variant> for $enum_name {
+            fn from(val: $variant) -> Self { $enum_name::$variant(val) }
+        }
+        impl_from_for_enum!(@flatten $enum_name, $variant, $variant ; $($children)*);
+        $( impl_from_for_enum!(@parse_level $enum_name ; $($rest)*); )?
+    };
+
+    // Case 5: Explicitly declared type, no nested child nodes
+    (@parse_level $enum_name:ident ; $variant:ident ( $type:ty ) $(, $($rest:tt)*)? ) => {
+        impl From<$type> for $enum_name {
+            fn from(val: $type) -> Self { $enum_name::$variant(val) }
+        }
+        $( impl_from_for_enum!(@parse_level $enum_name ; $($rest)*); )?
+    };
+
+    // Case 6: Implicit type, no nested child nodes
+    (@parse_level $enum_name:ident ; $variant:ident $(, $($rest:tt)*)? ) => {
+        impl From<$variant> for $enum_name {
+            fn from(val: $variant) -> Self { $enum_name::$variant(val) }
+        }
+        $( impl_from_for_enum!(@parse_level $enum_name ; $($rest)*); )?
+    };
+
+    // Base case / Termination condition
+    (@parse_level $enum_name:ident $(;)? ) => {};
+
+    // ==========================================
+    // 2. @flatten_map: Recursive flattening with mapper
+    // ==========================================
+
+    // Case 1: Grandchild node has its own mapper and is nested (top-level mapper takes precedence)
+    (@flatten_map $enum_name:ident, $top_var:ident, $top_ty:ty, $mapper:expr ; $sub_var:ident ( $type:ty => $_mapper:expr ) { $($children:tt)* } $(, $($rest:tt)*)? ) => {
+        impl From<$type> for $enum_name {
+            fn from(val: $type) -> Self { $enum_name::$top_var(($mapper)(<$top_ty>::from(val))) }
+        }
+        impl_from_for_enum!(@flatten_map $enum_name, $top_var, $top_ty, $mapper ; $($children)*);
+        $( impl_from_for_enum!(@flatten_map $enum_name, $top_var, $top_ty, $mapper ; $($rest)*); )?
+    };
+
+    // Case 2: Grandchild node has its own mapper, no nesting
+    (@flatten_map $enum_name:ident, $top_var:ident, $top_ty:ty, $mapper:expr ; $sub_var:ident ( $type:ty => $_mapper:expr ) $(, $($rest:tt)*)? ) => {
+        impl From<$type> for $enum_name {
+            fn from(val: $type) -> Self { $enum_name::$top_var(($mapper)(<$top_ty>::from(val))) }
+        }
+        $( impl_from_for_enum!(@flatten_map $enum_name, $top_var, $top_ty, $mapper ; $($rest)*); )?
+    };
+
+    // Case 3: Grandchild node with explicit type, has nested child nodes
+    (@flatten_map $enum_name:ident, $top_var:ident, $top_ty:ty, $mapper:expr ; $sub_var:ident ( $type:ty ) { $($children:tt)* } $(, $($rest:tt)*)? ) => {
+        impl From<$type> for $enum_name {
+            fn from(val: $type) -> Self { $enum_name::$top_var(($mapper)(<$top_ty>::from(val))) }
+        }
+        impl_from_for_enum!(@flatten_map $enum_name, $top_var, $top_ty, $mapper ; $($children)*);
+        $( impl_from_for_enum!(@flatten_map $enum_name, $top_var, $top_ty, $mapper ; $($rest)*); )?
+    };
+
+    // Case 4: Grandchild node with implicit type, has nested child nodes
+    (@flatten_map $enum_name:ident, $top_var:ident, $top_ty:ty, $mapper:expr ; $sub_var:ident { $($children:tt)* } $(, $($rest:tt)*)? ) => {
+        impl From<$sub_var> for $enum_name {
+            fn from(val: $sub_var) -> Self { $enum_name::$top_var(($mapper)(<$top_ty>::from(val))) }
+        }
+        impl_from_for_enum!(@flatten_map $enum_name, $top_var, $top_ty, $mapper ; $($children)*);
+        $( impl_from_for_enum!(@flatten_map $enum_name, $top_var, $top_ty, $mapper ; $($rest)*); )?
+    };
+
+    // Case 5: Grandchild node with explicit type, no nesting
+    (@flatten_map $enum_name:ident, $top_var:ident, $top_ty:ty, $mapper:expr ; $sub_var:ident ( $type:ty ) $(, $($rest:tt)*)? ) => {
+        impl From<$type> for $enum_name {
+            fn from(val: $type) -> Self { $enum_name::$top_var(($mapper)(<$top_ty>::from(val))) }
+        }
+        $( impl_from_for_enum!(@flatten_map $enum_name, $top_var, $top_ty, $mapper ; $($rest)*); )?
+    };
+
+    // Case 6: Grandchild node with implicit type, no nesting
+    (@flatten_map $enum_name:ident, $top_var:ident, $top_ty:ty, $mapper:expr ; $sub_var:ident $(, $($rest:tt)*)? ) => {
+        impl From<$sub_var> for $enum_name {
+            fn from(val: $sub_var) -> Self { $enum_name::$top_var(($mapper)(<$top_ty>::from(val))) }
+        }
+        $( impl_from_for_enum!(@flatten_map $enum_name, $top_var, $top_ty, $mapper ; $($rest)*); )?
+    };
+
+    // Base case / Termination condition
+    (@flatten_map $enum_name:ident, $top_var:ident, $top_ty:ty, $mapper:expr $(;)? ) => {};
+
+    // ==========================================
+    // 3. @flatten: Normal recursive flattening without mapper
+    // ==========================================
+
+    // Case 1: Grandchild node has mapper, has nested child nodes
+    (@flatten $enum_name:ident, $top_var:ident, $top_ty:ty ; $sub_var:ident ( $type:ty => $_mapper:expr ) { $($children:tt)* } $(, $($rest:tt)*)? ) => {
+        impl From<$type> for $enum_name {
+            fn from(val: $type) -> Self { $enum_name::$top_var(<$top_ty>::from(val)) }
+        }
+        impl_from_for_enum!(@flatten $enum_name, $top_var, $top_ty ; $($children)*);
+        $( impl_from_for_enum!(@flatten $enum_name, $top_var, $top_ty ; $($rest)*); )?
+    };
+
+    // Case 2: Grandchild node has mapper, no nesting
+    (@flatten $enum_name:ident, $top_var:ident, $top_ty:ty ; $sub_var:ident ( $type:ty => $_mapper:expr ) $(, $($rest:tt)*)? ) => {
+        impl From<$type> for $enum_name {
+            fn from(val: $type) -> Self { $enum_name::$top_var(<$top_ty>::from(val)) }
+        }
+        $( impl_from_for_enum!(@flatten $enum_name, $top_var, $top_ty ; $($rest)*); )?
+    };
+
+    // Case 3: Grandchild node with explicit type, has nested child nodes
+    (@flatten $enum_name:ident, $top_var:ident, $top_ty:ty ; $sub_var:ident ( $type:ty ) { $($children:tt)* } $(, $($rest:tt)*)? ) => {
+        impl From<$type> for $enum_name {
+            fn from(val: $type) -> Self { $enum_name::$top_var(<$top_ty>::from(val)) }
+        }
+        impl_from_for_enum!(@flatten $enum_name, $top_var, $top_ty ; $($children)*);
+        $( impl_from_for_enum!(@flatten $enum_name, $top_var, $top_ty ; $($rest)*); )?
+    };
+
+    // Case 4: Grandchild node with implicit type, has nested child nodes
+    (@flatten $enum_name:ident, $top_var:ident, $top_ty:ty ; $sub_var:ident { $($children:tt)* } $(, $($rest:tt)*)? ) => {
+        impl From<$sub_var> for $enum_name {
+            fn from(val: $sub_var) -> Self { $enum_name::$top_var(<$top_ty>::from(val)) }
+        }
+        impl_from_for_enum!(@flatten $enum_name, $top_var, $top_ty ; $($children)*);
+        $( impl_from_for_enum!(@flatten $enum_name, $top_var, $top_ty ; $($rest)*); )?
+    };
+
+    // Case 5: Grandchild node with explicit type, no nesting
+    (@flatten $enum_name:ident, $top_var:ident, $top_ty:ty ; $sub_var:ident ( $type:ty ) $(, $($rest:tt)*)? ) => {
+        impl From<$type> for $enum_name {
+            fn from(val: $type) -> Self { $enum_name::$top_var(<$top_ty>::from(val)) }
+        }
+        $( impl_from_for_enum!(@flatten $enum_name, $top_var, $top_ty ; $($rest)*); )?
+    };
+
+    // Case 6: Grandchild node with implicit type, no nesting
+    (@flatten $enum_name:ident, $top_var:ident, $top_ty:ty ; $sub_var:ident $(, $($rest:tt)*)? ) => {
+        impl From<$sub_var> for $enum_name {
+            fn from(val: $sub_var) -> Self { $enum_name::$top_var(<$top_ty>::from(val)) }
+        }
+        $( impl_from_for_enum!(@flatten $enum_name, $top_var, $top_ty ; $($rest)*); )?
+    };
+
+    // Base case / Termination condition
+    (@flatten $enum_name:ident, $top_var:ident, $top_ty:ty $(;)? ) => {};
 }
-impl_from_boxed_variant_for_enum!(Primitive {
-    Triangle,
-    Mesh,
-    ParametricSurface,
-    TransformedShape<Self>,
-});

@@ -38,7 +38,7 @@ impl Default for FunctionTexture {
     }
 }
 
-#[derive(Debug, Builder)]
+#[derive(Debug, Clone, Builder)]
 pub struct Function<F>
 where
     F: Fn(f64, f64) -> f64 + Send + Sync,
