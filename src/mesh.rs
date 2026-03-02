@@ -47,14 +47,7 @@ impl Mesh {
             .iter()
             .flat_map(|t| [t.v1, t.v2, t.v3].map(|v| merger.get_or_insert(v)))
             .collect();
-        Self {
-            bx: BBox::for_shapes(&triangles),
-            triangles: itriangles,
-            vertices: merger.vertices,
-            tree: Tree::new(triangles),
-            flipped_triangles: HashSet::new(),
-            texture: MeshTexture::default(),
-        }
+        Self::builder(merger.vertices, itriangles).build()
     }
 
     pub fn fit_inside(&self, bx: BBox, anchor: Vector) -> Matrix {

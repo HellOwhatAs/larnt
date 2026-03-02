@@ -358,15 +358,26 @@ impl Matrix {
     /// Unlike `mul_position`, this ignores the translation component
     /// and normalizes the result.
     pub fn mul_direction(&self, b: Vector) -> Vector {
+        self.mul_vector(b).normalize()
+    }
+
+    /// Transforms a direction vector by this matrix.
+    ///
+    /// Unlike `mul_direction`, this does not normalize the result.
+    pub fn mul_vector(&self, b: Vector) -> Vector {
         let x = self.x00 * b.x + self.x01 * b.y + self.x02 * b.z;
         let y = self.x10 * b.x + self.x11 * b.y + self.x12 * b.z;
         let z = self.x20 * b.x + self.x21 * b.y + self.x22 * b.z;
-        Vector::new(x, y, z).normalize()
+        Vector::new(x, y, z)
     }
 
-    /// Transforms a ray by this matrix.
-    pub fn mul_ray(&self, b: Ray) -> Ray {
-        Ray::new(self.mul_position(b.origin), self.mul_direction(b.direction))
+    /// Transforms a ray by this matrix. Returns the transformed ray and the scale factor applied to the direction.
+    pub fn mul_ray(&self, b: Ray) -> (Ray, f64) {
+        let d = self.mul_vector(b.direction);
+        let scale = d.length();
+        let normalized_d = d.div_scalar(scale);
+        let transformed_ray = Ray::new(self.mul_position(b.origin), normalized_d);
+        (transformed_ray, scale)
     }
 
     /// Transforms a bounding box by this matrix.

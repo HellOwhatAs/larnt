@@ -1,23 +1,21 @@
-use larnt::{BBox, Matrix, Mesh, TransformedShape, Vector, load_obj, render};
+use larnt::{BBox, Mesh, TransformedShape, Vector, load_obj, render};
 
 fn main() {
-    let mesh: Mesh = load_obj("examples/suzanne.obj").expect("Failed to load OBJ");
+    let mut mesh: Mesh = load_obj("examples/suzanne.obj").expect("Failed to load OBJ");
+    mesh.texture = larnt::mesh::MeshTexture::Silhouette;
     let matrix = mesh
         .fit_inside(
             BBox::new(Vector::new(0.0, 0.0, 0.0), Vector::new(1.0, 1.0, 1.0)),
             Vector::new(0.0, 0.0, 0.0),
         )
-        .translated(Vector::new(-0.5, -0.5, -0.5));
-    let mesh = TransformedShape::new(mesh, matrix);
-
-    let transform = Matrix::rotate(Vector::new(0.0, 1.0, 0.0), 0.5);
+        .translated(Vector::new(-0.5, -0.5, -0.5))
+        .rotated(Vector::new(0.0, 1.0, 0.0), 0.5);
 
     let eye = Vector::new(-0.5, 0.5, 2.0);
     let up = Vector::new(0.0, 1.0, 0.0);
     let width = 1024.0;
     let height = 1024.0;
-
-    let paths = render(vec![TransformedShape::new(mesh, transform)])
+    let paths = render(vec![TransformedShape::new(mesh, matrix)])
         .eye(eye)
         .up(up)
         .width(width)
