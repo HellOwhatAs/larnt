@@ -1,4 +1,4 @@
-Copyright (C) 2016 HellOwhatAs
+Copyright (C) 2026 HellOwhatAs
 Copyright (C) 2016 Michael Fogleman
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
