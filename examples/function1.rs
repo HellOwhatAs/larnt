@@ -14,7 +14,7 @@ fn main() {
         200,
         200,
     );
-    mesh.texture = MeshTexture::Silhouette;
+    mesh.texture = MeshTexture::silhouette().call();
 
     render::<Primitive>(vec![surface.into(), mesh.into()])
         .eye(Vector::new(75., 35., 50.))

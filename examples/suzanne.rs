@@ -2,7 +2,7 @@ use larnt::{BBox, Mesh, TransformedShape, Vector, load_obj, render};
 
 fn main() {
     let mut mesh: Mesh = load_obj("examples/suzanne.obj").expect("Failed to load OBJ");
-    mesh.texture = larnt::mesh::MeshTexture::Silhouette;
+    mesh.texture = larnt::mesh::MeshTexture::silhouette().cos_theta(0.5).call();
     let matrix = mesh
         .fit_inside(
             BBox::new(Vector::new(0.0, 0.0, 0.0), Vector::new(1.0, 1.0, 1.0)),

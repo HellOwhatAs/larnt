@@ -13,7 +13,7 @@ fn main() {
     };
     let mut mobius =
         ParametricSurface::new_mesh(mobius_func, (0.0, 2.0 * PI), (-width, width), 80, 20);
-    mobius.texture = MeshTexture::Silhouette;
+    mobius.texture = MeshTexture::silhouette().call();
 
     let mobius_func2 = |u: f64, v: f64| -> Vector {
         let x = (radius + (v / 2.0) * (u / 2.0).cos()) * u.cos() - 2.0;
@@ -23,7 +23,7 @@ fn main() {
     };
     let mut mobius2 =
         ParametricSurface::new_mesh(mobius_func2, (0.0, 2.0 * PI), (-width, width), 80, 20);
-    mobius2.texture = MeshTexture::Silhouette;
+    mobius2.texture = MeshTexture::silhouette().call();
 
     render::<Primitive>(vec![mobius.into(), mobius2.into()])
         .eye(Vector::new(3., -5., 1.))

@@ -7,7 +7,7 @@ use crate::tree::Tree;
 use crate::triangle::Triangle;
 use crate::vector::Vector;
 use crate::{Matrix, TransformedShape};
-use bon::Builder;
+use bon::{Builder, bon};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, Default)]
@@ -15,7 +15,15 @@ pub enum MeshTexture {
     #[default]
     Triangles,
     Polygonal,
-    Silhouette,
+    Silhouette(f64),
+}
+
+#[bon]
+impl MeshTexture {
+    #[builder]
+    pub fn silhouette(#[builder(default = 0.0)] cos_theta: f64) -> Self {
+        Self::Silhouette(cos_theta)
+    }
 }
 
 /// Triangle mesh shape.
@@ -135,27 +143,50 @@ impl Mesh {
         .map(|i| self.vertices[i])
     }
 
-    pub fn silhouette_paths(&self, args: &RenderArgs) -> Paths<Vector> {
+    pub fn silhouette_paths(&self, args: &RenderArgs, cos_theta: f64) -> Paths<Vector> {
+        if cos_theta > 0.0 {
+            self.silhouette_inner(
+                args,
+                |normal, view| (normal, normal.dot(view)),
+                |[(n1, dot1), (n2, dot2)]| (n1.dot(n2).abs() > cos_theta).then_some(dot1 * dot2),
+            )
+        } else {
+            self.silhouette_inner(
+                args,
+                |normal, view| normal.dot(view),
+                |[dot1, dot2]| Some(dot1 * dot2),
+            )
+        }
+    }
+
+    fn silhouette_inner<T: Copy>(
+        &self,
+        args: &RenderArgs,
+        calc_face_data: impl Fn(Vector, Vector) -> T,
+        get_dot1mul2: impl Fn([T; 2]) -> Option<f64>,
+    ) -> Paths<Vector> {
         let face_data: Vec<_> = self
             .triangles
             .chunks_exact(3)
             .map(|chunk| {
                 let true_normal = normal(chunk.iter().map(|&i| self.vertices[i])).normalize();
                 let view_dir = args.eye.sub(self.vertices[chunk[0]]);
-                true_normal.dot(view_dir)
+                calc_face_data(true_normal, view_dir)
             })
             .collect();
         self.filter_paths(|edges| {
-            if edges.len() == 2 {
-                let [dot1, dot2] = [0, 1].map(|i| face_data[edges[i].2]);
+            if edges.len() == 2
+                && let Some(dot1mul2) = get_dot1mul2([0, 1].map(|i| face_data[edges[i].2]))
+            {
                 let (a, b) = (edges[0].2, edges[1].2);
                 let key = if a < b { (a, b) } else { (b, a) };
                 if self.flipped_triangles.contains(&key) {
-                    return dot1 * dot2 >= 0.0;
+                    dot1mul2 >= 0.0
+                } else {
+                    dot1mul2 <= 0.0
                 }
-                dot1 * dot2 <= 0.0
             } else {
-                true
+                return true;
             }
         })
         .splice_exact()
@@ -208,7 +239,7 @@ impl Shape for Mesh {
         match self.texture {
             MeshTexture::Triangles => self.triangle_paths(args),
             MeshTexture::Polygonal => self.polygonal_paths(args),
-            MeshTexture::Silhouette => self.silhouette_paths(args),
+            MeshTexture::Silhouette(cos_theta) => self.silhouette_paths(args, cos_theta),
         }
     }
 }
