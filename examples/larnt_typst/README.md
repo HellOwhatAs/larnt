@@ -125,19 +125,25 @@ _3D line art engine using [rust rewrite](https://github.com/HellOwhatAs/larnt) o
 - CSG (Constructive Solid Geometry) Operations
 	- Intersection
 	- Difference
-- Output SVG
+- Output SVG or PNG
 
 ## Usage
-For information, see the [manual.pdf](https://github.com/HellOwhatAs/larnt/releases/download/typst-0.1.0/manual.pdf).
+For information, see the [manual.pdf](https://github.com/HellOwhatAs/larnt/releases/download/typst-0.2.0/manual.pdf).
 
 Add the following code to your document:
 ```typst
-#import "@preview/larnt:0.1.0" as la;
+#import "@preview/larnt:0.2.0" as la;
 
 #image(la.render(
   // Some shapes to render
 ))
 ```
+
+Use texture helpers such as `la.texture.striped(12)`, `la.texture.lat_lng()`,
+and `la.texture.silhouette(cos-theta: 0.5)`. The older raw string texture API
+is not part of the 0.2.0 interface. `la.func(...)` is still available for
+solid function plots, but `la.surface(...)` is usually faster for parameterized
+surface line art.
 
 
 ## Build

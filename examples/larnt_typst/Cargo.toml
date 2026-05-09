@@ -1,7 +1,8 @@
 [package]
 name = "larnt_typst_plugin"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
+publish = false
 
 [lib]
 crate-type = ["cdylib"]
@@ -11,7 +12,7 @@ crate-type = ["cdylib"]
 ciborium = "0.2.1"
 serde = "1.0"
 wasm-minimal-protocol = { git = "https://github.com/astrale-sharp/wasm-minimal-protocol", rev = "c51acd43095fe9da8fa943e064618e486fd2b58d" }
-larnt = { path = "../.." }
+larnt = { path = "../..", version = "0.2.0" }
 image = { version = "0.25", default-features = false }
 
 [profile.release]

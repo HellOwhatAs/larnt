@@ -2,7 +2,7 @@
 #import "./texture.typ"
 
 /// The cone shape.
-/// Can be warped with `outline()` to create outline cone.
+/// Uses `texture.outline()` by default to render the cone outline.
 ///
 /// ```example
 /// #image(render(
@@ -88,7 +88,8 @@
   )
 }
 
-/// The cylinder shape. Can be warped with `outline()` to create outline cylinder.
+/// The cylinder shape.
+/// Uses `texture.outline()` by default to render the cylinder outline.
 ///
 /// ```example
 /// #image(render(
@@ -133,7 +134,8 @@
   )
 }
 
-/// The sphere shape. Can be warped with `outline()` to create outline sphere.
+/// The sphere shape.
+/// Uses `texture.outline()` by default to render the sphere outline.
 ///
 /// ```example
 /// #image(render(
@@ -177,6 +179,100 @@
       center: center,
       radius: radius,
       texture: texture,
+    ),
+  )
+}
+
+/// The function-defined solid.
+///
+/// This samples a Typst function over a rectangular x/y grid before sending it to the WASM plugin,
+/// then the plugin reconstructs the surface with bilinear interpolation. Prefer `surface(...)`
+/// for pure surface plots when occlusion against a solid is not needed.
+///
+/// ```example
+/// #image(render(
+///   eye: (3., 0.5, 3.),
+///   fovy: 40.,
+///   func(
+///     (x, y) => x * y,
+///     (-1., -1., -1.),
+///     (1., 1., 1.),
+///     texture: texture.spiral(),
+///     n: 32,
+///     step: 0.01,
+///   ),
+///   func((x, y) => 0., (-1., -1., -1.), (1., 1., 1.), n: 16, step: 0.01),
+/// ))
+/// ```
+///
+/// -> shape
+#let func(
+  /// The function or pre-sampled 2D array defining the surface z value.
+  /// -> function | array
+  func,
+  /// The minimum corner of the bounding box.
+  /// -> array
+  min,
+  /// The maximum corner of the bounding box.
+  /// -> array
+  max,
+  /// The filled side of the surface. Can be `"Below"` or `"Above"`.
+  /// -> str
+  direction: "Below",
+  /// Texture of the function surface. Can be `grid`, `swirl`, or `spiral`.
+  /// -> texture
+  texture: texture.grid(),
+  /// The default number of samples on each axis when `x-samples` or `y-samples` is not set.
+  /// -> int
+  n: 50,
+  /// The number of x-axis intervals used for sampling.
+  /// -> int | none
+  x-samples: none,
+  /// The number of y-axis intervals used for sampling.
+  /// -> int | none
+  y-samples: none,
+  /// The ray-marching step size used by the Rust function solid.
+  /// -> float
+  step: 0.05,
+) = {
+  let x-samples = if x-samples == none { n } else { x-samples }
+  let y-samples = if y-samples == none { n } else { y-samples }
+  assert(
+    (type(func) == function or type(func) == array)
+      and (min, max).all(v => type(v) == array and v.len() == 3 and v.all(i => type(i) == float))
+      and type(direction) == str
+      and type(n) == int
+      and type(x-samples) == int
+      and type(y-samples) == int,
+    message: "func(...) expects a function or sample array, two arrays of 3 floats, and integer sample counts",
+  )
+  assert(direction in ("Below", "Above"), message: "func(...) direction must be either `Below` or `Above`")
+  assert(
+    (type(texture) == dictionary and "Grid" in texture) or texture == "Swirl" or texture == "Spiral",
+    message: "func(...) texture must be `texture.grid(..)`, `texture.swirl()`, or `texture.spiral()`",
+  )
+  assert(
+    max.at(0) > min.at(0) and max.at(1) > min.at(1) and max.at(2) > min.at(2),
+    message: "func(...) max must be greater than min on all axes",
+  )
+  assert(n > 0 and x-samples > 0 and y-samples > 0, message: "func(...) sample counts must be positive")
+  assert(step > 0., message: "func(...) step must be positive")
+
+  let samples = if type(func) == function {
+    let xs = range(x-samples + 1).map(i => min.at(0) + (max.at(0) - min.at(0)) * i / x-samples)
+    let ys = range(y-samples + 1).map(i => min.at(1) + (max.at(1) - min.at(1)) * i / y-samples)
+    ys.map(y => xs.map(x => float(func(x, y))))
+  } else {
+    func
+  }
+
+  return (
+    Function: (
+      samples: samples,
+      bbox: (min, max),
+      direction: direction,
+      texture: texture,
+      step: step,
     ),
   )
 }
@@ -242,7 +338,7 @@
   /// -> array
   triangles,
   /// An array of normal flipped triangle index pairs.
-  /// Useful for non-orientable surface such as Möbius strip and Klein bottle.
+  /// Useful for non-orientable surface such as Mobius strip and Klein bottle.
   /// -> array
   flipped_triangles: (),
   /// Texture of the Mesh.  Can be one of `triangles`, `polygonal`, or `silhouette`.
@@ -252,6 +348,10 @@
   assert(
     type(vertices) == array and type(triangles) == array and type(flipped_triangles) == array,
     message: "mesh(..) expects three array",
+  )
+  assert(
+    texture == "Triangles" or texture == "Polygonal" or (type(texture) == dictionary and "Silhouette" in texture),
+    message: "mesh(...) texture must be `texture.triangles()`, `texture.polygonal()`, or `texture.silhouette(..)`",
   )
   return (
     Mesh: (
@@ -265,6 +365,7 @@
 
 /// The parametric surface defined by a function of (u, v) => (x, y, z).
 /// It generates a sampled mesh across the parameter grid, applying a custom grid texture for rendering.
+/// For `texture.grid(..)`, line density comes from the supplied `u` and `v` samples.
 ///
 /// ```example
 /// #import "@preview/lilaq:0.5.0": linspace
@@ -298,6 +399,17 @@
   /// -> texture
   texture: texture.grid(),
 ) = {
+  assert(
+    type(u) == array and type(v) == array and type(func) == function,
+    message: "surface(...) expects two arrays and a function",
+  )
+  assert(u.len() >= 2 and v.len() >= 2, message: "surface(...) expects at least two samples per axis")
+  assert(
+    (type(texture) == dictionary and ("Grid" in texture or "Silhouette" in texture))
+      or texture == "Triangles"
+      or texture == "Polygonal",
+    message: "surface(...) texture must be `texture.grid(..)`, `texture.triangles()`, `texture.polygonal()`, or `texture.silhouette(..)`",
+  )
   (
     ParametricSurface: (
       samples: u.map(u => v.map(v => func(u, v))).join(),
@@ -559,21 +671,3 @@
     cbor.encode(shapes.pos()),
   )
 }
-
-
-#import "@preview/lilaq:0.5.0": linspace
-#set page(width: auto, height: auto, margin: 0pt)
-#image(render(
-  eye: (3., -5., 2.),
-  surface(
-    linspace(0., 2. * calc.pi),
-    linspace(-0.5, 0.5),
-    (u, v) => {
-      let x = (2.0 + (v / 2.0) * calc.cos(u / 2.0)) * calc.cos(u)
-      let y = (2.0 + (v / 2.0) * calc.cos(u / 2.0)) * calc.sin(u)
-      let z = (v / 2.0) * calc.sin(u / 2.0)
-      (x, y, z)
-    },
-    texture: "Silhouette",
-  ),
-))

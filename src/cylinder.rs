@@ -87,11 +87,11 @@ impl Cylinder {
     fn paths_outline(&self, args: &RenderArgs) -> Paths<Vector> {
         // For a cylinder with radius r aligned along Z-axis, the silhouette
         // generators are found by solving:
-        // E.x * cos(θ) + E.y * sin(θ) = r
+        // E.x * cos(theta) + E.y * sin(theta) = r
         // where E is the eye position.
         //
-        // This is of the form: a*cos(θ) + b*sin(θ) = c
-        // Solution: θ = atan2(b, a) ± acos(c / sqrt(a^2 + b^2))
+        // This is of the form: a*cos(theta) + b*sin(theta) = c
+        // Solution: theta = atan2(b, a) +/- acos(c / sqrt(a^2 + b^2))
         let mut result = Paths::new();
 
         let r = self.radius;
@@ -129,7 +129,7 @@ impl Cylinder {
         let theta1 = eye_azimuth + angular_offset;
         let theta2 = eye_azimuth - angular_offset;
 
-        // Front and back arcs seperately to pass visibility tests
+        // Front and back arcs separately to pass visibility tests
         for (func, (alpha, beta)) in [adaptive_arc, adaptive_arc_inner]
             .iter()
             .zip([(theta2, theta1), (theta1, theta2 + PI * 2.0)])

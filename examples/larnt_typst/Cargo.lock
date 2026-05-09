@@ -190,7 +190,7 @@ dependencies = [
 
 [[package]]
 name = "larnt"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bon",
  "image",
@@ -199,7 +199,7 @@ dependencies = [
 
 [[package]]
 name = "larnt_typst_plugin"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ciborium",
  "image",

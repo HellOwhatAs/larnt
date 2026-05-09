@@ -7,7 +7,7 @@
 #let random_circles(seed, num: 140) = ("RandomCircles": (seed: seed, num: num))
 #let triangles() = "Triangles"
 #let polygonal() = "Polygonal"
-#let silhouette() = "Silhouette"
-#let grid() = "Grid"
+#let silhouette(cos-theta: 0.0) = ("Silhouette": cos-theta)
+#let grid(grid-size: 1.0 / 8.0) = ("Grid": grid-size)
 #let swirl() = "Swirl"
 #let spiral() = "Spiral"

@@ -186,7 +186,7 @@ impl Mesh {
                     dot1mul2 <= 0.0
                 }
             } else {
-                return true;
+                true
             }
         })
         .splice_exact()
@@ -201,17 +201,17 @@ impl AsRef<Triangle> for Triangle {
 }
 
 pub trait TriangleMesh {
-    fn triangles(&self) -> impl Iterator<Item = impl AsRef<Triangle>> + ExactSizeIterator;
+    fn triangles(&self) -> impl ExactSizeIterator<Item = impl AsRef<Triangle>>;
 }
 
 impl TriangleMesh for Mesh {
-    fn triangles(&self) -> impl Iterator<Item = impl AsRef<Triangle>> + ExactSizeIterator {
+    fn triangles(&self) -> impl ExactSizeIterator<Item = impl AsRef<Triangle>> {
         self.tree.shapes().iter()
     }
 }
 
 impl TriangleMesh for TransformedShape<Mesh> {
-    fn triangles(&self) -> impl Iterator<Item = impl AsRef<Triangle>> + ExactSizeIterator {
+    fn triangles(&self) -> impl ExactSizeIterator<Item = impl AsRef<Triangle>> {
         self.shape.tree.shapes().iter().map(|triangle| {
             Triangle::new(
                 self.matrix.mul_position(triangle.v1),
@@ -246,8 +246,7 @@ impl Shape for Mesh {
 
 fn normal(mut v123: impl Iterator<Item = Vector>) -> Vector {
     let [v1, v2, v3] = std::array::from_fn(|_| v123.next().unwrap());
-    let normal = (v2.sub(v1)).cross(v3.sub(v1)).normalize();
-    normal
+    (v2.sub(v1)).cross(v3.sub(v1)).normalize()
 }
 
 struct VertexMerger {

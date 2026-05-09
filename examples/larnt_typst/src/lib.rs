@@ -1,9 +1,13 @@
+#![cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+
 pub mod constructor;
 
 use ciborium::de::from_reader;
 use image::{ImageFormat, Rgba};
+#[cfg(target_arch = "wasm32")]
 use wasm_minimal_protocol::*;
 
+#[cfg(target_arch = "wasm32")]
 initiate_protocol!();
 
 #[derive(serde::Deserialize)]
@@ -27,7 +31,7 @@ struct RenderArgs {
     format: Format,
 }
 
-#[wasm_func]
+#[cfg_attr(target_arch = "wasm32", wasm_func)]
 fn render(render_args: &[u8], shapes: &[u8]) -> Result<Vec<u8>, String> {
     let args: RenderArgs = from_reader(render_args).map_err(|e| e.to_string())?;
     let shapes: Vec<constructor::LnShape> = from_reader(shapes).map_err(|e| e.to_string())?;

@@ -2,8 +2,8 @@ use larnt::{Cube, Vector, render};
 
 fn main() {
     // create a scene and add a single cube
-    let mut shapes = Vec::new();
-    shapes.push(Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build());
+    let shapes =
+        vec![Cube::builder(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0)).build()];
 
     let (width, height) = (1024.0, 1024.0);
 

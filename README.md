@@ -91,7 +91,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-larnt = "0.1.0"
+larnt = "0.2.0"
 ```
 
 Or for the latest development version

@@ -22,7 +22,7 @@
       up: (0.0, 1.0, 0.0),
       fovy: 35.0,
       step: 5.,
-      mesh(vs, fs),
+      mesh(vs, fs, texture: texture.triangles()),
     ),
     width: 100%,
   )

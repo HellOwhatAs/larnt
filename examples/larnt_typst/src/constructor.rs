@@ -1,6 +1,63 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone)]
+struct BilinearGrid {
+    width: usize,
+    height: usize,
+    data: Vec<f64>,
+    x_origin: f64,
+    y_origin: f64,
+    x_scale: f64,
+    y_scale: f64,
+}
+
+impl BilinearGrid {
+    fn new(
+        width: usize,
+        height: usize,
+        data: Vec<f64>,
+        x_range: (f64, f64),
+        y_range: (f64, f64),
+    ) -> Self {
+        Self {
+            width,
+            height,
+            data,
+            x_origin: x_range.0,
+            y_origin: y_range.0,
+            x_scale: (width - 1) as f64 / (x_range.1 - x_range.0),
+            y_scale: (height - 1) as f64 / (y_range.1 - y_range.0),
+        }
+    }
+
+    #[inline(always)]
+    fn lerp(a: f64, b: f64, t: f64) -> f64 {
+        a + (b - a) * t
+    }
+
+    fn get(&self, x: f64, y: f64) -> f64 {
+        let u = ((x - self.x_origin) * self.x_scale).clamp(0.0, (self.width - 1) as f64);
+        let v = ((y - self.y_origin) * self.y_scale).clamp(0.0, (self.height - 1) as f64);
+
+        let ix = u.floor() as usize;
+        let iy = v.floor() as usize;
+        let tx = u - ix as f64;
+        let ty = v - iy as f64;
+
+        let ix1 = (ix + 1).min(self.width - 1);
+        let iy1 = (iy + 1).min(self.height - 1);
+
+        let q00 = self.data[iy * self.width + ix];
+        let q10 = self.data[iy * self.width + ix1];
+        let q01 = self.data[iy1 * self.width + ix];
+        let q11 = self.data[iy1 * self.width + ix1];
+
+        let top = Self::lerp(q00, q10, tx);
+        let bot = Self::lerp(q01, q11, tx);
+        Self::lerp(top, bot, ty)
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy)]
 pub enum Matrix {
     Rotate { v: [f64; 3], a: f64 },
     Scale { v: [f64; 3] },
@@ -47,7 +104,7 @@ impl Matrix {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Clone, Copy, Default)]
 pub enum ConeTexture {
     #[default]
     Outline,
@@ -63,7 +120,7 @@ impl ConeTexture {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Clone, Copy, Default)]
 pub enum CubeTexture {
     #[default]
     Vanilla,
@@ -79,7 +136,7 @@ impl CubeTexture {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Clone, Copy, Default)]
 pub enum CylinderTexture {
     #[default]
     Outline,
@@ -95,7 +152,7 @@ impl CylinderTexture {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Clone, Copy, Default)]
 pub enum SphereTexture {
     #[default]
     Outline,
@@ -136,12 +193,51 @@ impl SphereTexture {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Clone, Copy, Default)]
+pub enum Direction {
+    Above,
+    #[default]
+    Below,
+}
+
+impl Direction {
+    fn to_direction(self) -> larnt::Direction {
+        match self {
+            Direction::Above => larnt::Direction::Above,
+            Direction::Below => larnt::Direction::Below,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy)]
+pub enum FunctionTexture {
+    Grid(f64),
+    Swirl,
+    Spiral,
+}
+
+impl Default for FunctionTexture {
+    fn default() -> Self {
+        FunctionTexture::Grid(1.0 / 8.0)
+    }
+}
+
+impl FunctionTexture {
+    fn to_texture(self) -> larnt::FunctionTexture {
+        match self {
+            FunctionTexture::Grid(grid_size) => larnt::FunctionTexture::Grid(grid_size),
+            FunctionTexture::Swirl => larnt::FunctionTexture::Swirl,
+            FunctionTexture::Spiral => larnt::FunctionTexture::Spiral,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Default)]
 pub enum MeshTexture {
     #[default]
     Triangles,
     Polygonal,
-    Silhouette,
+    Silhouette(f64),
 }
 
 impl MeshTexture {
@@ -149,27 +245,34 @@ impl MeshTexture {
         match self {
             MeshTexture::Triangles => larnt::MeshTexture::Triangles,
             MeshTexture::Polygonal => larnt::MeshTexture::Polygonal,
-            MeshTexture::Silhouette => larnt::MeshTexture::Silhouette,
+            MeshTexture::Silhouette(cos_theta) => larnt::MeshTexture::Silhouette(cos_theta),
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Clone, Copy)]
 pub enum ParametricSurfaceTexture {
-    #[default]
-    Grid,
+    Grid(f64),
     Triangles,
     Polygonal,
-    Silhouette,
+    Silhouette(f64),
+}
+
+impl Default for ParametricSurfaceTexture {
+    fn default() -> Self {
+        ParametricSurfaceTexture::Grid(1.0 / 8.0)
+    }
 }
 
 impl ParametricSurfaceTexture {
     fn to_texture(self) -> Option<larnt::MeshTexture> {
         match self {
-            ParametricSurfaceTexture::Grid => None,
+            ParametricSurfaceTexture::Grid(_) => None,
             ParametricSurfaceTexture::Triangles => Some(larnt::MeshTexture::Triangles),
             ParametricSurfaceTexture::Polygonal => Some(larnt::MeshTexture::Polygonal),
-            ParametricSurfaceTexture::Silhouette => Some(larnt::MeshTexture::Silhouette),
+            ParametricSurfaceTexture::Silhouette(cos_theta) => {
+                Some(larnt::MeshTexture::Silhouette(cos_theta))
+            }
         }
     }
 }
@@ -202,6 +305,13 @@ pub enum LnShape {
         v1: [f64; 3],
         v2: [f64; 3],
         v3: [f64; 3],
+    },
+    Function {
+        samples: Vec<Vec<f64>>,
+        bbox: ([f64; 3], [f64; 3]),
+        direction: Direction,
+        texture: FunctionTexture,
+        step: f64,
     },
     Mesh {
         vertices: Vec<[f64; 3]>,
@@ -278,6 +388,42 @@ impl LnShape {
                 let v3_v = larnt::Vector::new(v3[0], v3[1], v3[2]);
                 larnt::Triangle::new(v1_v, v2_v, v3_v).into()
             }
+            LnShape::Function {
+                samples,
+                bbox,
+                direction,
+                texture,
+                step,
+            } => {
+                let height = samples.len();
+                let width = samples.first().map_or(0, Vec::len);
+                if width < 2 || height < 2 {
+                    return Err("Function samples must be at least 2x2".to_string());
+                }
+                if samples.iter().any(|row| row.len() != width) {
+                    return Err("Function samples must have consistent row lengths".to_string());
+                }
+
+                let grid = BilinearGrid::new(
+                    width,
+                    height,
+                    samples.into_iter().flatten().collect(),
+                    (bbox.0[0], bbox.1[0]),
+                    (bbox.0[1], bbox.1[1]),
+                );
+                let bx = larnt::BBox::new(
+                    larnt::Vector::new(bbox.0[0], bbox.0[1], bbox.0[2]),
+                    larnt::Vector::new(bbox.1[0], bbox.1[1], bbox.1[2]),
+                );
+                let func = move |x, y| grid.get(x, y);
+                larnt::Primitive::Dynamic(Box::new(
+                    larnt::Function::builder(func, bx)
+                        .direction(direction.to_direction())
+                        .texture(texture.to_texture())
+                        .step(step)
+                        .build(),
+                ))
+            }
             LnShape::Mesh {
                 vertices,
                 triangles,
@@ -345,15 +491,11 @@ impl LnShape {
                     matrix: matrix_inner,
                 } = *shape
                 {
-                    let res = LnShape::Transformation {
+                    LnShape::Transformation {
                         shape: shape_inner,
                         matrix: Matrix::from_raw(matrix.to_matrix().mul(&matrix_inner.to_matrix())),
                     }
-                    .to_shape();
-                    match res {
-                        Ok(s) => s,
-                        Err(e) => return Err(e),
-                    }
+                    .to_shape()?
                 } else {
                     larnt::TransformedShape::new(shape.to_shape()?, matrix.to_matrix()).into()
                 }
@@ -362,6 +504,7 @@ impl LnShape {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn render(
     shapes: impl Iterator<Item = LnShape>,
     eye: [f64; 3],

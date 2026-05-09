@@ -126,18 +126,18 @@ impl ParametricSurface {
                 let mut curr_u = if du { u + 1 } else { u };
                 let mut curr_v = if dv { v + 1 } else { v };
 
-                if curr_u == u_steps {
-                    if let Some(umap) = u_mapper {
-                        curr_v = umap.map_index_inv(curr_v);
-                        curr_u = 0;
-                    }
+                if curr_u == u_steps
+                    && let Some(umap) = u_mapper
+                {
+                    curr_v = umap.map_index_inv(curr_v);
+                    curr_u = 0;
                 }
                 // check the new `curr_v`
-                if curr_v == v_steps {
-                    if let Some(vmap) = v_mapper {
-                        curr_u = vmap.map_index_inv(curr_u);
-                        curr_v = 0;
-                    }
+                if curr_v == v_steps
+                    && let Some(vmap) = v_mapper
+                {
+                    curr_u = vmap.map_index_inv(curr_u);
+                    curr_v = 0;
                 }
 
                 indexer(curr_u, curr_v)

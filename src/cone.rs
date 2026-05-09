@@ -55,11 +55,11 @@ impl Cone {
     fn paths_outline(&self, args: &RenderArgs) -> Paths<Vector> {
         // For a cone with apex at (0,0,h) and base circle radius r at z=0,
         // the silhouette generators are found by solving:
-        // E.x * cos(θ) + E.y * sin(θ) = r * (1 - E.z / h)
+        // E.x * cos(theta) + E.y * sin(theta) = r * (1 - E.z / h)
         // where E is the eye position.
         //
-        // This is of the form: a*cos(θ) + b*sin(θ) = c
-        // Solution: θ = atan2(b, a) ± acos(c / sqrt(a^2 + b^2))
+        // This is of the form: a*cos(theta) + b*sin(theta) = c
+        // Solution: theta = atan2(b, a) +/- acos(c / sqrt(a^2 + b^2))
         let mut result = Paths::new();
 
         let r = self.radius;

@@ -145,21 +145,23 @@ impl<T> Paths<T> {
     }
 }
 
-impl<'a, T> std::ops::Index<usize> for Paths<T> {
+impl<T> std::ops::Index<usize> for Paths<T> {
     type Output = [T];
     fn index(&self, index: usize) -> &Self::Output {
-        self.get(index).expect(&format!(
-            "index out of bounds: the len is {} but the index is {index}",
-            self.len()
-        ))
+        self.get(index).unwrap_or_else(|| {
+            panic!(
+                "index out of bounds: the len is {} but the index is {index}",
+                self.len()
+            )
+        })
     }
 }
-impl<'a, T> std::ops::IndexMut<usize> for Paths<T> {
+impl<T> std::ops::IndexMut<usize> for Paths<T> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         let len = self.len();
-        self.get_mut(index).expect(&format!(
-            "index out of bounds: the len is {len} but the index is {index}",
-        ))
+        self.get_mut(index).unwrap_or_else(|| {
+            panic!("index out of bounds: the len is {len} but the index is {index}")
+        })
     }
 }
 
@@ -379,7 +381,7 @@ impl<T: Copy> Paths<T> {
         I: IntoIterator<Item = K>,
         FC: FnMut(&T, &T) -> bool,
     {
-        if self.len() == 0 {
+        if self.is_empty() {
             return Paths::new();
         }
 

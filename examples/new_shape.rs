@@ -61,7 +61,7 @@ fn main() {
             (Box::new(striped_cube.clone()) as Box<dyn Shape + Send + Sync>).into();
         assert!(matches!(striped_cube, Primitive::Dynamic(_)));
         let transformed_striped_cube: TransformedShape<Primitive> = TransformedShape::new(
-            striped_cube.into(),
+            striped_cube,
             Matrix::rotate(Vector::new(1., 0., 0.), std::f64::consts::PI / 4.),
         );
         render::<Primitive>(vec![transformed_striped_cube.into(), cube.clone().into()])

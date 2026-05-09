@@ -18,7 +18,7 @@ pub enum Direction {
 pub enum FunctionTexture {
     /// Grid texture with lines along constant x and y (works with any function)
     Grid(f64),
-    /// Radial swirl texture (best for functions returning negative values like -1/(x²+y²))
+    /// Radial swirl texture (best for functions returning negative values like -1/(x^2 + y^2))
     Swirl,
     /// Spiral path texture (works with any function)
     Spiral,
@@ -27,7 +27,7 @@ pub enum FunctionTexture {
 #[bon]
 impl FunctionTexture {
     #[builder]
-    fn grid(#[builder(default = 1.0 / 8.0)] grid_size: f64) -> Self {
+    pub fn grid(#[builder(default = 1.0 / 8.0)] grid_size: f64) -> Self {
         FunctionTexture::Grid(grid_size)
     }
 }

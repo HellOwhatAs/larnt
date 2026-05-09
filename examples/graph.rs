@@ -105,6 +105,6 @@ fn render_frame(frame: i32) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
 }
 
 fn main() {
-    let image_iter = (0..360).step_by(3).map(|i| render_frame(i));
+    let image_iter = (0..360).step_by(3).map(render_frame);
     save_gif_from_iter(image_iter, "output.gif").unwrap();
 }
