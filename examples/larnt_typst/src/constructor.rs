@@ -446,29 +446,22 @@ impl LnShape {
                 v_steps,
                 texture,
             } => {
+                let surface = larnt::ParametricSurface::from_grid(
+                    samples
+                        .into_iter()
+                        .map(|(x, y, z)| larnt::Vector::new(x, y, z))
+                        .collect(),
+                    u_steps,
+                    v_steps,
+                    |i, j| i * (v_steps + 1) + j,
+                );
+
                 if let Some(texture) = texture.to_texture() {
-                    let mut mesh = larnt::ParametricSurface::mesh_from_grid(
-                        samples
-                            .into_iter()
-                            .map(|(x, y, z)| larnt::Vector::new(x, y, z))
-                            .collect(),
-                        u_steps,
-                        v_steps,
-                        |i, j| i * (v_steps + 1) + j,
-                    );
+                    let mut mesh = surface.into_mesh();
                     mesh.texture = texture;
                     mesh.into()
                 } else {
-                    larnt::ParametricSurface::from_grid(
-                        samples
-                            .into_iter()
-                            .map(|(x, y, z)| larnt::Vector::new(x, y, z))
-                            .collect(),
-                        u_steps,
-                        v_steps,
-                        |i, j| i * (v_steps + 1) + j,
-                    )
-                    .into()
+                    surface.into()
                 }
             }
             LnShape::Difference(ln_shapes) => {

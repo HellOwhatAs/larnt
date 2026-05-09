@@ -12,7 +12,7 @@ fn main() {
         Vector::new(x, y, z)
     };
     let mut mobius =
-        ParametricSurface::new_mesh(mobius_func, (0.0, 2.0 * PI), (-width, width), 80, 20);
+        ParametricSurface::new(mobius_func, (0.0, 2.0 * PI), (-width, width), 80, 20).into_mesh();
     mobius.texture = MeshTexture::silhouette().call();
 
     let mobius_func2 = |u: f64, v: f64| -> Vector {
@@ -22,7 +22,7 @@ fn main() {
         Vector::new(x, y, z)
     };
     let mut mobius2 =
-        ParametricSurface::new_mesh(mobius_func2, (0.0, 2.0 * PI), (-width, width), 80, 20);
+        ParametricSurface::new(mobius_func2, (0.0, 2.0 * PI), (-width, width), 80, 20).into_mesh();
     mobius2.texture = MeshTexture::silhouette().call();
 
     render::<Primitive>(vec![mobius.into(), mobius2.into()])

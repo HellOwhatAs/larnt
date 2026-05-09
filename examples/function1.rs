@@ -7,13 +7,14 @@ fn main() {
     };
     let range = (-20.0, 20.0);
     let surface = ParametricSurface::new(func, range, range, 100, 100);
-    let mut mesh = ParametricSurface::new_mesh(
+    let mut mesh = ParametricSurface::new(
         |u, v| func(u, v).add(Vector::new(-6., -2., 20.)),
         range,
         range,
         200,
         200,
-    );
+    )
+    .into_mesh();
     mesh.texture = MeshTexture::silhouette().call();
 
     render::<Primitive>(vec![surface.into(), mesh.into()])

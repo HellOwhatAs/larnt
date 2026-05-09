@@ -38,7 +38,7 @@ pub use hit::Hit;
 pub use matrix::Matrix;
 pub use mesh::{Mesh, MeshTexture};
 pub use obj::load_obj;
-pub use parametric::ParametricSurface;
+pub use parametric::{ParametricSurface, ParametricSurfaceTexture};
 pub use path::{NewPath, Paths};
 pub use plane::Plane;
 pub use ray::Ray;

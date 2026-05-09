@@ -24,8 +24,8 @@ fn main() {
 
     let range = (0.0, 2. * PI);
     let torus = ParametricSurface::new(torus_func, range, range, 64, 32);
-    let twisted = ParametricSurface::new_mesh(twisted_func, range, range, 20, 10);
-    let mut silhouette = ParametricSurface::new_mesh(torus_func, range, range, 64, 32);
+    let twisted = ParametricSurface::new(twisted_func, range, range, 20, 10).into_mesh();
+    let mut silhouette = ParametricSurface::new(torus_func, range, range, 64, 32).into_mesh();
     silhouette.texture = MeshTexture::silhouette().call();
 
     let offset = radius + tube_radius;
