@@ -1,18 +1,28 @@
-use larnt::{BBox, Function, FunctionTexture, Primitive, Sphere, SphereTexture, Vector, render};
+use larnt::{ParametricSurface, Primitive, Sphere, SphereTexture, Vector, render};
 
 fn main() {
     let mut shapes: Vec<Primitive> = Vec::new();
-    let bbox = BBox::new(Vector::new(-1.0, -1.0, -1.0), Vector::new(1.0, 1.0, 1.0));
 
     shapes.push(Primitive::Dynamic(Box::new(
-        Function::builder(|x, y| x * y, bbox)
-            .step(0.01)
-            .texture(FunctionTexture::Spiral)
-            .build(),
+        ParametricSurface::new(
+            |x, y| Vector::new(x, y, x * y),
+            (-1.0, 1.0),
+            (-1.0, 1.0),
+            100,
+            100,
+        )
+        .with_texture(larnt::ParametricSurfaceTexture::Spiral {
+            spacing: 3.0,
+            arms: 2,
+        }),
     )));
-    shapes.push(Primitive::Dynamic(Box::new(
-        Function::builder(|_, _| 0.0, bbox).step(0.01).build(),
-    )));
+    shapes.push(Primitive::Dynamic(Box::new(ParametricSurface::new(
+        |x, y| Vector::new(x, y, 0.0),
+        (-1.0, 1.0),
+        (-1.0, 1.0),
+        20,
+        20,
+    ))));
     shapes.push(
         Sphere::builder(Vector::new(0.0, -0.6, 0.0), 0.25)
             .texture(SphereTexture::random_circles(42).call())
